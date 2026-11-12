@@ -8,6 +8,7 @@ import './tasks-multiselect.css';
 import './tasks-page-extra.css';
 import './tasks-status.css';
 import './tasks-table.css';
+import './tasks-dropdown-fix.css';
 import '../modules/tasks/task-modal.css';
 
 const statusOptions = { todo: { label: 'До виконання', icon: '○' }, in_progress: { label: 'У роботі', icon: '◐' }, done: { label: 'Завершено', icon: '✓' }, cancelled: { label: 'Скасовано', icon: '×' }, archived: { label: 'Архів', icon: '▣' } };
@@ -19,7 +20,7 @@ const descriptionPreview = value => { const holder = document.createElement('div
 
 function StatusMenu({ task, onChange }) {
   const [open, setOpen] = useState(false); const current = statusOptions[task.status] || statusOptions.todo;
-  return <div className={`status-menu status-menu-${task.status}`} onClick={event => event.stopPropagation()}><button type="button" className="status-menu-trigger" onClick={() => setOpen(value => !value)}><span className="status-menu-icon">{current.icon}</span><span>{current.label}</span><span className="status-menu-chevron">⌄</span></button>{open && <><button className="status-menu-overlay" type="button" aria-label="Закрити меню" onClick={() => setOpen(false)} /><div className="status-menu-options">{Object.entries(statusOptions).map(([value, option]) => <button type="button" className={value === task.status ? 'active' : ''} key={value} onClick={() => { setOpen(false); onChange(task, value); }}><span className={`status-menu-icon status-icon-${value}`}>{option.icon}</span><span>{option.label}</span>{value === task.status && <b>✓</b>}</button>)}</div></>}</div>;
+  return <div className={`status-menu status-menu-${task.status}${open ? ' status-menu-open' : ''}`} onClick={event => event.stopPropagation()}><button type="button" className="status-menu-trigger" onClick={() => setOpen(value => !value)}><span className="status-menu-icon">{current.icon}</span><span>{current.label}</span><span className="status-menu-chevron">⌄</span></button>{open && <><button className="status-menu-overlay" type="button" aria-label="Закрити меню" onClick={() => setOpen(false)} /><div className="status-menu-options">{Object.entries(statusOptions).map(([value, option]) => <button type="button" className={value === task.status ? 'active' : ''} key={value} onClick={() => { setOpen(false); onChange(task, value); }}><span className={`status-menu-icon status-icon-${value}`}>{option.icon}</span><span>{option.label}</span>{value === task.status && <b>✓</b>}</button>)}</div></>}</div>;
 }
 
 export default function Tasks() {
