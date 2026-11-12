@@ -256,27 +256,33 @@ export default function Settings() {
                 <strong>Стартовий план</strong>
                 <span>Поточний план</span>
               </div>
-              <label className="subscription-module-select">
-                Модуль клієнтів
-                <select
-                  value={clientModule}
-                  onChange={(event) => {
-                    setClientModule(event.target.value);
-                    window.localStorage.setItem(
-                      "nexaflow.client.module",
-                      event.target.value,
-                    );
-                  }}
-                >
-                  <option value="accounting">Бухгалтерія</option>
-                  <option value="dentistry">Стоматологія</option>
-                  <option value="legal">Юридичні послуги</option>
-                  <option value="real_estate">Нерухомість</option>
-                </select>
-                <small>
-                  Цей модуль визначає поля у формі створення клієнта.
-                </small>
-              </label>
+              <div className="subscription-module-select">
+                <div className="subscription-module-label">
+                  <span>✦</span>
+                  <div>
+                    <strong>Модуль клієнтів</strong>
+                    <small>Оберіть напрям для форми клієнта</small>
+                  </div>
+                </div>
+                <label className="subscription-module-control">
+                  <select
+                    value={clientModule}
+                    onChange={(event) => {
+                      setClientModule(event.target.value);
+                      window.localStorage.setItem(
+                        "nexaflow.client.module",
+                        event.target.value,
+                      );
+                    }}
+                  >
+                    <option value="accounting">Бухгалтерія</option>
+                    <option value="dentistry">Стоматологія</option>
+                    <option value="legal">Юридичні послуги</option>
+                    <option value="real_estate">Нерухомість</option>
+                  </select>
+                  <span>⌄</span>
+                </label>
+              </div>
             </div>
             <div className="subscription-meta">
               <div>
