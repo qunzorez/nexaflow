@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require __DIR__ . '/telegram.php';
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db();
@@ -8,6 +9,16 @@ $userQuery = $pdo->prepare('SELECT id, name, email, role, avatar_url FROM users 
 $userQuery->execute([$_SESSION['user_id']]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
+function deliverDueReminder(PDO $pdo, string $userId, array $reminder): void
+{
+    $check = $pdo->prepare("SELECT id FROM notifications WHERE user_id = ? AND type = 'task_reminder' AND entity_type = 'task' AND entity_id = ? AND created_at >= ? LIMIT 1");
+    $check->execute([$userId, $reminder['id'], $reminder['reminder_at']]);
+    if ($check->fetchColumn()) return;
+    $message = 'Нагадування: задача «' . $reminder['title'] . '» потребує вашої уваги.';
+    $insert = $pdo->prepare("INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id) VALUES (?, ?, 'task_reminder', ?, ?, 'task', ?)");
+    $insert->execute([bin2hex(random_bytes(16)), $userId, 'Нагадування про задачу', $message, $reminder['id']]);
+    sendTelegramToUser($pdo, $userId, "NexaFlow\n\nНагадування про задачу\n{$message}");
+}
 try {
     $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
     $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
@@ -37,6 +48,7 @@ try {
     $remindersQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.reminder_at, t.due_date, p.name AS project_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE t.reminder_at IS NOT NULL AND t.reminder_at <= NOW() AND t.status IN ('todo', 'in_progress') AND ((t.created_by = ? AND t.creator_reminder = 1) OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)) ORDER BY t.reminder_at ASC LIMIT 8");
     $remindersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $reminders = $remindersQuery->fetchAll();
+    foreach ($reminders as $reminder) deliverDueReminder($pdo, (string)$_SESSION['user_id'], $reminder);
     $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status <> 'archived'") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status <> 'archived' AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $taskCount = (int)$taskCountQuery->fetchColumn();
