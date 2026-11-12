@@ -415,9 +415,13 @@ export default function Clients() {
                       {client.has_employees ? (
                         <i>{client.employee_count} працівн.</i>
                       ) : null}
-                      {client.special_taxes.length ? (
-                        <i>+{client.special_taxes.length} податків</i>
-                      ) : null}
+                      {(client.special_taxes || []).map((key) => (
+                        <i key={key}>
+                          {specialTaxOptions.find(
+                            ([value]) => value === key,
+                          )?.[1] || key}
+                        </i>
+                      ))}
                     </span>
                     <div className="client-actions">
                       <button
