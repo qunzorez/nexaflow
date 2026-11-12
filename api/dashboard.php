@@ -17,7 +17,7 @@ function deliverDueReminder(PDO $pdo, string $userId, array $reminder): void
     $message = 'Нагадування: задача «' . $reminder['title'] . '» потребує вашої уваги.';
     $insert = $pdo->prepare("INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id) VALUES (?, ?, 'task_reminder', ?, ?, 'task', ?)");
     $insert->execute([bin2hex(random_bytes(16)), $userId, 'Нагадування про задачу', $message, $reminder['id']]);
-    sendTelegramToUser($pdo, $userId, "NexaFlow\n\nНагадування про задачу\n{$message}");
+    sendTelegramReminderToUser($pdo, $userId, $reminder);
 }
 try {
     $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
