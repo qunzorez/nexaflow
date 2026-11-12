@@ -89,6 +89,29 @@ export default function Settings() {
     event.currentTarget.reset();
     window.localStorage.setItem("nexaflow.client.module", clientModule);
   }
+  async function toggleEmailNotifications(event) {
+    const enabled = event.target.checked;
+    const previous = emailEnabled;
+    setEmailEnabled(enabled);
+    setError("");
+    const result = await post("/api/profile.php", {
+      name,
+      avatar_url: avatar,
+      phone,
+      telegram_tag: telegramTag,
+      telegram_chat_id: telegramChatId,
+      telegram_notifications_enabled: telegramEnabled,
+      email_notifications_enabled: enabled,
+      bio,
+    });
+    if (!result.ok) {
+      setEmailEnabled(previous);
+      setError(result.message || "Не вдалося зберегти налаштування email.");
+      return;
+    }
+    setEmailEnabled(Boolean(Number(result.user.email_notifications_enabled)));
+    setNotice("Налаштування email-сповіщень збережено.");
+  }
   if (!user) return <div className="loading-screen">Завантаження профілю…</div>;
   const avatarView = avatar ? (
     <img src={avatar} alt="Фото профілю" />
@@ -192,7 +215,7 @@ export default function Settings() {
                 <small>Отримуйте листи про нагадування, призначення та зміни задач.</small>
               </div>
               <label className="telegram-toggle">
-                <input type="checkbox" checked={emailEnabled} onChange={(event) => setEmailEnabled(event.target.checked)} />
+                <input type="checkbox" checked={emailEnabled} onChange={toggleEmailNotifications} />
                 <span />
                 <b>{emailEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
