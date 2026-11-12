@@ -36,3 +36,15 @@
   border-bottom: 1.5px solid currentColor;
   transform: rotate(45deg) translateY(-1px);
 }
+
+.status-menu-options .status-menu-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+}
+
+.status-menu-options .status-icon-todo { background: #dce5df; color: #68776f; }
+.status-menu-options .status-icon-in_progress { background: #cbdcff; color: #557bb4; }
+.status-menu-options .status-icon-done { background: #c8ead6; color: #23815e; }
+.status-menu-options .status-icon-cancelled { background: #ffd8d0; color: #c66d5a; }
+.status-menu-options .status-icon-archived { background: #d8dfe0; color: #65716c; }
