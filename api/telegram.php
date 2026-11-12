@@ -49,9 +49,36 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
         $user = $query->fetch();
         if (!$user || (int)$user['telegram_notifications_enabled'] !== 1) return;
         $chatId = (string)($user['telegram_chat_id'] ?? '');
-        if ($chatId !== '') sendTelegramMessage($chatId, $message);
+        if ($chatId === '') return;
+        $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+        $caption = "<b>NexaFlow • Сповіщення</b>\n\n🔔 {$safeMessage}";
+        $localLogo = __DIR__ . '/../assets/logo-telegram.png';
+        if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        if (!sendTelegramPhoto($chatId, $logo, $caption)) sendTelegramMessage($chatId, "NexaFlow\n\n{$message}");
     } catch (Throwable $error) {
         error_log('Telegram notification error: ' . $error->getMessage());
+    }
+}
+
+function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string $message, string $taskUrl): void
+{
+    try {
+        $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
+        $query->execute([$userId]);
+        $user = $query->fetch();
+        if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return;
+        $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+        $caption = "<b>NexaFlow • Оновлення задачі</b>\n\n🔄 <b>Статус задачі змінено</b>\n\n📌 <b>{$safeTitle}</b>\n\n{$safeMessage}";
+        $localLogo = __DIR__ . '/../assets/logo-telegram.png';
+        if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
+            sendTelegramMessage((string)$user['telegram_chat_id'], "NexaFlow\n\nСтатус задачі змінено\n\n{$title}\n\n{$message}", $taskUrl);
+        }
+    } catch (Throwable $error) {
+        error_log('Telegram task status error: ' . $error->getMessage());
     }
 }
 
