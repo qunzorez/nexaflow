@@ -11,7 +11,7 @@ $username = strtolower(trim((string)($message['from']['username'] ?? '')));
 $text = trim((string)($message['text'] ?? ''));
 if ($chatId === '') { http_response_code(200); echo 'ok'; exit; }
 
-if ($text === '/start' || str_starts_with($text, '/start ')) {
+if ($text === '/start' || strpos($text, '/start ') === 0) {
     sendTelegramMessage($chatId, "NexaFlow підключено ✅\n\nТепер ви отримуватимете сповіщення про призначені задачі та перевірки.");
 } elseif ($text === '/help') {
     sendTelegramMessage($chatId, "NexaFlow надсилає сюди робочі сповіщення. Керування виконується у вашому профілі на сайті.");
