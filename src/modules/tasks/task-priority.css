@@ -1,0 +1,6 @@
+.detail-priority { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px 5px 6px; border-radius: 999px; font: 800 10px/1 Manrope; }
+.detail-priority-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font: 900 12px/20px Arial, sans-serif; }
+.detail-priority-low { background: #f0f5f1; color: #6f8176; }.detail-priority-low .detail-priority-icon { background: #dfece2; }
+.detail-priority-normal { background: #eef4ff; color: #607ba4; }.detail-priority-normal .detail-priority-icon { background: #d9e5ff; }
+.detail-priority-high { background: #fff5df; color: #9a7839; }.detail-priority-high .detail-priority-icon { background: #ffe6ac; }
+.detail-priority-urgent { background: #fff0ed; color: #c66d5a; }.detail-priority-urgent .detail-priority-icon { background: #ffd8d0; }

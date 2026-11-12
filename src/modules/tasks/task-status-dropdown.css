@@ -1,0 +1,14 @@
+.detail-status-dropdown { position: relative; display: inline-block; }
+.detail-status-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 30px; padding: 4px 10px 4px 6px; border: 0; border-radius: 999px; color: inherit; font: 800 10px/1 Manrope; cursor: pointer; }
+.detail-status-trigger:hover, .detail-status-dropdown.is-open .detail-status-trigger { filter: brightness(.97); box-shadow: 0 0 0 3px #dff2e9; }
+.detail-status-icon { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; flex: 0 0 21px; border-radius: 50%; font: 900 12px/21px Arial, sans-serif; text-align: center; }
+.status-menu-todo .detail-status-trigger { background: #f1f4f2; color: #68776f; }.status-menu-todo .detail-status-icon { background: #dce5df; }
+.status-menu-in_progress .detail-status-trigger { background: #e8f1ff; color: #557bb4; }.status-menu-in_progress .detail-status-icon { background: #cbdcff; }
+.status-menu-review .detail-status-trigger { background: #fff4dc; color: #a87519; }.status-menu-review .detail-status-icon { background: #ffe5b5; }
+.status-menu-done .detail-status-trigger { background: #e5f5eb; color: #23815e; }.status-menu-done .detail-status-icon { background: #c8ead6; }
+.status-menu-cancelled .detail-status-trigger { background: #fff0ed; color: #c66d5a; }.status-menu-cancelled .detail-status-icon { background: #ffd8d0; }
+.status-menu-archived .detail-status-trigger { background: #eceff0; color: #65716c; }.status-menu-archived .detail-status-icon { background: #d8dfe0; }
+.detail-status-chevron { width: 6px; height: 6px; margin-left: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }.detail-status-dropdown.is-open .detail-status-chevron { transform: translateY(2px) rotate(225deg); }
+.detail-status-menu { position: absolute; z-index: 20; top: calc(100% + 7px); left: 0; min-width: 190px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: 0 16px 35px #16352b24; animation: detail-status-in .16s ease both; }
+.detail-status-menu button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px; border: 0; border-radius: 7px; background: #fff; color: var(--ink); font: 700 10px/1 Manrope; text-align: left; }.detail-status-menu button:hover,.detail-status-menu button.active { background: #eef8f2; color: var(--green); }.detail-status-menu button b { margin-left: auto; }
+@keyframes detail-status-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
