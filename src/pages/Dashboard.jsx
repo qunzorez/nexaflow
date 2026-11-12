@@ -4,7 +4,7 @@ import Layout from '../components/Layout.jsx';
 import { api, post } from '../services/api.js';
 import ReminderModal from '../modules/tasks/ReminderModal.jsx';
 
-const statusLabels = { todo: 'До виконання', in_progress: 'У роботі', done: 'Завершено', cancelled: 'Скасовано' };
+const statusLabels = { todo: 'До виконання', in_progress: 'У роботі', done: 'Завершено', cancelled: 'Скасовано', archived: 'Архів' };
 const timeLabel = minutes => { const value = Number(minutes || 0); return `${Math.floor(value / 60)} год ${value % 60} хв`; };
 const reminderLabel = value => new Date(String(value || '').replace(' ', 'T')).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
