@@ -57,7 +57,7 @@ if ($method === 'POST' && $action === 'assign_global_group') {
 }
 if ($projectId === '') jsonResponse(false, 'Проєкт не знайдено.', [], 422);
 
-$access = $pdo->prepare("SELECT p.id, p.name, p.description, p.owner_id, p.status, p.visibility, p.created_at, p.updated_at, u.name AS owner_name, cu.role AS user_role, pm.role AS project_role FROM projects p JOIN users u ON u.id = p.owner_id JOIN users cu ON cu.id = ? LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.id = ? AND (cu.role IN ('admin', 'owner') OR p.owner_id = ? OR pm.user_id = ?) LIMIT 1");
+$access = $pdo->prepare("SELECT p.id, p.name, p.description, p.owner_id, p.status, p.visibility, p.created_at, p.updated_at, u.name AS owner_name, cu.role AS user_role, pm.role AS project_role FROM projects p JOIN users u ON u.id = p.owner_id JOIN users cu ON cu.id = ? LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.id = ? AND (cu.role IN ('admin', 'owner') OR p.owner_id = ? OR (p.visibility = 'team' AND pm.user_id = ?)) LIMIT 1");
 $access->execute([$userId, $userId, $projectId, $userId, $userId]);
 $project = $access->fetch();
 if (!$project) jsonResponse(false, 'У вас немає доступу до цього проєкту.', [], 403);
