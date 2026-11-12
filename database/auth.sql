@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(40) NULL,
   telegram_tag VARCHAR(80) NULL,
   bio TEXT NULL,
-  email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0,
   role VARCHAR(30) NOT NULL DEFAULT 'user',
   requested_role VARCHAR(30) NOT NULL DEFAULT 'user',
   email_verified_at DATETIME NULL,

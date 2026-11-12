@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NULL,
   telegram_tag TEXT NULL,
   bio TEXT NULL,
-  email_notifications_enabled INTEGER NOT NULL DEFAULT 1,
+  email_notifications_enabled INTEGER NOT NULL DEFAULT 0,
   role TEXT NOT NULL DEFAULT 'user',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

@@ -10,7 +10,7 @@ if (!in_array('phone', $existingColumns, true)) $pdo->exec("ALTER TABLE users AD
 if (!in_array('telegram_tag', $existingColumns, true)) $pdo->exec("ALTER TABLE users ADD telegram_tag VARCHAR(80) NULL");
 if (!in_array('telegram_chat_id', $existingColumns, true)) $pdo->exec("ALTER TABLE users ADD telegram_chat_id VARCHAR(80) NULL");
 if (!in_array('telegram_notifications_enabled', $existingColumns, true)) { $pdo->exec("ALTER TABLE users ADD telegram_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0"); $pdo->exec("UPDATE users SET telegram_notifications_enabled = 1 WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id <> ''"); }
-if (!in_array('email_notifications_enabled', $existingColumns, true)) $pdo->exec("ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1");
+if (!in_array('email_notifications_enabled', $existingColumns, true)) $pdo->exec("ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0");
 if (!in_array('telegram_connect_token', $existingColumns, true)) $pdo->exec("ALTER TABLE users ADD telegram_connect_token VARCHAR(64) NULL");
 if (!in_array('bio', $existingColumns, true)) $pdo->exec("ALTER TABLE users ADD bio TEXT NULL");
 $query = $pdo->prepare('SELECT id, name, email, role, avatar_url, phone, telegram_tag, telegram_chat_id, telegram_notifications_enabled, email_notifications_enabled, telegram_connect_token, bio, password_hash FROM users WHERE id = ? LIMIT 1'); $query->execute([$userId]); $user = $query->fetch();

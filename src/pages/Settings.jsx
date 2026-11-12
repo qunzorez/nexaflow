@@ -188,13 +188,13 @@ export default function Settings() {
             </div>
             <div className="telegram-connect-box email-notification-box">
               <div>
-                <strong>Не надсилати email-сповіщення</strong>
-                <small>Вимкніть листи про нагадування, призначення та зміни задач.</small>
+                <strong>Отримувати email-сповіщення</strong>
+                <small>Отримуйте листи про нагадування, призначення та зміни задач.</small>
               </div>
               <label className="telegram-toggle">
-                <input type="checkbox" checked={!emailEnabled} onChange={(event) => setEmailEnabled(!event.target.checked)} />
+                <input type="checkbox" checked={emailEnabled} onChange={(event) => setEmailEnabled(event.target.checked)} />
                 <span />
-                <b>{emailEnabled ? "Дозволено" : "Вимкнено"}</b>
+                <b>{emailEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
             </div>
           </section>

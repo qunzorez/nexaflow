@@ -59,7 +59,7 @@ function sendUserNotificationEmail(PDO $pdo, string $userId, string $to, string 
     if (!isset($columnChecked[$connectionKey])) {
         $columnQuery = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email_notifications_enabled'");
         if (!$columnQuery->fetchColumn()) {
-            $pdo->exec("ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1");
+            $pdo->exec("ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0");
         }
         $columnChecked[$connectionKey] = true;
     }
