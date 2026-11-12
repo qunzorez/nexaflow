@@ -40,23 +40,13 @@ form.addEventListener('submit', async event => {
     if (!document.querySelector('#terms').checked) return showError('Підтвердіть умови використання.');
     const result = await request('/api/register.php', { name, email, password: passwordValue });
     if (!result.ok) return showError(result.message || 'Не вдалося створити акаунт.');
-<<<<<<< HEAD
     window.location.href = 'dashboard';
-=======
-    showSuccess('Акаунт створено. Тепер можна увійти в систему.');
-    setMode('login');
-    document.querySelector('#email').value = email;
->>>>>>> origin/main
     return;
   }
 
   const result = await request('/api/login.php', { email, password: passwordValue });
   if (!result.ok) return showError(result.message || 'Невірна пошта або пароль.');
-<<<<<<< HEAD
   window.location.href = 'dashboard';
-=======
-  showSuccess(`Вітаємо, ${result.user.name}! Авторизація через базу даних успішна.`);
->>>>>>> origin/main
 });
 
 function showError(message) { notice.className = 'notice'; notice.textContent = message; }

@@ -6,12 +6,8 @@ function db(): PDO
     static $pdo;
     if ($pdo instanceof PDO) return $pdo;
 
-<<<<<<< HEAD
     $localConfig = __DIR__ . '/config.local.php';
     $config = require file_exists($localConfig) ? $localConfig : (__DIR__ . '/config.php');
-=======
-    $config = require __DIR__ . '/config.php';
->>>>>>> origin/main
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $config['host'], $config['port'], $config['database'], $config['charset']);
     $pdo = new PDO($dsn, $config['username'], $config['password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,

@@ -18,7 +18,6 @@ try {
 
     $id = bin2hex(random_bytes(16));
     $hash = password_hash($password, PASSWORD_DEFAULT);
-<<<<<<< HEAD
     $insert = db()->prepare('INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)');
     $insert->execute([$id, $name, $email, $hash, 'user']);
     session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
@@ -28,11 +27,6 @@ try {
     $_SESSION['user_name'] = $name;
     $_SESSION['user_role'] = 'user';
     jsonResponse(true, 'Акаунт створено.', ['user' => ['name' => $name, 'email' => $email, 'role' => 'user']]);
-=======
-    $insert = db()->prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)');
-    $insert->execute([$id, $name, $email, $hash]);
-    jsonResponse(true, 'Акаунт створено.');
->>>>>>> origin/main
 } catch (Throwable $error) {
     error_log($error->getMessage());
     jsonResponse(false, 'Помилка бази даних під час реєстрації.', [], 500);
