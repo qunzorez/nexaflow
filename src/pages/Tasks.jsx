@@ -1,43 +1,430 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import Layout from '../components/Layout.jsx';
-import TaskFormModal from '../modules/tasks/TaskFormModal.jsx';
-import { api, post } from '../services/api.js';
-import './tasks.css';
-import './tasks-multiselect.css';
-import './tasks-page-extra.css';
-import './tasks-status.css';
-import './tasks-table.css';
-import './tasks-table-layout.css';
-import './tasks-dropdown-fix.css';
-import './tasks-status-centering.css';
-import './task-actions.css';
-import '../modules/tasks/task-modal.css';
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Layout from "../components/Layout.jsx";
+import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
+import { api, post } from "../services/api.js";
+import "./tasks.css";
+import "./tasks-multiselect.css";
+import "./tasks-page-extra.css";
+import "./tasks-status.css";
+import "./tasks-table.css";
+import "./tasks-table-layout.css";
+import "./tasks-dropdown-fix.css";
+import "./tasks-status-centering.css";
+import "./task-actions.css";
+import "../modules/tasks/task-modal.css";
 
-const statusOptions = { todo: { label: 'До виконання', icon: '○' }, in_progress: { label: 'У роботі', icon: '◐' }, review: { label: 'На перевірці', icon: '!' }, done: { label: 'Завершено', icon: '✓' }, cancelled: { label: 'Скасовано', icon: '×' }, archived: { label: 'Архів', icon: '▣' } };
-const priorityLabels = { low: 'Низький', normal: 'Звичайний', high: 'Високий', urgent: 'Терміновий' };
+const statusOptions = {
+  todo: { label: "До виконання", icon: "○" },
+  in_progress: { label: "У роботі", icon: "◐" },
+  review: { label: "На перевірці", icon: "!" },
+  done: { label: "Завершено", icon: "✓" },
+  cancelled: { label: "Скасовано", icon: "×" },
+  archived: { label: "Архів", icon: "▣" },
+};
+const priorityLabels = {
+  low: "Низький",
+  normal: "Звичайний",
+  high: "Високий",
+  urgent: "Терміновий",
+};
 const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
 const pageSize = 10;
-function taskSort(a, b) { const priorityDifference = (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9); if (priorityDifference) return priorityDifference; const dueA = a.due_date ? new Date(`${a.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY; const dueB = b.due_date ? new Date(`${b.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY; if (dueA !== dueB) return dueA - dueB; return String(b.created_at || '').localeCompare(String(a.created_at || '')); }
-const descriptionPreview = value => { const holder = document.createElement('div'); holder.innerHTML = String(value || ''); holder.querySelectorAll('img').forEach(image => image.replaceWith('Зображення')); return (holder.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 140); };
+function taskSort(a, b) {
+  const priorityDifference =
+    (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9);
+  if (priorityDifference) return priorityDifference;
+  const dueA = a.due_date
+    ? new Date(`${a.due_date}T00:00:00`).getTime()
+    : Number.POSITIVE_INFINITY;
+  const dueB = b.due_date
+    ? new Date(`${b.due_date}T00:00:00`).getTime()
+    : Number.POSITIVE_INFINITY;
+  if (dueA !== dueB) return dueA - dueB;
+  return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+}
+const descriptionPreview = (value) => {
+  const holder = document.createElement("div");
+  holder.innerHTML = String(value || "");
+  holder
+    .querySelectorAll("img")
+    .forEach((image) => image.replaceWith("Зображення"));
+  return (holder.textContent || "").replace(/\s+/g, " ").trim().slice(0, 140);
+};
 
 function StatusMenu({ task, onChange }) {
-  const [open, setOpen] = useState(false); const current = statusOptions[task.status] || statusOptions.todo; const canManage = task.canManage !== false; const visibleOptions = Object.entries(statusOptions).filter(([value]) => canManage || !['review', 'cancelled', 'archived'].includes(value));
-  return <div className={`status-menu status-menu-${task.status}${open ? ' status-menu-open' : ''}`} onClick={event => event.stopPropagation()}><button type="button" className="status-menu-trigger" onClick={() => setOpen(value => !value)}><span className="status-menu-icon">{current.icon}</span><span>{current.label}</span><span className="status-menu-chevron">⌄</span></button>{open && <><button className="status-menu-overlay" type="button" aria-label="Закрити меню" onClick={() => setOpen(false)} /><div className="status-menu-options">{visibleOptions.map(([value, option]) => <button type="button" className={value === task.status ? 'active' : ''} key={value} onClick={() => { setOpen(false); onChange(task, value); }}><span className={`status-menu-icon status-icon-${value}`}>{option.icon}</span><span>{option.label}</span>{value === task.status && <b>✓</b>}</button>)}</div></>}</div>;
+  const [open, setOpen] = useState(false);
+  const current = statusOptions[task.status] || statusOptions.todo;
+  const canManage = task.canManage !== false;
+  const visibleOptions = Object.entries(statusOptions).filter(
+    ([value]) =>
+      canManage || !["review", "cancelled", "archived"].includes(value),
+  );
+  return (
+    <div
+      className={`status-menu status-menu-${task.status}${open ? " status-menu-open" : ""}`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="status-menu-trigger"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="status-menu-icon">{current.icon}</span>
+        <span>{current.label}</span>
+        <span className="status-menu-chevron">⌄</span>
+      </button>
+      {open && (
+        <>
+          <button
+            className="status-menu-overlay"
+            type="button"
+            aria-label="Закрити меню"
+            onClick={() => setOpen(false)}
+          />
+          <div className="status-menu-options">
+            {visibleOptions.map(([value, option]) => (
+              <button
+                type="button"
+                className={value === task.status ? "active" : ""}
+                key={value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(task, value);
+                }}
+              >
+                <span className={`status-menu-icon status-icon-${value}`}>
+                  {option.icon}
+                </span>
+                <span>{option.label}</span>
+                {value === task.status && <b>✓</b>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function Tasks() {
-  const [data, setData] = useState(null); const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [filter, setFilter] = useState('all'); const [search, setSearch] = useState(''); const [page, setPage] = useState(1); const [editing, setEditing] = useState(null); const [modalOpen, setModalOpen] = useState(false); const [projectIds, setProjectIds] = useState([]); const [assigneeIds, setAssigneeIds] = useState([]); const navigate = useNavigate(); const [params] = useSearchParams(); const openedFromQuery = useRef(false);
-  async function load() { const result = await api('/api/tasks.php'); if (!result.ok) return navigate('/'); setData(result); }
-  useEffect(() => { load(); const interval = window.setInterval(load, 15000); const refreshOnFocus = () => load(); window.addEventListener('focus', refreshOnFocus); return () => { window.clearInterval(interval); window.removeEventListener('focus', refreshOnFocus); }; }, []); useEffect(() => { if (data && params.get('create') === '1' && !openedFromQuery.current) { openedFromQuery.current = true; createTask(); } }, [data, params]); useEffect(() => { setPage(1); }, [filter, search]);
-  function createTask() { setEditing(null); setProjectIds([]); setAssigneeIds([]); setModalOpen(true); } function editTask(task) { setEditing(task); setProjectIds(task.project_ids || []); setAssigneeIds(task.assignee_ids || []); setModalOpen(true); } function closeModal() { setModalOpen(false); setEditing(null); setProjectIds([]); setAssigneeIds([]); if (params.get('create') === '1') navigate('/tasks', { replace: true }); }
-  async function save(event) { event.preventDefault(); setNotice(''); setError(''); const form = new FormData(event.currentTarget); const payload = Object.fromEntries(form.entries()); payload.project_ids = projectIds; payload.assignee_ids = assigneeIds; payload.action = editing ? 'update' : 'create'; if (editing) payload.id = editing.id; const result = await post('/api/tasks.php', payload); if (!result.ok) return setError(result.message); setNotice(result.message); closeModal(); load(); }
-  async function changeStatus(task, status) { const result = await post('/api/tasks.php', { action: 'set_status', id: task.id, status }); if (!result.ok) return setError(result.message); setNotice(result.message); load(); }
-  async function archive(task) { if (!window.confirm('Перемістити задачу до архіву? Час та історія збережуться.')) return; changeStatus(task, 'archived'); }
+  const [data, setData] = useState(null);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [projectIds, setProjectIds] = useState([]);
+  const [assigneeIds, setAssigneeIds] = useState([]);
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const openedFromQuery = useRef(false);
+  async function load() {
+    const result = await api("/api/tasks.php");
+    if (!result.ok) return navigate("/");
+    setData(result);
+  }
+  useEffect(() => {
+    load();
+    const interval = window.setInterval(load, 15000);
+    const refreshOnFocus = () => load();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
+  useEffect(() => {
+    if (data && params.get("create") === "1" && !openedFromQuery.current) {
+      openedFromQuery.current = true;
+      createTask();
+    }
+  }, [data, params]);
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
+  function createTask() {
+    setEditing(null);
+    setProjectIds([]);
+    setAssigneeIds([]);
+    setModalOpen(true);
+  }
+  function editTask(task) {
+    setEditing(task);
+    setProjectIds(task.project_ids || []);
+    setAssigneeIds(task.assignee_ids || []);
+    setModalOpen(true);
+  }
+  function closeModal() {
+    setModalOpen(false);
+    setEditing(null);
+    setProjectIds([]);
+    setAssigneeIds([]);
+    if (params.get("create") === "1") navigate("/tasks", { replace: true });
+  }
+  async function save(event) {
+    event.preventDefault();
+    setNotice("");
+    setError("");
+    const form = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(form.entries());
+    payload.project_ids = projectIds;
+    payload.assignee_ids = assigneeIds;
+    payload.action = editing ? "update" : "create";
+    if (editing) payload.id = editing.id;
+    const result = await post("/api/tasks.php", payload);
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message);
+    closeModal();
+    load();
+  }
+  async function changeStatus(task, status) {
+    const result = await post("/api/tasks.php", {
+      action: "set_status",
+      id: task.id,
+      status,
+    });
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message);
+    load();
+  }
+  async function archive(task) {
+    if (
+      !window.confirm(
+        "Перемістити задачу до архіву? Час та історія збережуться.",
+      )
+    )
+      return;
+    changeStatus(task, "archived");
+  }
   if (!data) return <div className="loading-screen">Завантаження задач…</div>;
-  const canArchive = task => ['admin', 'owner'].includes(data.user?.role) || task.created_by === data.user?.id;
+  const canArchive = (task) =>
+    ["admin", "owner"].includes(data.user?.role) ||
+    task.created_by === data.user?.id;
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredTasks = data.tasks.filter(task => { const matchesFilter = filter === 'all' ? task.status !== 'archived' : task.status === filter; const haystack = `${task.title} ${task.client_name || ''} ${task.project_name || ''} ${task.assignee_name || ''}`.toLowerCase(); return matchesFilter && (!normalizedSearch || haystack.includes(normalizedSearch)); }).sort(taskSort);
-  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize)); const currentPage = Math.min(page, totalPages); const pageTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(task => ({ ...task, canManage: ['admin', 'owner', 'manager'].includes(data.user?.role) })); const firstRow = filteredTasks.length ? (currentPage - 1) * pageSize + 1 : 0; const lastRow = Math.min(currentPage * pageSize, filteredTasks.length);
-  return <Layout page="Задачі" user={data.user}><div className="content tasks-page tasks-redesign"><section className="welcome-row tasks-hero"><div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Задачі</h1><p className="subtext">Плануйте роботу, контролюйте дедлайни та тримайте команду в одному ритмі.</p></div><button className="primary-action hero-create" type="button" onClick={createTask}>＋ Створити задачу</button></section>{notice && <div className="team-notice success">{notice}</div>}{error && <div className="form-notice">{error}</div>}<section className="panel task-table-panel"><div className="task-table-heading"><div><div className="heading-with-count"><h2>Усі задачі</h2><span className="task-count-badge">{filteredTasks.length}</span></div><p>Знайдіть потрібну задачу та змініть її статус в один клік.</p></div></div><div className="task-toolbar"><label className="task-search"><span>⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Пошук за назвою, клієнтом або виконавцем…" /></label><select className="task-filter task-filter-large" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Активні задачі</option><option value="todo">До виконання</option><option value="in_progress">У роботі</option><option value="done">Завершені</option><option value="cancelled">Скасовані</option><option value="archived">Архів</option></select></div><div className="task-table-wrap"><table className="task-table"><thead><tr><th>Задача</th><th>Проєкт / клієнт</th><th>Виконавці</th><th>Пріоритет</th><th>Дедлайн</th><th>Статус</th><th aria-label="Дії" /></tr></thead><tbody>{pageTasks.map(task => <tr className="task-table-row" key={task.id} onClick={() => navigate(`/tasks/${task.id}`)}><td><div className="table-task-title"><strong>{task.title}</strong>{task.description && <small>{descriptionPreview(task.description)}{descriptionPreview(task.description).length >= 140 ? '…' : ''}</small>}</div></td><td><div className="table-secondary"><span>{task.project_name || 'Без проєкту'}</span><small>{task.client_name || 'Без клієнта'}</small></div></td><td><span className="table-assignee">{task.assignee_name || 'Не призначено'}</span></td><td><span className={`priority-pill priority-${task.priority}`}>{priorityLabels[task.priority]}</span></td><td><span className="table-date">{task.due_date ? new Date(`${task.due_date}T00:00:00`).toLocaleDateString('uk-UA') : '—'}</span></td><td><StatusMenu task={task} onChange={changeStatus} /></td><td><button className="table-more" type="button" onClick={event => { event.stopPropagation(); editTask(task); }} aria-label="Редагувати">⋯</button></td></tr>)}</tbody></table>{!pageTasks.length && <div className="task-table-empty"><div className="empty-illustration">✓</div><h3>{search ? 'Нічого не знайдено' : filter === 'archived' ? 'Архів порожній' : 'Задач поки немає'}</h3><p>{search ? 'Спробуйте змінити пошуковий запит.' : 'Створіть першу задачу кнопкою вище.'}</p></div>}</div><div className="task-table-footer"><span>Показано {firstRow}–{lastRow} із {filteredTasks.length}</span><div className="pagination"><button type="button" disabled={currentPage === 1} onClick={() => setPage(value => value - 1)}>‹</button>{Array.from({ length: totalPages }, (_, index) => index + 1).slice(Math.max(0, currentPage - 3), currentPage + 2).map(number => <button type="button" className={number === currentPage ? 'active' : ''} key={number} onClick={() => setPage(number)}>{number}</button>)}<button type="button" disabled={currentPage === totalPages} onClick={() => setPage(value => value + 1)}>›</button></div></div></section>{modalOpen && <TaskFormModal data={data} editing={editing} projectIds={projectIds} assigneeIds={assigneeIds} setProjectIds={setProjectIds} setAssigneeIds={setAssigneeIds} onSubmit={save} onClose={closeModal} />}</div></Layout>;
+  const filteredTasks = data.tasks
+    .filter((task) => {
+      const matchesFilter =
+        filter === "all" ? ["todo", "in_progress"].includes(task.status) : task.status === filter;
+      const haystack =
+        `${task.title} ${task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
+      return (
+        matchesFilter &&
+        (!normalizedSearch || haystack.includes(normalizedSearch))
+      );
+    })
+    .sort(taskSort);
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageTasks = filteredTasks
+    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    .map((task) => ({
+      ...task,
+      canManage: ["admin", "owner", "manager"].includes(data.user?.role),
+    }));
+  const firstRow = filteredTasks.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastRow = Math.min(currentPage * pageSize, filteredTasks.length);
+  return (
+    <Layout page="Задачі" user={data.user}>
+      <div className="content tasks-page tasks-redesign">
+        <section className="welcome-row tasks-hero">
+          <div>
+            <p className="eyebrow">РОБОЧИЙ ПРОСТІР</p>
+            <h1>Задачі</h1>
+            <p className="subtext">
+              Плануйте роботу, контролюйте дедлайни та тримайте команду в одному
+              ритмі.
+            </p>
+          </div>
+          <button
+            className="primary-action hero-create"
+            type="button"
+            onClick={createTask}
+          >
+            ＋ Створити задачу
+          </button>
+        </section>
+        {notice && <div className="team-notice success">{notice}</div>}
+        {error && <div className="form-notice">{error}</div>}
+        <section className="panel task-table-panel">
+          <div className="task-table-heading">
+            <div>
+              <div className="heading-with-count">
+                <h2>Усі задачі</h2>
+                <span className="task-count-badge">{filteredTasks.length}</span>
+              </div>
+              <p>Знайдіть потрібну задачу та змініть її статус в один клік.</p>
+            </div>
+          </div>
+          <div className="task-toolbar">
+            <label className="task-search">
+              <span>⌕</span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Пошук за назвою, клієнтом або виконавцем…"
+              />
+            </label>
+            <select
+              className="task-filter task-filter-large"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              <option value="all">Активні задачі</option>
+              <option value="todo">До виконання</option>
+              <option value="in_progress">У роботі</option>
+              <option value="done">Завершені</option>
+              <option value="cancelled">Скасовані</option>
+              <option value="archived">Архів</option>
+            </select>
+          </div>
+          <div className="task-table-wrap">
+            <table className="task-table">
+              <thead>
+                <tr>
+                  <th>Задача</th>
+                  <th>Проєкт / клієнт</th>
+                  <th>Виконавці</th>
+                  <th>Пріоритет</th>
+                  <th>Дедлайн</th>
+                  <th>Статус</th>
+                  <th aria-label="Дії" />
+                </tr>
+              </thead>
+              <tbody>
+                {pageTasks.map((task) => (
+                  <tr
+                    className="task-table-row"
+                    key={task.id}
+                    onClick={() => navigate(`/tasks/${task.id}`)}
+                  >
+                    <td>
+                      <div className="table-task-title">
+                        <strong>{task.title}</strong>
+                        {task.description && (
+                          <small>
+                            {descriptionPreview(task.description)}
+                            {descriptionPreview(task.description).length >= 140
+                              ? "…"
+                              : ""}
+                          </small>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="table-secondary">
+                        <span>{task.project_name || "Без проєкту"}</span>
+                        <small>{task.client_name || "Без клієнта"}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="table-assignee">
+                        {task.assignee_name || "Не призначено"}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`priority-pill priority-${task.priority}`}
+                      >
+                        {priorityLabels[task.priority]}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="table-date">
+                        {task.due_date
+                          ? new Date(
+                              `${task.due_date}T00:00:00`,
+                            ).toLocaleDateString("uk-UA")
+                          : "—"}
+                      </span>
+                    </td>
+                    <td>
+                      <StatusMenu task={task} onChange={changeStatus} />
+                    </td>
+                    <td>
+                      <button
+                        className="table-more"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          editTask(task);
+                        }}
+                        aria-label="Редагувати"
+                      >
+                        ⋯
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!pageTasks.length && (
+              <div className="task-table-empty">
+                <div className="empty-illustration">✓</div>
+                <h3>
+                  {search
+                    ? "Нічого не знайдено"
+                    : filter === "archived"
+                      ? "Архів порожній"
+                      : "Задач поки немає"}
+                </h3>
+                <p>
+                  {search
+                    ? "Спробуйте змінити пошуковий запит."
+                    : "Створіть першу задачу кнопкою вище."}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="task-table-footer">
+            <span>
+              Показано {firstRow}–{lastRow} із {filteredTasks.length}
+            </span>
+            <div className="pagination">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setPage((value) => value - 1)}
+              >
+                ‹
+              </button>
+              {Array.from({ length: totalPages }, (_, index) => index + 1)
+                .slice(Math.max(0, currentPage - 3), currentPage + 2)
+                .map((number) => (
+                  <button
+                    type="button"
+                    className={number === currentPage ? "active" : ""}
+                    key={number}
+                    onClick={() => setPage(number)}
+                  >
+                    {number}
+                  </button>
+                ))}
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((value) => value + 1)}
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        </section>
+        {modalOpen && (
+          <TaskFormModal
+            data={data}
+            editing={editing}
+            projectIds={projectIds}
+            assigneeIds={assigneeIds}
+            setProjectIds={setProjectIds}
+            setAssigneeIds={setAssigneeIds}
+            onSubmit={save}
+            onClose={closeModal}
+          />
+        )}
+      </div>
+    </Layout>
+  );
 }

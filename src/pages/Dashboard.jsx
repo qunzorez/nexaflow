@@ -73,7 +73,7 @@ export default function Dashboard() {
         };
   const dashboardTasks =
     data.tasks
-      ?.filter((task) => task.status !== "archived")
+      ?.filter((task) => ["todo", "in_progress"].includes(task.status))
       .filter((task) => taskFilter === "all" || task.status === taskFilter)
       .filter((task) =>
         `${task.title} ${task.project_name || ""} ${task.client_name || ""}`
@@ -194,8 +194,11 @@ export default function Dashboard() {
                           `Власник: ${project.owner_name}`}
                       </small>
                     </div>
-                    <span className={`project-status project-status-${project.status || "active"}`}>
-                      {projectStatusLabels[project.status] || projectStatusLabels.active}
+                    <span
+                      className={`project-status project-status-${project.status || "active"}`}
+                    >
+                      {projectStatusLabels[project.status] ||
+                        projectStatusLabels.active}
                     </span>
                   </div>
                 ))}
