@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function sendTelegramMessage(string $chatId, string $message): bool
+function sendTelegramMessage(string $chatId, string $message, string $buttonUrl = ''): bool
 {
     if ($chatId === '') return false;
     $localConfig = __DIR__ . '/config.local.php';
@@ -9,7 +9,9 @@ function sendTelegramMessage(string $chatId, string $message): bool
     $token = trim((string)($config['telegram_bot_token'] ?? ''));
     if ($token === '' || !function_exists('curl_init')) return false;
     $curl = curl_init('https://api.telegram.org/bot' . rawurlencode($token) . '/sendMessage');
-    curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => ['chat_id' => $chatId, 'text' => $message, 'disable_web_page_preview' => true], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
+    $fields = ['chat_id' => $chatId, 'text' => $message, 'disable_web_page_preview' => true];
+    if ($buttonUrl !== '') $fields['reply_markup'] = json_encode(['inline_keyboard' => [[['text' => 'Відкрити задачу →', 'url' => $buttonUrl]]]], JSON_UNESCAPED_UNICODE);
+    curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $fields, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
     $result = curl_exec($curl); $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE); curl_close($curl);
     return $status === 200 && is_string($result) && (json_decode($result, true)['ok'] ?? false) === true;
 }
@@ -21,7 +23,11 @@ function sendTelegramPhoto(string $chatId, string $photoUrl, string $caption, st
     $config = require file_exists($localConfig) ? $localConfig : (__DIR__ . '/config.php');
     $token = trim((string)($config['telegram_bot_token'] ?? ''));
     if ($token === '' || !function_exists('curl_init')) return false;
-    $fields = ['chat_id' => $chatId, 'photo' => $photoUrl, 'caption' => $caption, 'parse_mode' => 'HTML'];
+    $mime = function_exists('mime_content_type') ? (string)(mime_content_type($photoUrl) ?: 'image/png') : 'image/png';
+    $photo = is_file($photoUrl)
+        ? new CURLFile($photoUrl, $mime, basename($photoUrl))
+        : $photoUrl;
+    $fields = ['chat_id' => $chatId, 'photo' => $photo, 'caption' => $caption, 'parse_mode' => 'HTML'];
     if ($buttonUrl !== '') $fields['reply_markup'] = json_encode(['inline_keyboard' => [[['text' => 'Відкрити задачу →', 'url' => $buttonUrl]]]], JSON_UNESCAPED_UNICODE);
     $curl = curl_init('https://api.telegram.org/bot' . rawurlencode($token) . '/sendPhoto');
     curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $fields, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
@@ -64,8 +70,11 @@ function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): 
         $caption = "<b>NexaFlow • Нагадування</b>\n\n🔔 Час повернутися до задачі\n\n<b>{$title}</b>\n\n📁 Проєкт: {$project}\n📅 Дедлайн: {$due}\n\nЗадача все ще очікує вашої уваги. Відкрийте її, щоб переглянути деталі та продовжити роботу.";
         $chatId = (string)$user['telegram_chat_id'];
         $taskUrl = 'https://nexaflow.top/tasks/' . rawurlencode((string)$reminder['id']);
-        $sent = sendTelegramPhoto($chatId, 'https://nexaflow.top/assets/logo-telegram.png', $caption, $taskUrl);
-        if (!$sent) sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)) . "\n\nВідкрити задачу: {$taskUrl}");
+        $localLogo = __DIR__ . '/../assets/logo-telegram.png';
+        if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
+        $logoSource = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        $sent = sendTelegramPhoto($chatId, $logoSource, $caption, $taskUrl);
+        if (!$sent) sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)), $taskUrl);
     } catch (Throwable $error) {
         error_log('Telegram reminder error: ' . $error->getMessage());
     }
