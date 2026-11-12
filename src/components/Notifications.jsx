@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, post } from '../services/api.js';
 import DOMPurify from 'dompurify';
 import './notifications.css';
@@ -7,17 +7,19 @@ export default function Notifications() {
   const [open, setOpen] = useState(false); const [selected, setSelected] = useState(null);
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
+  const wrapRef = useRef(null);
 
   async function load() {
     const result = await api('/api/notifications.php');
     if (result.ok) { setItems(result.notifications || []); setUnread(Number(result.unread || 0)); }
   }
   useEffect(() => { load(); }, []);
-  async function mark(item) { setSelected(item); if (!Number(item.is_read)) { await post('/api/notifications.php', { action: 'read', id: item.id }); load(); } }
+  useEffect(() => { const closeOnOutsideClick = event => { if (open && wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false); }; document.addEventListener('pointerdown', closeOnOutsideClick); return () => document.removeEventListener('pointerdown', closeOnOutsideClick); }, [open]);
+  async function mark(item) { setOpen(false); setSelected(item); if (!Number(item.is_read)) { await post('/api/notifications.php', { action: 'read', id: item.id }); load(); } }
   async function markAll() { await post('/api/notifications.php', { action: 'read_all' }); load(); }
   const preview = value => String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   const notificationHtml = item => item.content_html || (/<[a-z][\s\S]*>/i.test(String(item.message || '')) ? item.message : `<p>${String(item.message || '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]))}</p>`);
-  return <div className="notification-wrap">
+  return <div className="notification-wrap" ref={wrapRef}>
     <button className={`icon-btn notification-button${unread > 0 ? ' has-unread' : ''}`} aria-label="Сповіщення" onClick={() => { setOpen(!open); if (!open) load(); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{unread > 0 && <span className="notification-count">{unread > 99 ? '99+' : unread}</span>}</button>
     {open && <div className="notifications-panel">
       <div className="notifications-head"><strong>Сповіщення</strong><button type="button" onClick={markAll}>Позначити все прочитаним</button></div>
