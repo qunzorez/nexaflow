@@ -1,0 +1,16 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home3/nexaflow/public_html/
+    - /bin/cp -R dist/. $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/api
+    - /bin/cp api/db.php $DEPLOYPATH/api/db.php
+    - /bin/cp api/register.php $DEPLOYPATH/api/register.php
+    - /bin/cp api/login.php $DEPLOYPATH/api/login.php
+    - /bin/cp api/logout.php $DEPLOYPATH/api/logout.php
+    - /bin/cp api/me.php $DEPLOYPATH/api/me.php
+    - /bin/cp api/dashboard.php $DEPLOYPATH/api/dashboard.php
+    - /bin/cp api/team.php $DEPLOYPATH/api/team.php
+    - /bin/cp api/invite.php $DEPLOYPATH/api/invite.php
+    - /bin/cp api/accept-invite.php $DEPLOYPATH/api/accept-invite.php
+    - /bin/cp api/mailer.php $DEPLOYPATH/api/mailer.php
