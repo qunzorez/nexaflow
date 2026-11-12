@@ -207,7 +207,7 @@ export default function Tasks() {
   const filteredTasks = data.tasks
     .filter((task) => {
       const matchesFilter =
-        filter === "all" ? ["todo", "in_progress"].includes(task.status) : task.status === filter;
+        filter === "all" ? task.status !== "archived" : task.status === filter;
       const haystack =
         `${task.title} ${task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
       return (

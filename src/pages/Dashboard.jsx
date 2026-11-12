@@ -73,7 +73,7 @@ export default function Dashboard() {
         };
   const dashboardTasks =
     data.tasks
-      ?.filter((task) => ["todo", "in_progress"].includes(task.status))
+      ?.filter((task) => task.status !== "archived")
       .filter((task) => taskFilter === "all" || task.status === taskFilter)
       .filter((task) =>
         `${task.title} ${task.project_name || ""} ${task.client_name || ""}`

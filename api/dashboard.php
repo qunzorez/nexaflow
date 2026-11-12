@@ -37,7 +37,7 @@ try {
     $remindersQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.reminder_at, t.due_date, p.name AS project_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE t.reminder_at IS NOT NULL AND t.reminder_at <= NOW() AND t.status IN ('todo', 'in_progress') AND ((t.created_by = ? AND t.creator_reminder = 1) OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)) ORDER BY t.reminder_at ASC LIMIT 8");
     $remindersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $reminders = $remindersQuery->fetchAll();
-    $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress')") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress') AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
+    $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status <> 'archived'") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status <> 'archived' AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $taskCount = (int)$taskCountQuery->fetchColumn();
     $timeQuery = $pdo->prepare('SELECT COALESCE(SUM(minutes), 0) FROM time_entries WHERE user_id = ?'); $timeQuery->execute([$_SESSION['user_id']]); $myMinutes = (int)$timeQuery->fetchColumn(); $teamTime = [];
