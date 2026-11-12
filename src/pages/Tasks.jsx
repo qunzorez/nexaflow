@@ -9,6 +9,7 @@ import "./tasks-page-extra.css";
 import "./tasks-status.css";
 import "./tasks-table.css";
 import "./tasks-table-layout.css";
+import "./tasks-fixed-table.css";
 import "./tasks-dropdown-fix.css";
 import "./tasks-status-centering.css";
 import "./task-actions.css";

@@ -1,15 +1,32 @@
 .task-table-wrap {
-  min-height: 340px;
-  overflow: visible !important;
+  height: 430px;
+  min-height: 430px;
+  overflow: auto !important;
 }
 
 .task-table {
-  min-height: 300px;
+  min-height: 0;
+}
+
+.task-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.task-table tbody tr {
+  height: 72px;
+}
+
+.task-table tbody td {
+  height: 72px;
+  max-height: 72px;
+  overflow: hidden;
 }
 
 @media (max-width: 900px) {
   .task-table-wrap {
     overflow-x: auto !important;
-    overflow-y: visible !important;
+    overflow-y: auto !important;
   }
 }

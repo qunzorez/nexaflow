@@ -1,0 +1,25 @@
+.tasks-redesign .task-table {
+  table-layout: fixed;
+}
+
+.tasks-redesign .task-table th:nth-child(1),
+.tasks-redesign .task-table td:nth-child(1) { width: 22%; }
+.tasks-redesign .task-table th:nth-child(2),
+.tasks-redesign .task-table td:nth-child(2) { width: 18%; }
+.tasks-redesign .task-table th:nth-child(3),
+.tasks-redesign .task-table td:nth-child(3) { width: 13%; }
+.tasks-redesign .task-table th:nth-child(4),
+.tasks-redesign .task-table td:nth-child(4) { width: 13%; }
+.tasks-redesign .task-table th:nth-child(5),
+.tasks-redesign .task-table td:nth-child(5) { width: 12%; }
+.tasks-redesign .task-table th:nth-child(6),
+.tasks-redesign .task-table td:nth-child(6) { width: 15%; }
+.tasks-redesign .task-table th:nth-child(7),
+.tasks-redesign .task-table td:nth-child(7) { width: 7%; }
+
+.tasks-redesign .table-task-title small,
+.tasks-redesign .table-secondary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
