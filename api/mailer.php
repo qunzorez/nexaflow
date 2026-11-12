@@ -36,11 +36,16 @@ function sendProjectEmail(string $to, string $subject, string $message, string $
     }
     if ($html !== '') {
         $boundary = 'nexaflow_' . bin2hex(random_bytes(8));
-        $headers = "From: NexaFlow <{$from}>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
+        $headers = "From: NexaFlow <{$from}>\r\nTo: <{$to}>\r\nReply-To: {$from}\r\nDate: " . date('r') . "\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
         $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$message}\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$html}\r\n--{$boundary}--\r\n";
     } else {
-        $headers = "From: NexaFlow <{$from}>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+        $headers = "From: NexaFlow <{$from}>\r\nTo: <{$to}>\r\nReply-To: {$from}\r\nDate: " . date('r') . "\r\nContent-Type: text/plain; charset=UTF-8\r\n";
         $body = $message;
     }
-    return mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers, '-f' . $from);
+    $sent = mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
+    if (!$sent) {
+        $lastError = error_get_last();
+        error_log('NexaFlow email failed: to=' . $to . '; subject=' . $subject . '; error=' . (string)($lastError['message'] ?? 'mail() returned false'));
+    }
+    return $sent;
 }
