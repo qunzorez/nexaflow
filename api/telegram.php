@@ -55,13 +55,33 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
     }
 }
 
-function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): void
+function sendTelegramTaskReview(PDO $pdo, string $userId, string $title, string $taskUrl): void
 {
     try {
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
         $query->execute([$userId]);
         $user = $query->fetch();
         if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return;
+        $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        $caption = "<b>NexaFlow • Потрібна перевірка</b>\n\n🔎 <b>Задача очікує вашої перевірки</b>\n\n📌 {$safeTitle}\n\nПерегляньте результат і підтвердьте виконання або поверніть задачу на доопрацювання.";
+        $localLogo = __DIR__ . '/../assets/logo-telegram.png';
+        if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
+            sendTelegramMessage((string)$user['telegram_chat_id'], strip_tags(str_replace(['<b>', '</b>'], '', $caption)), $taskUrl);
+        }
+    } catch (Throwable $error) {
+        error_log('Telegram task review error: ' . $error->getMessage());
+    }
+}
+
+function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): bool
+{
+    try {
+        $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
+        $query->execute([$userId]);
+        $user = $query->fetch();
+        if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return false;
         $project = trim((string)($reminder['project_name'] ?? '')) ?: 'Без проєкту';
         $due = trim((string)($reminder['due_date'] ?? '')) ?: 'Не встановлено';
         $title = htmlspecialchars((string)$reminder['title'], ENT_QUOTES, 'UTF-8');
@@ -74,8 +94,10 @@ function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): 
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
         $logoSource = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
         $sent = sendTelegramPhoto($chatId, $logoSource, $caption, $taskUrl);
-        if (!$sent) sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)), $taskUrl);
+        if (!$sent) $sent = sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)), $taskUrl);
+        return $sent;
     } catch (Throwable $error) {
         error_log('Telegram reminder error: ' . $error->getMessage());
+        return false;
     }
 }
