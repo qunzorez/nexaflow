@@ -51,7 +51,7 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
         $chatId = (string)($user['telegram_chat_id'] ?? '');
         if ($chatId === '') return;
         $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
-        $caption = "<b>NexaFlow • Сповіщення</b>\n\n🔔 {$safeMessage}";
+        $caption = "<b>NexaFlow • Нове сповіщення</b>\n\n🔔 <b>Важлива інформація</b>\n\n{$safeMessage}\n\nПерейдіть у NexaFlow, щоб переглянути деталі.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
         $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
@@ -61,7 +61,27 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
     }
 }
 
-function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string $message, string $taskUrl): void
+function sendTelegramTaskAssignment(PDO $pdo, string $userId, string $title, string $taskUrl): void
+{
+    try {
+        $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
+        $query->execute([$userId]);
+        $user = $query->fetch();
+        if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return;
+        $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        $caption = "<b>NexaFlow • Нова задача</b>\n\n👤 <b>Вам призначили задачу</b>\n\n📌 <b>{$safeTitle}</b>\n\nВідкрийте задачу, щоб переглянути опис, дедлайн і почати роботу.";
+        $localLogo = __DIR__ . '/../assets/logo-telegram.png';
+        if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
+            sendTelegramMessage((string)$user['telegram_chat_id'], "NexaFlow • Нова задача\n\n👤 Вам призначили задачу\n\n📌 {$title}\n\nВідкрити задачу: {$taskUrl}", $taskUrl);
+        }
+    } catch (Throwable $error) {
+        error_log('Telegram assignment error: ' . $error->getMessage());
+    }
+}
+
+function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string $message, string $taskUrl, string $event = 'updated'): void
 {
     try {
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
@@ -70,12 +90,17 @@ function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string 
         if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return;
         $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
-        $caption = "<b>NexaFlow • Оновлення задачі</b>\n\n🔄 <b>Статус задачі змінено</b>\n\n📌 <b>{$safeTitle}</b>\n\n{$safeMessage}";
+        $heading = match ($event) {
+            'task_review_approved' => '✅ Виконання задачі підтверджено',
+            'task_review_rejected' => '🔧 Задачу повернуто на доопрацювання',
+            default => '🔄 Статус задачі оновлено',
+        };
+        $caption = "<b>NexaFlow • Оновлення задачі</b>\n\n<b>{$heading}</b>\n\n📌 <b>{$safeTitle}</b>\n\n{$safeMessage}\n\nПерегляньте актуальний статус і деталі задачі.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
         $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
         if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
-            sendTelegramMessage((string)$user['telegram_chat_id'], "NexaFlow\n\nСтатус задачі змінено\n\n{$title}\n\n{$message}", $taskUrl);
+            sendTelegramMessage((string)$user['telegram_chat_id'], "NexaFlow • Оновлення задачі\n\n{$heading}\n\n📌 {$title}\n\n{$message}\n\nВідкрити задачу: {$taskUrl}", $taskUrl);
         }
     } catch (Throwable $error) {
         error_log('Telegram task status error: ' . $error->getMessage());
@@ -90,7 +115,7 @@ function sendTelegramTaskReview(PDO $pdo, string $userId, string $title, string 
         $user = $query->fetch();
         if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return;
         $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
-        $caption = "<b>NexaFlow • Потрібна перевірка</b>\n\n🔎 <b>Задача очікує вашої перевірки</b>\n\n📌 {$safeTitle}\n\nПерегляньте результат і підтвердьте виконання або поверніть задачу на доопрацювання.";
+        $caption = "<b>NexaFlow • Потрібна перевірка</b>\n\n🔎 <b>Задача очікує вашої перевірки</b>\n\n📌 <b>{$safeTitle}</b>\n\nПерегляньте результат, підтвердьте виконання або поверніть задачу на доопрацювання.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
         $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
