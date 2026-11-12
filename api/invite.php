@@ -92,7 +92,9 @@ try {
     if ($existingUser && $existingUser['id'] !== $_SESSION['user_id']) {
         $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_invite', ?, ?, 'project', ?)")->execute([bin2hex(random_bytes(16)), $existingUser['id'], $_SESSION['user_id'], 'Запрошення до нового проєкту', "Вас запросили до проєкту «{$project['name']}». Відкрийте лист і натисніть «Приєднатись до проєкту».", $projectId]);
     }
-    $sent = sendProjectEmail($email, $subject, $message, $htmlMessage);
+    $sent = $existingUser
+        ? sendUserNotificationEmail($pdo, (string)$existingUser['id'], $email, $subject, $message, $htmlMessage)
+        : sendProjectEmail($email, $subject, $message, $htmlMessage);
     jsonResponse(true, $sent ? 'Запрошення відправлено на email.' : 'Запрошення створено, але хостинг не підтвердив відправку email.', ['sent' => $sent, 'expires_in_days' => 7]);
 } catch (Throwable $error) {
     error_log($error->getMessage());

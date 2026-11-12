@@ -119,7 +119,10 @@ try {
                 if ($existingInviteUser && $existingInviteUser['id'] !== $_SESSION['user_id']) {
                     $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_invite', ?, ?, 'project', ?)")->execute([bin2hex(random_bytes(16)), $existingInviteUser['id'], $_SESSION['user_id'], 'Запрошення до нового проєкту', "Вас запросили до проєкту «{$name}». Відкрийте лист і натисніть «Приєднатись до проєкту».", $id]);
                 }
-                if (sendProjectEmail($inviteEmail, $subject, $message, $htmlMessage)) $sent++;
+                $emailSent = $existingInviteUser && $existingInviteUser['id'] !== $_SESSION['user_id']
+                    ? sendUserNotificationEmail($pdo, (string)$existingInviteUser['id'], $inviteEmail, $subject, $message, $htmlMessage)
+                    : sendProjectEmail($inviteEmail, $subject, $message, $htmlMessage);
+                if ($emailSent) $sent++;
                 else $failed++;
                 $invited++;
             }
