@@ -13,7 +13,7 @@ import './tasks-status-centering.css';
 import './task-actions.css';
 import '../modules/tasks/task-modal.css';
 
-const statusOptions = { todo: { label: 'До виконання', icon: '○' }, in_progress: { label: 'У роботі', icon: '◐' }, done: { label: 'Завершено', icon: '✓' }, cancelled: { label: 'Скасовано', icon: '×' }, archived: { label: 'Архів', icon: '▣' } };
+const statusOptions = { todo: { label: 'До виконання', icon: '○' }, in_progress: { label: 'У роботі', icon: '◐' }, review: { label: 'На перевірці', icon: '!' }, done: { label: 'Завершено', icon: '✓' }, cancelled: { label: 'Скасовано', icon: '×' }, archived: { label: 'Архів', icon: '▣' } };
 const priorityLabels = { low: 'Низький', normal: 'Звичайний', high: 'Високий', urgent: 'Терміновий' };
 const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
 const pageSize = 10;

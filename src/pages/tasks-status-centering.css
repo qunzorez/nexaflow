@@ -44,7 +44,11 @@
 }
 
 .status-menu-options .status-icon-todo { background: #dce5df; color: #68776f; }
+.status-menu-options .status-icon-review { background: #ffe5b5; color: #a87519; }
 .status-menu-options .status-icon-in_progress { background: #cbdcff; color: #557bb4; }
 .status-menu-options .status-icon-done { background: #c8ead6; color: #23815e; }
 .status-menu-options .status-icon-cancelled { background: #ffd8d0; color: #c66d5a; }
 .status-menu-options .status-icon-archived { background: #d8dfe0; color: #65716c; }
+
+.status-menu-review .status-menu-trigger { background: #fff4dc; color: #a87519; }
+.status-menu-review .status-menu-icon { background: #ffe5b5; }

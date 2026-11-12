@@ -7,10 +7,11 @@ import TimeLogModal from '../modules/tasks/TimeLogModal.jsx';
 import { api, post } from '../services/api.js';
 import './task-detail.css';
 import './task-detail-extra.css';
+import './task-review-status.css';
 import '../modules/tasks/task-modal.css';
 import '../modules/tasks/time-log.css';
 
-const statusLabels = { todo: 'До виконання', in_progress: 'У роботі', done: 'Завершено', cancelled: 'Скасовано', archived: 'Архів' };
+const statusLabels = { todo: 'До виконання', in_progress: 'У роботі', review: 'На перевірці', done: 'Завершено', cancelled: 'Скасовано', archived: 'Архів' };
 const formatMinutes = value => { const minutes = Number(value || 0); const hours = Math.floor(minutes / 60); const rest = minutes % 60; return hours ? `${hours} год${rest ? ` ${rest} хв` : ''}` : `${rest} хв`; };
 function descriptionInfo(value) { const holder = document.createElement('div'); holder.innerHTML = String(value || ''); return { text: (holder.textContent || '').replace(/\s+/g, ' ').trim(), images: holder.querySelectorAll('img').length }; }
 function descriptionChangeMessage(oldValue, newValue) { const oldInfo = descriptionInfo(oldValue); const newInfo = descriptionInfo(newValue); const parts = []; if (!oldInfo.text && newInfo.text) parts.push(`додано текст опису «${newInfo.text.slice(0, 140)}${newInfo.text.length > 140 ? '…' : ''}»`); else if (oldInfo.text && !newInfo.text) parts.push('видалено текст опису'); else if (oldInfo.text !== newInfo.text) parts.push(`змінено текст опису на «${newInfo.text.slice(0, 140)}${newInfo.text.length > 140 ? '…' : ''}»`); if (!oldInfo.images && newInfo.images) parts.push(`додано ${newInfo.images} зображення`); else if (oldInfo.images && !newInfo.images) parts.push('видалено зображення'); else if (oldInfo.images !== newInfo.images) parts.push(`змінено кількість зображень: ${oldInfo.images} → ${newInfo.images}`); return parts.length ? `${parts.join(' та ')}.` : ''; }
