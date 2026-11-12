@@ -3,6 +3,20 @@
   isolation: isolate;
   background: radial-gradient(circle at 88% 2%, #e9f7ef 0, transparent 23rem);
 }
+.dashboard-page::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 16%;
+  right: -90px;
+  width: 230px;
+  height: 230px;
+  border: 24px solid #e2f4e9;
+  border-radius: 50%;
+  opacity: .55;
+  animation: dashboard-orbit 12s ease-in-out infinite;
+  pointer-events: none;
+}
 
 .dashboard-page .welcome-row {
   position: relative;
@@ -56,6 +70,7 @@
   overflow: hidden;
   transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
   animation: dashboard-rise .55s ease both;
+  text-align: center;
 }
 .dashboard-page .stat-card:nth-child(2) { animation-delay: .05s; }
 .dashboard-page .stat-card:nth-child(3) { animation-delay: .1s; }
@@ -71,7 +86,7 @@
   background: #f0faf4;
 }
 .dashboard-page .stat-card:hover { transform: translateY(-5px); border-color: #c4e2d0; box-shadow: 0 15px 30px #3e69551c; }
-.dashboard-page .stat-icon { position: relative; z-index: 1; width: 38px; height: 38px; border-radius: 12px; font-size: 16px; box-shadow: inset 0 0 0 1px #ccebd8; }
+.dashboard-page .stat-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto; border-radius: 12px; font-size: 16px; box-shadow: inset 0 0 0 1px #ccebd8; }
 .dashboard-page .stat-icon span { display: block; animation: icon-float 3.5s ease-in-out infinite; }
 .dashboard-page .stat-card strong { position: relative; z-index: 1; margin-top: 18px; }
 .dashboard-page .stat-card > span:not(.stat-icon), .dashboard-page .stat-card small { position: relative; z-index: 1; }
@@ -126,6 +141,7 @@
 
 @keyframes dashboard-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes icon-float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-2px) rotate(-4deg); } }
+@keyframes dashboard-orbit { 0%, 100% { transform: translate3d(0, 0, 0) rotate(0); } 50% { transform: translate3d(-24px, 18px, 0) rotate(16deg); } }
 
 @media (max-width: 700px) {
   .dashboard-page .welcome-row { padding: 22px 20px; margin-top: 0; border-radius: 17px; }
