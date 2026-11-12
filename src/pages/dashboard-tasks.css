@@ -13,6 +13,7 @@
 .team-time-tools label span { font-size: 17px; }
 .team-time-tools input, .team-time-tools select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 10px; padding: 9px 0; }
 .team-time-tools select { width: 170px; flex: 0 0 170px; padding: 9px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-.team-time-panel .team-time-list { height: 360px; max-height: 360px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
+.team-time-panel .team-time-list { height: 280px; max-height: 280px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
+.team-time-panel .team-time-row { min-height: 56px; box-sizing: border-box; }
 @media (max-width: 600px) { .dashboard-task-tools { display: grid; grid-template-columns: 1fr; } .dashboard-task-tools select { width: 100%; } }
 @media (max-width: 600px) { .team-time-tools { display: grid; grid-template-columns: 1fr; } .team-time-tools select { width: 100%; } }
