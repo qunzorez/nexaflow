@@ -18,14 +18,15 @@ try {
 
     $id = bin2hex(random_bytes(16));
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $insert = db()->prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)');
-    $insert->execute([$id, $name, $email, $hash]);
+    $insert = db()->prepare('INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)');
+    $insert->execute([$id, $name, $email, $hash, 'user']);
     session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
     session_start();
     session_regenerate_id(true);
     $_SESSION['user_id'] = $id;
     $_SESSION['user_name'] = $name;
-    jsonResponse(true, 'Акаунт створено.', ['user' => ['name' => $name, 'email' => $email]]);
+    $_SESSION['user_role'] = 'user';
+    jsonResponse(true, 'Акаунт створено.', ['user' => ['name' => $name, 'email' => $email, 'role' => 'user']]);
 } catch (Throwable $error) {
     error_log($error->getMessage());
     jsonResponse(false, 'Помилка бази даних під час реєстрації.', [], 500);

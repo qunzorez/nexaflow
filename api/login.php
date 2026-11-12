@@ -11,7 +11,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
 }
 
 try {
-    $query = db()->prepare('SELECT id, name, email, password_hash FROM users WHERE email = ? LIMIT 1');
+    $query = db()->prepare('SELECT id, name, email, password_hash, role FROM users WHERE email = ? LIMIT 1');
     $query->execute([$email]);
     $user = $query->fetch();
     if (!$user || !password_verify($password, $user['password_hash'])) {
@@ -23,7 +23,8 @@ try {
     session_regenerate_id(true);
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['user_name'] = $user['name'];
-    jsonResponse(true, 'Вхід виконано.', ['user' => ['name' => $user['name'], 'email' => $user['email']]]);
+    $_SESSION['user_role'] = $user['role'];
+    jsonResponse(true, 'Вхід виконано.', ['user' => ['name' => $user['name'], 'email' => $user['email'], 'role' => $user['role']]]);
 } catch (Throwable $error) {
     error_log($error->getMessage());
     jsonResponse(false, 'Помилка бази даних під час входу.', [], 500);

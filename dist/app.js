@@ -40,13 +40,13 @@ form.addEventListener('submit', async event => {
     if (!document.querySelector('#terms').checked) return showError('Підтвердіть умови використання.');
     const result = await request('/api/register.php', { name, email, password: passwordValue });
     if (!result.ok) return showError(result.message || 'Не вдалося створити акаунт.');
-    window.location.href = 'dashboard.html';
+    window.location.href = 'dashboard';
     return;
   }
 
   const result = await request('/api/login.php', { email, password: passwordValue });
   if (!result.ok) return showError(result.message || 'Невірна пошта або пароль.');
-  window.location.href = 'dashboard.html';
+  window.location.href = 'dashboard';
 });
 
 function showError(message) { notice.className = 'notice'; notice.textContent = message; }

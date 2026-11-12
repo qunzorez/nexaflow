@@ -1,0 +1,17 @@
+DirectoryIndex index.html
+
+RewriteEngine On
+
+# Redirect direct .html links to clean URLs.
+RewriteCond %{THE_REQUEST} \s/+dashboard\.html(?:[?\s]) [NC]
+RewriteRule ^dashboard\.html$ /dashboard [R=301,L]
+
+# Serve the static HTML files without exposing the .html extension.
+RewriteRule ^dashboard/?$ dashboard.html [L]
+RewriteRule ^team/?$ team.html [L]
+RewriteRule ^accept-invite/?$ accept-invite.html [L]
+
+# Keep real files and folders, including /api, working normally.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
