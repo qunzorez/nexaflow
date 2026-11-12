@@ -21,7 +21,8 @@ try {
     require __DIR__ . '/db.php';
     $pdo = db();
     $userId = '';
-    if ($connectToken !== '') {
+    $hasConnectToken = (bool)$pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'telegram_connect_token'")->fetchColumn();
+    if ($hasConnectToken && $connectToken !== '') {
         $query = $pdo->prepare('SELECT id FROM users WHERE telegram_connect_token = ? LIMIT 1');
         $query->execute([$connectToken]);
         $userId = (string)($query->fetchColumn() ?: '');
