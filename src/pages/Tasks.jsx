@@ -10,6 +10,7 @@ import "./tasks-status.css";
 import "./tasks-table.css";
 import "./tasks-table-layout.css";
 import "./tasks-fixed-table.css";
+import "./tasks-clients.css";
 import "./tasks-dropdown-fix.css";
 import "./tasks-status-centering.css";
 import "./task-actions.css";
@@ -299,7 +300,8 @@ export default function Tasks() {
               <thead>
                 <tr>
                   <th>Задача</th>
-                  <th>Проєкт / клієнт</th>
+                  <th>Проєкт</th>
+                  <th>Клієнти</th>
                   <th>Виконавці</th>
                   <th>Пріоритет</th>
                   <th>Дедлайн</th>
@@ -330,11 +332,24 @@ export default function Tasks() {
                     <td>
                       <div className="table-secondary">
                         <span>{task.project_name || "Без проєкту"}</span>
-                        <small>
-                          {task.client_names ||
+                      </div>
+                    </td>
+                    <td>
+                      <div className="table-clients">
+                        <span className="table-client-icon">♙</span>
+                        <div className="table-client-list">
+                          {(
+                            task.client_names ||
                             task.client_name ||
-                            "Без клієнта"}
-                        </small>
+                            "Без клієнта"
+                          )
+                            .split(",")
+                            .map((name) => name.trim())
+                            .filter(Boolean)
+                            .map((name) => (
+                              <b key={name}>{name}</b>
+                            ))}
+                        </div>
                       </div>
                     </td>
                     <td>

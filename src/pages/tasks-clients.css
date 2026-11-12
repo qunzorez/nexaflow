@@ -1,0 +1,14 @@
+.tasks-redesign .task-table { min-width: 1080px; }
+.tasks-redesign .task-table th:nth-child(1), .tasks-redesign .task-table td:nth-child(1) { width: 20%; }
+.tasks-redesign .task-table th:nth-child(2), .tasks-redesign .task-table td:nth-child(2) { width: 14%; }
+.tasks-redesign .task-table th:nth-child(3), .tasks-redesign .task-table td:nth-child(3) { width: 18%; }
+.tasks-redesign .task-table th:nth-child(4), .tasks-redesign .task-table td:nth-child(4) { width: 12%; }
+.tasks-redesign .task-table th:nth-child(5), .tasks-redesign .task-table td:nth-child(5) { width: 11%; }
+.tasks-redesign .task-table th:nth-child(6), .tasks-redesign .task-table td:nth-child(6) { width: 10%; }
+.tasks-redesign .task-table th:nth-child(7), .tasks-redesign .task-table td:nth-child(7) { width: 11%; }
+.tasks-redesign .task-table th:nth-child(8), .tasks-redesign .task-table td:nth-child(8) { width: 4%; }
+.table-clients { display: flex; align-items: flex-start; gap: 8px; min-width: 130px; }
+.table-client-icon { display: grid; place-items: center; flex: none; width: 25px; height: 25px; border-radius: 8px; background: #eef0ff; color: #7066c7; font-size: 13px; }
+.table-client-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.table-client-list b { padding: 5px 7px; border-radius: 7px; background: #f1f0ff; color: #5b56a5; font-size: 9px; font-weight: 800; line-height: 1.1; }
+.table-client-list b:first-child { background: #e8f7ef; color: var(--green); }
