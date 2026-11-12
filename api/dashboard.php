@@ -12,9 +12,9 @@ try {
     $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
     $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
     if ($isAdmin) {
-        $projects = $pdo->query('SELECT p.id, p.name, p.description, p.owner_id, p.created_at, u.name AS owner_name FROM projects p JOIN users u ON u.id = p.owner_id ORDER BY p.created_at DESC')->fetchAll();
+        $projects = $pdo->query('SELECT p.id, p.name, p.description, p.owner_id, p.status, p.created_at, u.name AS owner_name FROM projects p JOIN users u ON u.id = p.owner_id ORDER BY p.created_at DESC')->fetchAll();
     } else {
-        $query = $pdo->prepare('SELECT DISTINCT p.id, p.name, p.description, p.owner_id, p.created_at, u.name AS owner_name, CASE WHEN p.owner_id = ? THEN \'owner\' ELSE pm.role END AS project_role FROM projects p JOIN users u ON u.id = p.owner_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR pm.user_id IS NOT NULL ORDER BY p.created_at DESC');
+        $query = $pdo->prepare('SELECT DISTINCT p.id, p.name, p.description, p.owner_id, p.status, p.created_at, u.name AS owner_name, CASE WHEN p.owner_id = ? THEN \'owner\' ELSE pm.role END AS project_role FROM projects p JOIN users u ON u.id = p.owner_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR pm.user_id IS NOT NULL ORDER BY p.created_at DESC');
         $query->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
         $projects = $query->fetchAll();
     }
