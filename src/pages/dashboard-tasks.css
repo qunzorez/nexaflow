@@ -1,0 +1,9 @@
+.dashboard-tasks-panel { min-width: 0; }
+.dashboard-task-tools { display: flex; gap: 8px; margin-top: 15px; }
+.dashboard-task-tools label { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; color: #819088; background: #fbfdfb; }
+.dashboard-task-tools label:focus-within { border-color: #76bca1; box-shadow: 0 0 0 3px #dff2e9; }
+.dashboard-task-tools label span { font-size: 17px; }
+.dashboard-task-tools input, .dashboard-task-tools select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 10px; padding: 9px 0; }
+.dashboard-task-tools select { width: 125px; flex: 0 0 125px; padding: 9px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.dashboard-tasks-panel .dashboard-task-list { max-height: 294px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
+@media (max-width: 600px) { .dashboard-task-tools { display: grid; grid-template-columns: 1fr; } .dashboard-task-tools select { width: 100%; } }
