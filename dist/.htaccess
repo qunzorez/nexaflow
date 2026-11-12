@@ -2,6 +2,10 @@ DirectoryIndex index.html
 
 RewriteEngine On
 
+# Always use the secure HTTPS version of the site.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
 # Redirect direct .html links to clean URLs.
 RewriteCond %{THE_REQUEST} \s/+dashboard\.html(?:[?\s]) [NC]
 RewriteRule ^dashboard\.html$ /dashboard [R=301,L]
