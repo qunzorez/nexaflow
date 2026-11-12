@@ -1,0 +1,15 @@
+.priority-dropdown { position: relative; margin-top: 7px; }
+.priority-dropdown-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 9px; padding: 6px 38px 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font: 700 12px/1 Manrope; text-align: left; position: relative; }
+.priority-dropdown-trigger:hover, .priority-dropdown.is-open .priority-dropdown-trigger { border-color: #76bca1; box-shadow: 0 0 0 3px #dff2e9; }
+.priority-dropdown-icon { width: 24px; height: 24px; flex: 0 0 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font: 900 14px/1 Arial, sans-serif; }
+.priority-dropdown-normal .priority-dropdown-icon-normal, .priority-dropdown-normal > .priority-dropdown-trigger .priority-dropdown-icon { background: #eef4ff; color: #647fa8; }
+.priority-dropdown-low .priority-dropdown-icon-low, .priority-dropdown-low > .priority-dropdown-trigger .priority-dropdown-icon { background: #edf4ef; color: #668276; }
+.priority-dropdown-high .priority-dropdown-icon-high, .priority-dropdown-high > .priority-dropdown-trigger .priority-dropdown-icon { background: #fff2d8; color: #a27931; }
+.priority-dropdown-urgent .priority-dropdown-icon-urgent, .priority-dropdown-urgent > .priority-dropdown-trigger .priority-dropdown-icon { background: #ffebe7; color: #c45e4e; }
+.priority-dropdown-chevron { position: absolute; right: 16px; top: 50%; width: 7px; height: 7px; border-right: 2px solid #60736a; border-bottom: 2px solid #60736a; transform: translateY(-70%) rotate(45deg); transition: transform .16s ease; }
+.priority-dropdown.is-open .priority-dropdown-chevron { transform: translateY(-25%) rotate(225deg); }
+.priority-dropdown-menu { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 6px); padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: 0 16px 32px #16352b24; animation: priority-menu-in .16s ease both; }
+.priority-dropdown-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 8px; border: 0; border-radius: 7px; background: #fff; color: var(--ink); font: 700 11px/1 Manrope; text-align: left; }
+.priority-dropdown-menu button:hover, .priority-dropdown-menu button.active { background: #eef8f2; color: var(--green); }
+.priority-dropdown-menu button b { margin-left: auto; font-size: 12px; }
+@keyframes priority-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
