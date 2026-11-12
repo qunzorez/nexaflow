@@ -51,3 +51,14 @@
   .settings-page::before, .settings-page::after, .settings-page > .welcome-row, .settings-page > .team-notice, .settings-page > .form-notice, .settings-grid-page > .panel, .settings-actions { animation: none; }
   .settings-grid-page > .panel, .settings-avatar, .photo-button, .settings-actions .primary-action { transition: none; }
 }
+
+/* Compact profile layout: keep the settings page calm and balanced. */
+.settings-page::before,
+.settings-page::after { display: none; }
+.settings-grid-page > .panel:hover { transform: none; box-shadow: 0 8px 24px #3e69550b; }
+.settings-grid-page > .panel { background: #fff; }
+.settings-contact-card { grid-column: auto; }
+.settings-contact-grid { grid-template-columns: 1fr; gap: 13px; }
+.settings-section-icon { width: 28px; height: 28px; border-radius: 9px; font-size: 15px; }
+.profile-photo-row { padding: 12px; }
+.settings-grid-page { align-items: start; }
