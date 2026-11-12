@@ -61,7 +61,8 @@
 .settings-contact-grid { grid-template-columns: 1fr; gap: 13px; }
 .settings-section-icon { width: 28px; height: 28px; border-radius: 9px; font-size: 15px; }
 .profile-photo-row { padding: 12px; }
-.settings-grid-page { align-items: start; }
+.settings-grid-page { align-items: stretch; }
+.settings-grid-page > .panel { height: 100%; }
 .account-info-card { min-height: 214px; }
 .account-info-card .settings-section-title { margin-bottom: 0; }
 .account-info-list { display: grid; gap: 0; border-top: 1px solid var(--line); }
