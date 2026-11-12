@@ -7,7 +7,7 @@ if (empty($_SESSION['user_id'])) {
     jsonResponse(false, 'Сесія не знайдена.', [], 401);
 }
 
-$query = db()->prepare('SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1');
+$query = db()->prepare('SELECT id, name, email, role, avatar_url FROM users WHERE id = ? LIMIT 1');
 $query->execute([$_SESSION['user_id']]);
 $user = $query->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);

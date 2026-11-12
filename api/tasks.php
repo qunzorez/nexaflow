@@ -9,7 +9,7 @@ $columnsQuery = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMN
 $columnsQuery->execute(); $existingColumns = array_column($columnsQuery->fetchAll(), 'COLUMN_NAME');
 if (!in_array('recurrence_rule', $existingColumns, true)) $pdo->exec("ALTER TABLE tasks ADD recurrence_rule VARCHAR(20) NOT NULL DEFAULT 'none'");
 if (!in_array('recurrence_parent_id', $existingColumns, true)) $pdo->exec("ALTER TABLE tasks ADD recurrence_parent_id CHAR(32) NULL");
-$userQuery = $pdo->prepare('SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1'); $userQuery->execute([$userId]); $user = $userQuery->fetch();
+$userQuery = $pdo->prepare('SELECT id, name, email, role, avatar_url FROM users WHERE id = ? LIMIT 1'); $userQuery->execute([$userId]); $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
