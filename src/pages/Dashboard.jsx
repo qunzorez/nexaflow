@@ -136,14 +136,18 @@ export default function Dashboard() {
           </div>
         </section>
         {data.reminders?.length > 0 && (
-          <section className="panel reminders-panel">
+          <section className="panel reminders-panel reminder-panel-enter">
             <div className="panel-heading">
-              <div>
-                <h2>Нагадування</h2>
-                <p>Задачі, про які потрібно пам’ятати.</p>
+              <div className="reminders-heading-copy">
+                <span className="reminders-heading-icon">⏰</span>
+                <div>
+                  <h2>Нагадування</h2>
+                  <p>Час повернутися до задач, які потребують вашої уваги.</p>
+                </div>
               </div>
-              <span className="task-count-badge">{data.reminders.length}</span>
+              <span className="task-count-badge reminder-count-pulse">{data.reminders.length}</span>
             </div>
+            <div className="reminders-callout"><span>✦</span><strong>У вас є важливі задачі</strong><small>Натисніть на задачу, щоб перенести або вимкнути нагадування.</small></div>
             <div className="reminder-list">
               {data.reminders.map((task) => (
                 <button
@@ -152,6 +156,7 @@ export default function Dashboard() {
                   onClick={() => setReminderTask(task)}
                   key={task.id}
                 >
+                  <span className="reminder-leading-icon">⏱</span>
                   <span className={`task-status status-${task.status}`}>
                     {statusLabels[task.status]}
                   </span>
