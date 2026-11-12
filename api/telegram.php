@@ -90,11 +90,13 @@ function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string 
         if (!$user || (int)$user['telegram_notifications_enabled'] !== 1 || !$user['telegram_chat_id']) return;
         $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
-        $heading = match ($event) {
-            'task_review_approved' => '✅ Виконання задачі підтверджено',
-            'task_review_rejected' => '🔧 Задачу повернуто на доопрацювання',
-            default => '🔄 Статус задачі оновлено',
-        };
+        if ($event === 'task_review_approved') {
+            $heading = '✅ Виконання задачі підтверджено';
+        } elseif ($event === 'task_review_rejected') {
+            $heading = '🔧 Задачу повернуто на доопрацювання';
+        } else {
+            $heading = '🔄 Статус задачі оновлено';
+        }
         $caption = "<b>NexaFlow • Оновлення задачі</b>\n\n<b>{$heading}</b>\n\n📌 <b>{$safeTitle}</b>\n\n{$safeMessage}\n\nПерегляньте актуальний статус і деталі задачі.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';

@@ -18,7 +18,7 @@ function db(): PDO
     return $pdo;
 }
 
-function jsonResponse(bool $ok, string $message = '', array $extra = [], int $status = 200): never
+function jsonResponse(bool $ok, string $message = '', array $extra = [], int $status = 200): void
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
