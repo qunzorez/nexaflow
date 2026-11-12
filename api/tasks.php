@@ -3,6 +3,10 @@ declare(strict_types=1);
 require __DIR__ . '/db.php';
 require __DIR__ . '/mailer.php';
 require __DIR__ . '/telegram.php';
+set_exception_handler(static function (Throwable $error): void {
+    error_log('Tasks API error: ' . $error->getMessage());
+    jsonResponse(false, 'Помилка задачі: ' . $error->getMessage(), [], 500);
+});
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db(); $userId = (string)$_SESSION['user_id']; $method = $_SERVER['REQUEST_METHOD'] ?? 'GET'; $data = $method === 'POST' ? body() : []; $action = (string)($data['action'] ?? '');
