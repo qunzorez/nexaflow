@@ -10,4 +10,5 @@ return [
     'password' => 'Masterok1-0',
     'charset' => 'utf8mb4',
     'telegram_bot_token' => '',
+    'mail_transport' => 'mail',
 ];

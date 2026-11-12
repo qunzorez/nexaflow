@@ -4,7 +4,10 @@ declare(strict_types=1);
 function sendProjectEmail(string $to, string $subject, string $message, string $html = ''): bool
 {
     $from = 'no-reply@nexaflow.top';
-    if (file_exists(__DIR__ . '/config.local.php')) {
+    $configFile = __DIR__ . '/config.local.php';
+    $config = require file_exists($configFile) ? $configFile : (__DIR__ . '/config.php');
+    $mailTransport = (string)($config['mail_transport'] ?? 'mail');
+    if ($mailTransport === 'mailpit') {
         $socket = @fsockopen('127.0.0.1', 1025, $errorCode, $errorMessage, 3);
         if (!$socket) return false;
         $read = static function () use ($socket): string { return (string)fgets($socket, 2048); };
