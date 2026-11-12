@@ -1,0 +1,8 @@
+.priority-select-wrap,
+.priority-select-wrap.priority-low,
+.priority-select-wrap.priority-normal,
+.priority-select-wrap.priority-high,
+.priority-select-wrap.priority-urgent {
+  background: #fff !important;
+  color: var(--ink) !important;
+}
