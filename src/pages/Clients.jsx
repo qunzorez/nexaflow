@@ -39,6 +39,14 @@ const emptyForm = {
   has_employees: false,
   employee_count: "",
   special_taxes: [],
+  module: window.localStorage.getItem("nexaflow.client.module") || "accounting",
+  module_data: {},
+};
+const moduleNames = {
+  accounting: "Бухгалтерія",
+  dentistry: "Стоматологія",
+  legal: "Юридичні послуги",
+  real_estate: "Нерухомість",
 };
 
 function Toggle({ label, value, onChange }) {
@@ -79,7 +87,123 @@ function ClientFormModal({ form, setForm, editing, onSave, onClose }) {
           <p className="client-modal-subtitle">
             Додайте організаційні та податкові дані клієнта.
           </p>
+          <div className="client-module-badge">
+            Модуль:{" "}
+            <strong>
+              {moduleNames[form.module] || moduleNames.accounting}
+            </strong>
+          </div>
           <form className="client-form" onSubmit={onSave}>
+            {form.module !== "accounting" && (
+              <div className="client-module-fields">
+                <h3>Дані модуля</h3>
+                <div className="client-form-grid">
+                  <label>
+                    Контактна особа
+                    <input
+                      value={form.module_data?.contact_person || ""}
+                      onChange={(event) =>
+                        set("module_data", {
+                          ...form.module_data,
+                          contact_person: event.target.value,
+                        })
+                      }
+                      placeholder="Ім’я та прізвище"
+                    />
+                  </label>
+                  <label>
+                    Телефон
+                    <input
+                      value={form.module_data?.phone || ""}
+                      onChange={(event) =>
+                        set("module_data", {
+                          ...form.module_data,
+                          phone: event.target.value,
+                        })
+                      }
+                      placeholder="+380…"
+                    />
+                  </label>
+                  <label>
+                    Email
+                    <input
+                      type="email"
+                      value={form.module_data?.email || ""}
+                      onChange={(event) =>
+                        set("module_data", {
+                          ...form.module_data,
+                          email: event.target.value,
+                        })
+                      }
+                      placeholder="client@example.com"
+                    />
+                  </label>
+                  {form.module === "dentistry" && (
+                    <label>
+                      Дата народження
+                      <input
+                        type="date"
+                        value={form.module_data?.birth_date || ""}
+                        onChange={(event) =>
+                          set("module_data", {
+                            ...form.module_data,
+                            birth_date: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  )}
+                  {form.module === "dentistry" && (
+                    <label>
+                      Тип клієнта
+                      <select
+                        value={form.module_data?.patient_type || "Пацієнт"}
+                        onChange={(event) =>
+                          set("module_data", {
+                            ...form.module_data,
+                            patient_type: event.target.value,
+                          })
+                        }
+                      >
+                        <option>Пацієнт</option>
+                        <option>Дитина</option>
+                        <option>Сім’я</option>
+                      </select>
+                    </label>
+                  )}
+                  {form.module === "legal" && (
+                    <label>
+                      Тип справи
+                      <input
+                        value={form.module_data?.case_type || ""}
+                        onChange={(event) =>
+                          set("module_data", {
+                            ...form.module_data,
+                            case_type: event.target.value,
+                          })
+                        }
+                        placeholder="Договір, судова справа…"
+                      />
+                    </label>
+                  )}
+                  {form.module === "real_estate" && (
+                    <label>
+                      Тип об’єкта
+                      <input
+                        value={form.module_data?.property_type || ""}
+                        onChange={(event) =>
+                          set("module_data", {
+                            ...form.module_data,
+                            property_type: event.target.value,
+                          })
+                        }
+                        placeholder="Квартира, будинок, офіс…"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="client-form-grid">
               <label>
                 Назва клієнта
@@ -272,7 +396,13 @@ export default function Clients() {
   }, [search, legalFilter, taxFilter]);
   function openCreate() {
     setEditing(null);
-    setForm({ ...emptyForm, special_taxes: [] });
+    setForm({
+      ...emptyForm,
+      module:
+        window.localStorage.getItem("nexaflow.client.module") || "accounting",
+      module_data: {},
+      special_taxes: [],
+    });
     setModal(true);
   }
   function openEdit(client) {
@@ -284,6 +414,11 @@ export default function Clients() {
       has_employees: Boolean(Number(client.has_employees)),
       employee_count: client.employee_count || "",
       special_taxes: client.special_taxes || [],
+      module:
+        client.module ||
+        window.localStorage.getItem("nexaflow.client.module") ||
+        "accounting",
+      module_data: client.module_data || {},
     });
     setModal(true);
   }

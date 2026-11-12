@@ -19,6 +19,9 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [telegramTag, setTelegramTag] = useState("");
   const [bio, setBio] = useState("");
+  const [clientModule, setClientModule] = useState(
+    () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
+  );
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -69,6 +72,7 @@ export default function Settings() {
     );
     setNotice(result.message);
     event.currentTarget.reset();
+    window.localStorage.setItem("nexaflow.client.module", clientModule);
   }
   if (!user) return <div className="loading-screen">Завантаження профілю…</div>;
   const avatarView = avatar ? (
@@ -94,7 +98,9 @@ export default function Settings() {
           <section className="panel settings-profile-card">
             <div className="settings-section-title">
               <div>
-                <h2><span className="settings-section-icon">◎</span>Профіль</h2>
+                <h2>
+                  <span className="settings-section-icon">◎</span>Профіль
+                </h2>
                 <p>Основна інформація користувача.</p>
               </div>
             </div>
@@ -125,7 +131,10 @@ export default function Settings() {
           <section className="panel settings-contact-card">
             <div className="settings-section-title">
               <div>
-                <h2><span className="settings-section-icon">⌁</span>Контактна інформація</h2>
+                <h2>
+                  <span className="settings-section-icon">⌁</span>Контактна
+                  інформація
+                </h2>
                 <p>Додайте дані, за якими команда зможе з вами зв’язатися.</p>
               </div>
             </div>
@@ -162,10 +171,14 @@ export default function Settings() {
               />
             </label>
           </section>
-          <section className={`panel password-card${showPasswordFields ? " is-open" : ""}`}>
+          <section
+            className={`panel password-card${showPasswordFields ? " is-open" : ""}`}
+          >
             <div className="settings-section-title password-section-heading">
               <div>
-                <h2><span className="settings-section-icon">▣</span>Безпека</h2>
+                <h2>
+                  <span className="settings-section-icon">▣</span>Безпека
+                </h2>
                 <p>Змініть пароль, якщо потрібно.</p>
               </div>
               <button
@@ -178,56 +191,110 @@ export default function Settings() {
                 {showPasswordFields ? "Сховати" : "Змінити пароль"}
               </button>
             </div>
-            {showPasswordFields && <>
-              <label>
-                Поточний пароль
-                <input
-                  type="password"
-                  name="current_password"
-                  autoComplete="current-password"
-                  placeholder="Введіть поточний пароль"
-                />
-              </label>
-              <label>
-                Новий пароль
-                <input
-                  type="password"
-                  name="new_password"
-                  minLength="8"
-                  autoComplete="new-password"
-                  placeholder="Мінімум 8 символів"
-                />
-              </label>
-              <small className="settings-hint">
-                Залиште поля порожніми, якщо не хочете змінювати пароль.
-              </small>
-            </>}
+            {showPasswordFields && (
+              <>
+                <label>
+                  Поточний пароль
+                  <input
+                    type="password"
+                    name="current_password"
+                    autoComplete="current-password"
+                    placeholder="Введіть поточний пароль"
+                  />
+                </label>
+                <label>
+                  Новий пароль
+                  <input
+                    type="password"
+                    name="new_password"
+                    minLength="8"
+                    autoComplete="new-password"
+                    placeholder="Мінімум 8 символів"
+                  />
+                </label>
+                <small className="settings-hint">
+                  Залиште поля порожніми, якщо не хочете змінювати пароль.
+                </small>
+              </>
+            )}
           </section>
           <section className="panel account-info-card">
             <div className="settings-section-title">
               <div>
-                <h2><span className="settings-section-icon">✦</span>Про акаунт</h2>
+                <h2>
+                  <span className="settings-section-icon">✦</span>Про акаунт
+                </h2>
                 <p>Ваш поточний статус у NexaFlow.</p>
               </div>
             </div>
             <div className="account-info-list">
-              <div><span>Роль</span><strong>{roleNames[user.role] || "Користувач"}</strong></div>
-              <div><span>Пошта</span><strong className="account-email">{user.email}</strong></div>
-              <div><span>Статус пошти</span><strong className="account-verified">● Підтверджено</strong></div>
+              <div>
+                <span>Роль</span>
+                <strong>{roleNames[user.role] || "Користувач"}</strong>
+              </div>
+              <div>
+                <span>Пошта</span>
+                <strong className="account-email">{user.email}</strong>
+              </div>
+              <div>
+                <span>Статус пошти</span>
+                <strong className="account-verified">● Підтверджено</strong>
+              </div>
             </div>
           </section>
           <section className="panel subscription-card">
             <div className="subscription-main">
               <div className="settings-section-title">
                 <div>
-                  <h2><span className="settings-section-icon">◇</span>Підписка</h2>
+                  <h2>
+                    <span className="settings-section-icon">◇</span>Підписка
+                  </h2>
                   <p>Керуйте доступом до можливостей NexaFlow.</p>
                 </div>
               </div>
-              <div className="subscription-plan"><strong>Стартовий план</strong><span>Поточний план</span></div>
+              <div className="subscription-plan">
+                <strong>Стартовий план</strong>
+                <span>Поточний план</span>
+              </div>
+              <label className="subscription-module-select">
+                Модуль клієнтів
+                <select
+                  value={clientModule}
+                  onChange={(event) => {
+                    setClientModule(event.target.value);
+                    window.localStorage.setItem(
+                      "nexaflow.client.module",
+                      event.target.value,
+                    );
+                  }}
+                >
+                  <option value="accounting">Бухгалтерія</option>
+                  <option value="dentistry">Стоматологія</option>
+                  <option value="legal">Юридичні послуги</option>
+                  <option value="real_estate">Нерухомість</option>
+                </select>
+                <small>
+                  Цей модуль визначає поля у формі створення клієнта.
+                </small>
+              </label>
             </div>
-            <div className="subscription-meta"><div><span>Статус</span><strong>● Активна</strong></div><div><span>Оплата</span><b>Поки без оплати</b></div></div>
-            <button type="button" className="outline-btn subscription-button" disabled>Керувати підпискою</button>
+            <div className="subscription-meta">
+              <div>
+                <span>Статус</span>
+                <strong>● Активна</strong>
+              </div>
+              <div>
+                <span>Оплата</span>
+                <b>Поки без оплати</b>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="outline-btn subscription-button"
+              disabled
+            >
+              Керувати підпискою
+            </button>
           </section>
           <div className="settings-actions">
             <button className="primary-action">Зберегти зміни</button>

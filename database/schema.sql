@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS clients (
   has_employees INTEGER NOT NULL DEFAULT 0,
   employee_count INTEGER NULL,
   special_taxes TEXT NULL,
+  module TEXT NOT NULL DEFAULT 'accounting',
+  module_data TEXT NULL,
   created_by TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

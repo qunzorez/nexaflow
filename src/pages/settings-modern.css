@@ -85,3 +85,4 @@
 .subscription-meta strong, .subscription-meta b { color: var(--green); font-size: 10px; white-space: nowrap; }
 .subscription-button { opacity: .65; white-space: nowrap; }
 @media (max-width: 760px) { .subscription-card, .account-info-card, .password-card { grid-column: auto; grid-row: auto; } .subscription-card { min-height: 0; gap: 15px; } .subscription-meta { justify-content: space-between; } .subscription-button { justify-self: start; } }
+.subscription-module-select{display:grid;gap:7px;max-width:280px;margin-top:18px;color:var(--muted);font-size:10px;font-weight:800}.subscription-module-select select{border:1px solid var(--line);border-radius:9px;background:#fff;padding:10px 11px;color:var(--ink);font:700 11px Manrope}.subscription-module-select small{font-size:9px;font-weight:500}
