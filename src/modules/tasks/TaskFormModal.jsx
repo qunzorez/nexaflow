@@ -5,6 +5,7 @@ import TaskDescriptionEditor from './TaskDescriptionEditor.jsx';
 import './task-editor.css';
 import './priority-field.css';
 import './priority-field-fix.css';
+import './priority-field-polish.css';
 import './task-modal-layer.css';
 
 const priorities = [{ value: 'low', label: 'Низький', icon: '↓' }, { value: 'normal', label: 'Звичайний', icon: '—' }, { value: 'high', label: 'Високий', icon: '↑' }, { value: 'urgent', label: 'Терміновий', icon: '!' }];
