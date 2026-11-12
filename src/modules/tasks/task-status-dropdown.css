@@ -4,7 +4,7 @@
 .detail-status-icon { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; flex: 0 0 21px; border-radius: 50%; font: 900 12px/21px Arial, sans-serif; text-align: center; }
 .status-menu-todo .detail-status-trigger { background: #f1f4f2; color: #68776f; }.status-menu-todo .detail-status-icon { background: #dce5df; }
 .status-menu-in_progress .detail-status-trigger { background: #e8f1ff; color: #557bb4; }.status-menu-in_progress .detail-status-icon { background: #cbdcff; }
-.status-menu-review .detail-status-trigger { background: #fff4dc; color: #a87519; }.status-menu-review .detail-status-icon { background: #ffe5b5; }
+.status-menu-review .detail-status-trigger { background: #f0eafd; color: #725bc2; }.status-menu-review .detail-status-icon { background: #dfd5ff; }
 .status-menu-done .detail-status-trigger { background: #e5f5eb; color: #23815e; }.status-menu-done .detail-status-icon { background: #c8ead6; }
 .status-menu-cancelled .detail-status-trigger { background: #fff0ed; color: #c66d5a; }.status-menu-cancelled .detail-status-icon { background: #ffd8d0; }
 .status-menu-archived .detail-status-trigger { background: #eceff0; color: #65716c; }.status-menu-archived .detail-status-icon { background: #d8dfe0; }
