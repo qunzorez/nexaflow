@@ -63,8 +63,13 @@ function sendUserNotificationEmail(PDO $pdo, string $userId, string $to, string 
         }
         $columnChecked[$connectionKey] = true;
     }
-    $preference = $pdo->prepare('SELECT email_notifications_enabled FROM users WHERE id = ? LIMIT 1');
+    // The user ID is authoritative. Re-read the address immediately before
+    // sending so a stale email from a previous query cannot receive the mail.
+    $preference = $pdo->prepare('SELECT email, email_notifications_enabled FROM users WHERE id = ? LIMIT 1');
     $preference->execute([$userId]);
-    if ((int)$preference->fetchColumn() !== 1) return false;
-    return sendProjectEmail($to, $subject, $message, $html);
+    $recipient = $preference->fetch(PDO::FETCH_ASSOC);
+    if (!$recipient || (int)$recipient['email_notifications_enabled'] !== 1) return false;
+    $recipientEmail = strtolower(trim((string)$recipient['email']));
+    if (!filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) return false;
+    return sendProjectEmail($recipientEmail, $subject, $message, $html);
 }
