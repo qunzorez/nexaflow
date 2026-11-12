@@ -21,7 +21,8 @@ export default function Settings() {
   const [telegramChatId, setTelegramChatId] = useState("");
   const [telegramConnectUrl, setTelegramConnectUrl] = useState("");
   const [telegramEnabled, setTelegramEnabled] = useState(false);
-  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
   const [bio, setBio] = useState("");
   const [clientModule, setClientModule] = useState(
     () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
@@ -67,7 +68,6 @@ export default function Settings() {
       telegram_tag: telegramTag,
       telegram_chat_id: telegramChatId,
       telegram_notifications_enabled: telegramEnabled,
-      email_notifications_enabled: emailEnabled,
       bio,
       current_password: form.get("current_password"),
       new_password: form.get("new_password"),
@@ -90,27 +90,21 @@ export default function Settings() {
     window.localStorage.setItem("nexaflow.client.module", clientModule);
   }
   async function toggleEmailNotifications(event) {
+    if (emailSaving) return;
     const enabled = event.target.checked;
-    const previous = emailEnabled;
-    setEmailEnabled(enabled);
+    setEmailSaving(true);
     setError("");
-    const result = await post("/api/profile.php", {
-      name,
-      avatar_url: avatar,
-      phone,
-      telegram_tag: telegramTag,
-      telegram_chat_id: telegramChatId,
-      telegram_notifications_enabled: telegramEnabled,
-      email_notifications_enabled: enabled,
-      bio,
-    });
-    if (!result.ok) {
-      setEmailEnabled(previous);
-      setError(result.message || "Не вдалося зберегти налаштування email.");
-      return;
+    setNotice("");
+    try {
+      const result = await post("/api/email-preference.php", { enabled });
+      if (!result.ok) throw new Error(result.message || "Не вдалося зберегти налаштування email.");
+      setEmailEnabled(result.enabled === true);
+      setNotice("Налаштування email-сповіщень збережено.");
+    } catch (error) {
+      setError(error.message || "Помилка з’єднання. Налаштування не збережено.");
+    } finally {
+      setEmailSaving(false);
     }
-    setEmailEnabled(Boolean(Number(result.user.email_notifications_enabled)));
-    setNotice("Налаштування email-сповіщень збережено.");
   }
   if (!user) return <div className="loading-screen">Завантаження профілю…</div>;
   const avatarView = avatar ? (
@@ -215,9 +209,9 @@ export default function Settings() {
                 <small>Отримуйте листи про нагадування, призначення та зміни задач.</small>
               </div>
               <label className="telegram-toggle">
-                <input type="checkbox" checked={emailEnabled} onChange={toggleEmailNotifications} />
+                <input type="checkbox" checked={emailEnabled} disabled={emailSaving} onChange={toggleEmailNotifications} />
                 <span />
-                <b>{emailEnabled ? "Увімкнено" : "Вимкнено"}</b>
+                <b>{emailSaving ? "Збереження…" : emailEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
             </div>
           </section>
@@ -353,7 +347,7 @@ export default function Settings() {
             </button>
           </section>
           <div className="settings-actions">
-            <button className="primary-action">Зберегти зміни</button>
+            <button className="primary-action" disabled={emailSaving}>Зберегти зміни</button>
           </div>
         </form>
       </div>
