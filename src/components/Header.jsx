@@ -7,7 +7,7 @@ const roleNames = { admin: 'Адміністратор', owner: 'Власник'
 export default function Header({ page, user, onMenu }) {
   const [profile, setProfile] = useState(user); const [open, setOpen] = useState(false); const menuRef = useRef(null); const navigate = useNavigate();
   useEffect(() => { setProfile(user); }, [user]);
-  useEffect(() => { api('/api/me.php').then(result => result.ok && setProfile(result.user)); }, []);
+  useEffect(() => { api('/api/me.php').then(result => result.ok && setProfile(result.user)); const syncProfile = event => event.detail && setProfile(event.detail); window.addEventListener('nexaflow:profile-updated', syncProfile); return () => window.removeEventListener('nexaflow:profile-updated', syncProfile); }, []);
   useEffect(() => { const close = event => { if (!menuRef.current?.contains(event.target)) setOpen(false); }; document.addEventListener('mousedown', close); return () => document.removeEventListener('mousedown', close); }, []);
   const canCreateProject = ['admin', 'owner', 'manager'].includes(profile?.role);
   async function logout() { await post('/api/logout.php', {}); navigate('/'); }
