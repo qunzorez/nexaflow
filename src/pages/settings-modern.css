@@ -63,6 +63,7 @@
 .profile-photo-row { padding: 12px; }
 .settings-grid-page { align-items: start; }
 .account-info-card { min-height: 214px; }
+.account-info-card .settings-section-title { margin-bottom: 0; }
 .account-info-list { display: grid; gap: 0; border-top: 1px solid var(--line); }
 .account-info-list > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); }
 .account-info-list span { color: var(--muted); font-size: 10px; }
