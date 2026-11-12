@@ -109,6 +109,8 @@
 .dashboard-page .team-time-row:hover,
 .dashboard-page .reminder-row:hover { background: #f7fcf8; padding-left: 8px; padding-right: 8px; }
 .dashboard-page .project-icon { border-radius: 12px; box-shadow: 0 5px 12px #7564c822; }
+.dashboard-page .project-list { height: 280px; max-height: 280px; margin-top: 18px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
+.dashboard-page .project-row { min-height: 56px; box-sizing: border-box; }
 .dashboard-page .project-status { box-shadow: inset 0 0 0 1px #d1ecdc; }
 .dashboard-page .reminders-panel { animation: dashboard-rise .55s ease both; }
 .dashboard-page .reminder-row { border-radius: 9px; }
