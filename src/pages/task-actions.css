@@ -1,0 +1,14 @@
+.table-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  line-height: 1;
+}
+
+.table-more::before {
+  content: '✎';
+  font-size: 15px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
