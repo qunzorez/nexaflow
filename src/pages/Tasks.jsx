@@ -112,20 +112,26 @@ export default function Tasks() {
   const [data, setData] = useState(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState(() => window.localStorage.getItem("nexaflow.tasks.filter") || "all");
+  const [filter, setFilter] = useState(
+    () => window.localStorage.getItem("nexaflow.tasks.filter") || "all",
+  );
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [projectIds, setProjectIds] = useState([]);
   const [assigneeIds, setAssigneeIds] = useState([]);
+  const [clientIds, setClientIds] = useState([]);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const openedFromQuery = useRef(false);
   async function load() {
-    const result = await api("/api/tasks.php");
+    const [result, clients] = await Promise.all([
+      api("/api/tasks.php"),
+      api("/api/clients.php"),
+    ]);
     if (!result.ok) return navigate("/");
-    setData(result);
+    setData({ ...result, clients: clients.ok ? clients.clients || [] : [] });
   }
   useEffect(() => {
     load();
@@ -153,12 +159,14 @@ export default function Tasks() {
     setEditing(null);
     setProjectIds([]);
     setAssigneeIds([]);
+    setClientIds([]);
     setModalOpen(true);
   }
   function editTask(task) {
     setEditing(task);
     setProjectIds(task.project_ids || []);
     setAssigneeIds(task.assignee_ids || []);
+    setClientIds(task.client_ids || []);
     setModalOpen(true);
   }
   function closeModal() {
@@ -166,6 +174,7 @@ export default function Tasks() {
     setEditing(null);
     setProjectIds([]);
     setAssigneeIds([]);
+    setClientIds([]);
     if (params.get("create") === "1") navigate("/tasks", { replace: true });
   }
   async function save(event) {
@@ -176,6 +185,7 @@ export default function Tasks() {
     const payload = Object.fromEntries(form.entries());
     payload.project_ids = projectIds;
     payload.assignee_ids = assigneeIds;
+    payload.client_ids = clientIds;
     payload.action = editing ? "update" : "create";
     if (editing) payload.id = editing.id;
     const result = await post("/api/tasks.php", payload);
@@ -213,7 +223,7 @@ export default function Tasks() {
       const matchesFilter =
         filter === "all" ? task.status !== "archived" : task.status === filter;
       const haystack =
-        `${task.title} ${task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
+        `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
       return (
         matchesFilter &&
         (!normalizedSearch || haystack.includes(normalizedSearch))
@@ -320,7 +330,11 @@ export default function Tasks() {
                     <td>
                       <div className="table-secondary">
                         <span>{task.project_name || "Без проєкту"}</span>
-                        <small>{task.client_name || "Без клієнта"}</small>
+                        <small>
+                          {task.client_names ||
+                            task.client_name ||
+                            "Без клієнта"}
+                        </small>
                       </div>
                     </td>
                     <td>
@@ -422,8 +436,10 @@ export default function Tasks() {
             editing={editing}
             projectIds={projectIds}
             assigneeIds={assigneeIds}
+            clientIds={clientIds}
             setProjectIds={setProjectIds}
             setAssigneeIds={setAssigneeIds}
+            setClientIds={setClientIds}
             onSubmit={save}
             onClose={closeModal}
           />

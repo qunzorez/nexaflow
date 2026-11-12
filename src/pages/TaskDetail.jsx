@@ -1,34 +1,351 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import DOMPurify from 'dompurify';
-import Layout from '../components/Layout.jsx';
-import TaskFormModal from '../modules/tasks/TaskFormModal.jsx';
-import TimeLogModal from '../modules/tasks/TimeLogModal.jsx';
-import TaskStatusDropdown from '../modules/tasks/TaskStatusDropdown.jsx';
-import { api, post } from '../services/api.js';
-import './task-detail.css';
-import './task-detail-extra.css';
-import './task-review-status.css';
-import '../modules/tasks/task-modal.css';
-import '../modules/tasks/time-log.css';
-import '../modules/tasks/task-status-dropdown.css';
-import '../modules/tasks/task-priority.css';
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import DOMPurify from "dompurify";
+import Layout from "../components/Layout.jsx";
+import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
+import TimeLogModal from "../modules/tasks/TimeLogModal.jsx";
+import TaskStatusDropdown from "../modules/tasks/TaskStatusDropdown.jsx";
+import { api, post } from "../services/api.js";
+import "./task-detail.css";
+import "./task-detail-extra.css";
+import "./task-review-status.css";
+import "../modules/tasks/task-modal.css";
+import "../modules/tasks/time-log.css";
+import "../modules/tasks/task-status-dropdown.css";
+import "../modules/tasks/task-priority.css";
 
-const statusLabels = { todo: 'До виконання', in_progress: 'У роботі', review: 'На перевірці', done: 'Завершено', cancelled: 'Скасовано', archived: 'Архів' };
-const formatMinutes = value => { const minutes = Number(value || 0); const hours = Math.floor(minutes / 60); const rest = minutes % 60; return hours ? `${hours} год${rest ? ` ${rest} хв` : ''}` : `${rest} хв`; };
-function descriptionInfo(value) { const holder = document.createElement('div'); holder.innerHTML = String(value || ''); return { text: (holder.textContent || '').replace(/\s+/g, ' ').trim(), images: holder.querySelectorAll('img').length }; }
-function descriptionChangeMessage(oldValue, newValue) { const oldInfo = descriptionInfo(oldValue); const newInfo = descriptionInfo(newValue); const parts = []; if (!oldInfo.text && newInfo.text) parts.push(`додано текст опису «${newInfo.text.slice(0, 140)}${newInfo.text.length > 140 ? '…' : ''}»`); else if (oldInfo.text && !newInfo.text) parts.push('видалено текст опису'); else if (oldInfo.text !== newInfo.text) parts.push(`змінено текст опису на «${newInfo.text.slice(0, 140)}${newInfo.text.length > 140 ? '…' : ''}»`); if (!oldInfo.images && newInfo.images) parts.push(`додано ${newInfo.images} зображення`); else if (oldInfo.images && !newInfo.images) parts.push('видалено зображення'); else if (oldInfo.images !== newInfo.images) parts.push(`змінено кількість зображень: ${oldInfo.images} → ${newInfo.images}`); return parts.length ? `${parts.join(' та ')}.` : ''; }
+const statusLabels = {
+  todo: "До виконання",
+  in_progress: "У роботі",
+  review: "На перевірці",
+  done: "Завершено",
+  cancelled: "Скасовано",
+  archived: "Архів",
+};
+const formatMinutes = (value) => {
+  const minutes = Number(value || 0);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours} год${rest ? ` ${rest} хв` : ""}` : `${rest} хв`;
+};
+function descriptionInfo(value) {
+  const holder = document.createElement("div");
+  holder.innerHTML = String(value || "");
+  return {
+    text: (holder.textContent || "").replace(/\s+/g, " ").trim(),
+    images: holder.querySelectorAll("img").length,
+  };
+}
+function descriptionChangeMessage(oldValue, newValue) {
+  const oldInfo = descriptionInfo(oldValue);
+  const newInfo = descriptionInfo(newValue);
+  const parts = [];
+  if (!oldInfo.text && newInfo.text)
+    parts.push(
+      `додано текст опису «${newInfo.text.slice(0, 140)}${newInfo.text.length > 140 ? "…" : ""}»`,
+    );
+  else if (oldInfo.text && !newInfo.text) parts.push("видалено текст опису");
+  else if (oldInfo.text !== newInfo.text)
+    parts.push(
+      `змінено текст опису на «${newInfo.text.slice(0, 140)}${newInfo.text.length > 140 ? "…" : ""}»`,
+    );
+  if (!oldInfo.images && newInfo.images)
+    parts.push(`додано ${newInfo.images} зображення`);
+  else if (oldInfo.images && !newInfo.images) parts.push("видалено зображення");
+  else if (oldInfo.images !== newInfo.images)
+    parts.push(
+      `змінено кількість зображень: ${oldInfo.images} → ${newInfo.images}`,
+    );
+  return parts.length ? `${parts.join(" та ")}.` : "";
+}
 
 export default function TaskDetail() {
-  const { id } = useParams(); const navigate = useNavigate(); const [data, setData] = useState(null); const [listData, setListData] = useState(null); const [modal, setModal] = useState(false); const [timeModal, setTimeModal] = useState(false); const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [projectIds, setProjectIds] = useState([]); const [assigneeIds, setAssigneeIds] = useState([]);
-  async function load() { const [detail, list] = await Promise.all([api(`/api/tasks.php?id=${encodeURIComponent(id)}`), api('/api/tasks.php')]); if (!detail.ok) return navigate('/tasks'); setData(detail); setListData(list); }
-  useEffect(() => { load(); const interval = window.setInterval(load, 15000); const refreshOnFocus = () => load(); window.addEventListener('focus', refreshOnFocus); return () => { window.clearInterval(interval); window.removeEventListener('focus', refreshOnFocus); }; }, [id]);
-  function edit() { setProjectIds(data.task.project_ids || []); setAssigneeIds(data.task.assignee_ids || []); setModal(true); }
-  async function save(event) { event.preventDefault(); setError(''); const form = new FormData(event.currentTarget); const payload = Object.fromEntries(form.entries()); payload.action = 'update'; payload.id = id; payload.project_ids = projectIds; payload.assignee_ids = assigneeIds; const result = await post('/api/tasks.php', payload); if (!result.ok) return setError(result.message); setNotice(result.message); setModal(false); load(); }
-  async function changeStatus(status) { setError(''); const result = await post('/api/tasks.php', { action: 'set_status', id, status }); if (!result.ok) return setError(result.message); setNotice(result.message); load(); }
-  async function logTime(event) { event.preventDefault(); setError(''); const form = new FormData(event.currentTarget); const minutes = Number(form.get('hours') || 0) * 60 + Number(form.get('minutes') || 0); const result = await post('/api/tasks.php', { action: 'log_time', task_id: id, minutes, note: form.get('note') }); if (!result.ok) return setError(result.message); setNotice(result.message); setTimeModal(false); load(); }
-  if (!data || !listData) return <div className="loading-screen">Завантаження задачі…</div>;
-  const task = data.task; const canManage = ['admin', 'owner', 'manager'].includes(data.user?.role); const priorityInfo = { low: ['Низький', '↓'], normal: ['Звичайний', '—'], high: ['Високий', '↑'], urgent: ['Терміновий', '!'] }[task.priority] || ['Звичайний', '—']; const descriptionHtml = task.description ? (/<[a-z][\s\S]*>/i.test(task.description) ? task.description : `<p>${String(task.description).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character])).replace(/\n/g, '<br />')}</p>`) : '<p>Опис задачі ще не додано.</p>';
-  return <Layout page="Деталі задачі" user={data.user}><div className="content task-detail-page"><button className="page-back" type="button" onClick={() => navigate('/tasks')}>← Назад до задач</button>{notice && <div className="team-notice success">{notice}</div>}{error && <div className="form-notice">{error}</div>}<section className="task-detail-header"><div><p className="eyebrow">ЗАДАЧА</p><h1>{task.title}</h1><div className="detail-badges"><TaskStatusDropdown task={task} canManage={canManage} onChange={changeStatus} /><span className={`detail-priority detail-priority-${task.priority}`}><span className="detail-priority-icon">{priorityInfo[1]}</span>{priorityInfo[0]}</span></div></div><div className="task-detail-actions"><button className="outline-btn" type="button" onClick={() => setTimeModal(true)}>＋ Лог часу</button><button className="primary-action" type="button" onClick={edit}>Редагувати задачу</button></div></section><div className="task-detail-grid"><main><section className="panel task-description-panel"><h2>Опис задачі</h2><div className="detail-description" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(descriptionHtml, { USE_PROFILES: { html: true } }) }} /><div className="detail-info-grid"><Info label="Клієнт" value={task.client_name || 'Не вказано'} /><Info label="Проєкти" value={task.project_name || 'Без проєкту'} /><Info label="Виконавці" value={task.assignee_name || 'Не призначено'} /><Info label="Дедлайн" value={task.due_date ? new Date(`${task.due_date}T00:00:00`).toLocaleDateString('uk-UA') : 'Не встановлено'} /><Info label="Нагадування" value={task.reminder_at || 'Не встановлено'} /></div></section><section className="panel time-panel"><div className="panel-heading"><div><h2>Лог часу</h2><p>Час, який користувачі додали до цієї задачі.</p></div></div><div className="time-total">Всього: {formatMinutes(data.total_minutes)}</div><div className="time-entry-list">{data.time_entries?.length ? data.time_entries.map(item => <div className="time-entry-row" key={item.id}><div><strong>{item.user_name}</strong><small>{item.note || 'Без примітки'} · {new Date(String(item.logged_at).replace(' ', 'T')).toLocaleString('uk-UA')}</small></div><b>{formatMinutes(item.minutes)}</b></div>) : <p className="muted-note">Час ще не додано.</p>}</div></section></main><aside><section className="panel history-panel"><div className="panel-heading"><div><h2>Історія змін</h2><p>Хто і що змінював у задачі.</p></div></div><div className="history-list">{data.history.length ? data.history.map(item => <div className="history-item" key={item.id}><span className="history-dot" /><div><strong>{item.user_name || 'Система'}: {String(item.message).replace(/^Ви:\s*/, '')}</strong><small>{new Date(String(item.created_at).replace(' ', 'T')).toLocaleString('uk-UA')}</small></div></div>) : <p className="muted-note">Історія поки порожня.</p>}</div></section></aside></div>{modal && <TaskFormModal data={listData} editing={task} projectIds={projectIds} assigneeIds={assigneeIds} setProjectIds={setProjectIds} setAssigneeIds={setAssigneeIds} onSubmit={save} onClose={() => setModal(false)} />}{timeModal && <TimeLogModal onSubmit={logTime} onClose={() => setTimeModal(false)} />}</div></Layout>;
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [listData, setListData] = useState(null);
+  const [modal, setModal] = useState(false);
+  const [timeModal, setTimeModal] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [projectIds, setProjectIds] = useState([]);
+  const [assigneeIds, setAssigneeIds] = useState([]);
+  const [clientIds, setClientIds] = useState([]);
+  async function load() {
+    const [detail, list, clients] = await Promise.all([
+      api(`/api/tasks.php?id=${encodeURIComponent(id)}`),
+      api("/api/tasks.php"),
+      api("/api/clients.php"),
+    ]);
+    if (!detail.ok) return navigate("/tasks");
+    setData(detail);
+    setListData({ ...list, clients: clients.ok ? clients.clients || [] : [] });
+  }
+  useEffect(() => {
+    load();
+    const interval = window.setInterval(load, 15000);
+    const refreshOnFocus = () => load();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, [id]);
+  function edit() {
+    setProjectIds(data.task.project_ids || []);
+    setAssigneeIds(data.task.assignee_ids || []);
+    setClientIds(data.task.client_ids || []);
+    setModal(true);
+  }
+  async function save(event) {
+    event.preventDefault();
+    setError("");
+    const form = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(form.entries());
+    payload.action = "update";
+    payload.id = id;
+    payload.project_ids = projectIds;
+    payload.assignee_ids = assigneeIds;
+    payload.client_ids = clientIds;
+    const result = await post("/api/tasks.php", payload);
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message);
+    setModal(false);
+    load();
+  }
+  async function changeStatus(status) {
+    setError("");
+    const result = await post("/api/tasks.php", {
+      action: "set_status",
+      id,
+      status,
+    });
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message);
+    load();
+  }
+  async function logTime(event) {
+    event.preventDefault();
+    setError("");
+    const form = new FormData(event.currentTarget);
+    const minutes =
+      Number(form.get("hours") || 0) * 60 + Number(form.get("minutes") || 0);
+    const result = await post("/api/tasks.php", {
+      action: "log_time",
+      task_id: id,
+      minutes,
+      note: form.get("note"),
+    });
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message);
+    setTimeModal(false);
+    load();
+  }
+  if (!data || !listData)
+    return <div className="loading-screen">Завантаження задачі…</div>;
+  const task = data.task;
+  const canManage = ["admin", "owner", "manager"].includes(data.user?.role);
+  const priorityInfo = {
+    low: ["Низький", "↓"],
+    normal: ["Звичайний", "—"],
+    high: ["Високий", "↑"],
+    urgent: ["Терміновий", "!"],
+  }[task.priority] || ["Звичайний", "—"];
+  const descriptionHtml = task.description
+    ? /<[a-z][\s\S]*>/i.test(task.description)
+      ? task.description
+      : `<p>${String(task.description)
+          .replace(
+            /[&<>'"]/g,
+            (character) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#039;",
+                '"': "&quot;",
+              })[character],
+          )
+          .replace(/\n/g, "<br />")}</p>`
+    : "<p>Опис задачі ще не додано.</p>";
+  return (
+    <Layout page="Деталі задачі" user={data.user}>
+      <div className="content task-detail-page">
+        <button
+          className="page-back"
+          type="button"
+          onClick={() => navigate("/tasks")}
+        >
+          ← Назад до задач
+        </button>
+        {notice && <div className="team-notice success">{notice}</div>}
+        {error && <div className="form-notice">{error}</div>}
+        <section className="task-detail-header">
+          <div>
+            <p className="eyebrow">ЗАДАЧА</p>
+            <h1>{task.title}</h1>
+            <div className="detail-badges">
+              <TaskStatusDropdown
+                task={task}
+                canManage={canManage}
+                onChange={changeStatus}
+              />
+              <span
+                className={`detail-priority detail-priority-${task.priority}`}
+              >
+                <span className="detail-priority-icon">{priorityInfo[1]}</span>
+                {priorityInfo[0]}
+              </span>
+            </div>
+          </div>
+          <div className="task-detail-actions">
+            <button
+              className="outline-btn"
+              type="button"
+              onClick={() => setTimeModal(true)}
+            >
+              ＋ Лог часу
+            </button>
+            <button className="primary-action" type="button" onClick={edit}>
+              Редагувати задачу
+            </button>
+          </div>
+        </section>
+        <div className="task-detail-grid">
+          <main>
+            <section className="panel task-description-panel">
+              <h2>Опис задачі</h2>
+              <div
+                className="detail-description"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(descriptionHtml, {
+                    USE_PROFILES: { html: true },
+                  }),
+                }}
+              />
+              <div className="detail-info-grid">
+                <Info
+                  label="Клієнти"
+                  value={task.client_names || task.client_name || "Не вказано"}
+                />
+                <Info
+                  label="Проєкти"
+                  value={task.project_name || "Без проєкту"}
+                />
+                <Info
+                  label="Виконавці"
+                  value={task.assignee_name || "Не призначено"}
+                />
+                <Info
+                  label="Дедлайн"
+                  value={
+                    task.due_date
+                      ? new Date(
+                          `${task.due_date}T00:00:00`,
+                        ).toLocaleDateString("uk-UA")
+                      : "Не встановлено"
+                  }
+                />
+                <Info
+                  label="Нагадування"
+                  value={task.reminder_at || "Не встановлено"}
+                />
+              </div>
+            </section>
+            <section className="panel time-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Лог часу</h2>
+                  <p>Час, який користувачі додали до цієї задачі.</p>
+                </div>
+              </div>
+              <div className="time-total">
+                Всього: {formatMinutes(data.total_minutes)}
+              </div>
+              <div className="time-entry-list">
+                {data.time_entries?.length ? (
+                  data.time_entries.map((item) => (
+                    <div className="time-entry-row" key={item.id}>
+                      <div>
+                        <strong>{item.user_name}</strong>
+                        <small>
+                          {item.note || "Без примітки"} ·{" "}
+                          {new Date(
+                            String(item.logged_at).replace(" ", "T"),
+                          ).toLocaleString("uk-UA")}
+                        </small>
+                      </div>
+                      <b>{formatMinutes(item.minutes)}</b>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted-note">Час ще не додано.</p>
+                )}
+              </div>
+            </section>
+          </main>
+          <aside>
+            <section className="panel history-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Історія змін</h2>
+                  <p>Хто і що змінював у задачі.</p>
+                </div>
+              </div>
+              <div className="history-list">
+                {data.history.length ? (
+                  data.history.map((item) => (
+                    <div className="history-item" key={item.id}>
+                      <span className="history-dot" />
+                      <div>
+                        <strong>
+                          {item.user_name || "Система"}:{" "}
+                          {String(item.message).replace(/^Ви:\s*/, "")}
+                        </strong>
+                        <small>
+                          {new Date(
+                            String(item.created_at).replace(" ", "T"),
+                          ).toLocaleString("uk-UA")}
+                        </small>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted-note">Історія поки порожня.</p>
+                )}
+              </div>
+            </section>
+          </aside>
+        </div>
+        {modal && (
+          <TaskFormModal
+            data={listData}
+            editing={task}
+            projectIds={projectIds}
+            assigneeIds={assigneeIds}
+            clientIds={clientIds}
+            setProjectIds={setProjectIds}
+            setAssigneeIds={setAssigneeIds}
+            setClientIds={setClientIds}
+            onSubmit={save}
+            onClose={() => setModal(false)}
+          />
+        )}
+        {timeModal && (
+          <TimeLogModal
+            onSubmit={logTime}
+            onClose={() => setTimeModal(false)}
+          />
+        )}
+      </div>
+    </Layout>
+  );
 }
-function Info({ label, value }) { return <div className="detail-info"><small>{label}</small><strong>{value}</strong></div>; }
+function Info({ label, value }) {
+  return (
+    <div className="detail-info">
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </div>
+  );
+}
