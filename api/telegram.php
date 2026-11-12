@@ -16,10 +16,20 @@ function sendTelegramMessage(string $chatId, string $message): bool
 
 function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
 {
-    $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
-    $query->execute([$userId]);
-    $user = $query->fetch();
-    if (!$user || (int)$user['telegram_notifications_enabled'] !== 1) return;
-    $chatId = (string)($user['telegram_chat_id'] ?? '');
-    if ($chatId !== '') sendTelegramMessage($chatId, $message);
+    try {
+        static $columnReady = false;
+        if (!$columnReady) {
+            $columns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'telegram_notifications_enabled'")->fetchColumn();
+            if (!$columns) $pdo->exec("ALTER TABLE users ADD telegram_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0");
+            $columnReady = true;
+        }
+        $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
+        $query->execute([$userId]);
+        $user = $query->fetch();
+        if (!$user || (int)$user['telegram_notifications_enabled'] !== 1) return;
+        $chatId = (string)($user['telegram_chat_id'] ?? '');
+        if ($chatId !== '') sendTelegramMessage($chatId, $message);
+    } catch (Throwable $error) {
+        error_log('Telegram notification error: ' . $error->getMessage());
+    }
 }
