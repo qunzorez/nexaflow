@@ -18,6 +18,7 @@ export default function Settings() {
   const [avatar, setAvatar] = useState("");
   const [phone, setPhone] = useState("");
   const [telegramTag, setTelegramTag] = useState("");
+  const [telegramChatId, setTelegramChatId] = useState("");
   const [bio, setBio] = useState("");
   const [clientModule, setClientModule] = useState(
     () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
@@ -33,6 +34,7 @@ export default function Settings() {
       setAvatar(result.user.avatar_url || "");
       setPhone(result.user.phone || "");
       setTelegramTag(result.user.telegram_tag || "");
+      setTelegramChatId(result.user.telegram_chat_id || "");
       setBio(result.user.bio || "");
     });
   }, []);
@@ -57,6 +59,7 @@ export default function Settings() {
       avatar_url: avatar,
       phone,
       telegram_tag: telegramTag,
+      telegram_chat_id: telegramChatId,
       bio,
       current_password: form.get("current_password"),
       new_password: form.get("new_password"),
@@ -66,6 +69,7 @@ export default function Settings() {
     setAvatar(result.user.avatar_url || "");
     setPhone(result.user.phone || "");
     setTelegramTag(result.user.telegram_tag || "");
+    setTelegramChatId(result.user.telegram_chat_id || "");
     setBio(result.user.bio || "");
     window.dispatchEvent(
       new CustomEvent("nexaflow:profile-updated", { detail: result.user }),
@@ -157,6 +161,17 @@ export default function Settings() {
                   onChange={(event) => setTelegramTag(event.target.value)}
                   placeholder="@username"
                 />
+              </label>
+              <label>
+                Telegram chat ID
+                <input
+                  value={telegramChatId}
+                  onChange={(event) => setTelegramChatId(event.target.value)}
+                  placeholder="Наприклад, 123456789"
+                />
+                <small className="settings-hint">
+                  Відкрийте бота та натисніть /start, потім вкажіть chat ID.
+                </small>
               </label>
             </div>
             <label>
