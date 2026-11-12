@@ -51,3 +51,20 @@ function sendProjectEmail(string $to, string $subject, string $message, string $
     }
     return $sent;
 }
+
+function sendUserNotificationEmail(PDO $pdo, string $userId, string $to, string $subject, string $message, string $html = ''): bool
+{
+    static $columnChecked = [];
+    $connectionKey = spl_object_id($pdo);
+    if (!isset($columnChecked[$connectionKey])) {
+        $columnQuery = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email_notifications_enabled'");
+        if (!$columnQuery->fetchColumn()) {
+            $pdo->exec("ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1");
+        }
+        $columnChecked[$connectionKey] = true;
+    }
+    $preference = $pdo->prepare('SELECT email_notifications_enabled FROM users WHERE id = ? LIMIT 1');
+    $preference->execute([$userId]);
+    if ((int)$preference->fetchColumn() !== 1) return false;
+    return sendProjectEmail($to, $subject, $message, $html);
+}

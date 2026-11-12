@@ -21,6 +21,7 @@ export default function Settings() {
   const [telegramChatId, setTelegramChatId] = useState("");
   const [telegramConnectUrl, setTelegramConnectUrl] = useState("");
   const [telegramEnabled, setTelegramEnabled] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const [bio, setBio] = useState("");
   const [clientModule, setClientModule] = useState(
     () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
@@ -38,6 +39,7 @@ export default function Settings() {
       setTelegramTag(result.user.telegram_tag || "");
       setTelegramChatId(result.user.telegram_chat_id || "");
       setTelegramEnabled(Boolean(Number(result.user.telegram_notifications_enabled)));
+      setEmailEnabled(result.user.email_notifications_enabled === undefined ? true : Boolean(Number(result.user.email_notifications_enabled)));
       setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
       setBio(result.user.bio || "");
     });
@@ -65,6 +67,7 @@ export default function Settings() {
       telegram_tag: telegramTag,
       telegram_chat_id: telegramChatId,
       telegram_notifications_enabled: telegramEnabled,
+      email_notifications_enabled: emailEnabled,
       bio,
       current_password: form.get("current_password"),
       new_password: form.get("new_password"),
@@ -76,6 +79,7 @@ export default function Settings() {
     setTelegramTag(result.user.telegram_tag || "");
     setTelegramChatId(result.user.telegram_chat_id || "");
     setTelegramEnabled(Boolean(Number(result.user.telegram_notifications_enabled)));
+    setEmailEnabled(Boolean(Number(result.user.email_notifications_enabled)));
     setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
     setBio(result.user.bio || "");
     window.dispatchEvent(
@@ -181,6 +185,17 @@ export default function Settings() {
                 <b>{telegramEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
               <a className="outline-btn telegram-bot-link" href={telegramConnectUrl} target="_blank" rel="noreferrer">Підключити Telegram →</a>
+            </div>
+            <div className="telegram-connect-box email-notification-box">
+              <div>
+                <strong>Email-сповіщення</strong>
+                <small>Отримуйте нагадування, призначення та зміни задач на пошту.</small>
+              </div>
+              <label className="telegram-toggle">
+                <input type="checkbox" checked={emailEnabled} onChange={(event) => setEmailEnabled(event.target.checked)} />
+                <span />
+                <b>{emailEnabled ? "Увімкнено" : "Вимкнено"}</b>
+              </label>
             </div>
           </section>
           <section

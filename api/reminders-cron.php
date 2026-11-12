@@ -111,7 +111,7 @@ foreach ($tasks as $task) {
                 . '<p style="background:#eef8f3;padding:16px;border-radius:10px">Проєкт: <strong>' . $safeProject . '</strong><br>Дедлайн: <strong>' . $safeDue . '</strong></p>'
                 . '<a href="' . htmlspecialchars($taskUrl, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block;background:#198f70;color:#fff;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:700">Відкрити задачу →</a>'
                 . '<p style="color:#71847e;font-size:13px;margin-top:28px">Це автоматичне повідомлення NexaFlow.</p></div></div>';
-            if (sendProjectEmail($recipientEmail, $title . ' — NexaFlow', $message, $html)) {
+            if (sendUserNotificationEmail($pdo, $userId, $recipientEmail, $title . ' — NexaFlow', $message, $html)) {
                 $pdo->prepare('UPDATE notifications SET email_sent_at = NOW() WHERE id = ?')->execute([$notificationId]);
             }
         }
