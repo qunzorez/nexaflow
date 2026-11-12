@@ -3,3 +3,74 @@
 @media(max-width:1050px){.stat-grid{grid-template-columns:repeat(2,1fr)}.grid-two,.team-grid{grid-template-columns:1fr}}@media(max-width:700px){.sidebar{position:fixed;z-index:5;left:-260px;top:0;bottom:0;transition:.25s;box-shadow:10px 0 30px #234b351c}.sidebar.open{left:0}.menu-btn{display:block;border:0;background:none;font-size:22px;color:var(--green)}.topbar{padding:0 18px}.breadcrumb{font-size:11px}.user-chip>div{display:none}.content{padding:27px 16px}.welcome-row{display:block}.welcome-row .primary-action{margin-top:19px}.stat-grid{gap:9px}.stat-card{padding:14px}.auth-page{grid-template-columns:1fr}.auth-brand{display:none}.auth-card{width:min(410px,calc(100% - 32px))}.notifications-panel{right:-50px}.assignment-row>span:nth-last-child(2){display:none}}
 .side-brand{min-height:42px;background:url('/assets/logo-color-text.png') left center/contain no-repeat}.side-brand>*{display:none}.auth-brand .brand-mark,.auth-result-card .brand-mark{width:210px;height:82px;background:transparent url('/assets/logo-color.png') center/contain no-repeat;border-radius:0;box-shadow:none;transform:none}.auth-brand .brand-mark span,.auth-result-card .brand-mark span{display:none}
 .auth-simple-page{grid-template-columns:1fr;place-items:center}
+/* Єдиний стиль для полів дати й часу */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 14px;
+  border: 1px solid #dce7e1;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff 0%, #fbfdfc 100%);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  outline: none;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, transform .2s ease;
+}
+
+input[type="date"]:hover,
+input[type="datetime-local"]:hover,
+input[type="time"]:hover {
+  border-color: #a8d3bd;
+  background: #fff;
+}
+
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="time"]:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px #1f8a6817;
+  background: #fff;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  width: 18px;
+  height: 18px;
+  margin-left: 8px;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: .72;
+  transition: opacity .2s ease, background .2s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: var(--mint);
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit {
+  color: var(--ink);
+}
+
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="datetime-local"]::-webkit-datetime-edit-text,
+input[type="time"]::-webkit-datetime-edit-text {
+  color: #a0b0a8;
+  padding: 0 2px;
+}
+
+input[type="date"]:invalid,
+input[type="datetime-local"]:invalid,
+input[type="time"]:invalid {
+  box-shadow: none;
+}
