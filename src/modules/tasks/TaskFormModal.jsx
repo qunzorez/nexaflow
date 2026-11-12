@@ -17,6 +17,7 @@ import "./task-modal-layer.css";
 export default function TaskFormModal({
   data,
   editing,
+  error,
   projectIds,
   assigneeIds,
   clientIds,
@@ -52,6 +53,7 @@ export default function TaskFormModal({
           <p className="task-modal-subtitle">
             Додайте деталі, проєкти та всіх відповідальних виконавців.
           </p>
+          {error && <div className="task-modal-error" role="alert">{error}</div>}
           <form className="task-form" onSubmit={onSubmit}>
             <label>
               Назва задачі

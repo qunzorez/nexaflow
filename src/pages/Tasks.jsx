@@ -147,6 +147,7 @@ export default function Tasks() {
   const [data, setData] = useState(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
   const [filter, setFilter] = useState(
     () => window.localStorage.getItem("nexaflow.tasks.filter") || "all",
   );
@@ -191,6 +192,7 @@ export default function Tasks() {
     window.localStorage.setItem("nexaflow.tasks.filter", filter);
   }, [filter]);
   function createTask() {
+    setModalError("");
     setEditing(null);
     setProjectIds([]);
     setAssigneeIds([]);
@@ -198,6 +200,7 @@ export default function Tasks() {
     setModalOpen(true);
   }
   function editTask(task) {
+    setModalError("");
     setEditing(task);
     setProjectIds(task.project_ids || []);
     setAssigneeIds(task.assignee_ids || []);
@@ -205,6 +208,7 @@ export default function Tasks() {
     setModalOpen(true);
   }
   function closeModal() {
+    setModalError("");
     setModalOpen(false);
     setEditing(null);
     setProjectIds([]);
@@ -216,6 +220,7 @@ export default function Tasks() {
     event.preventDefault();
     setNotice("");
     setError("");
+    setModalError("");
     const form = new FormData(event.currentTarget);
     const payload = Object.fromEntries(form.entries());
     payload.project_ids = projectIds;
@@ -224,7 +229,7 @@ export default function Tasks() {
     payload.action = editing ? "update" : "create";
     if (editing) payload.id = editing.id;
     const result = await post("/api/tasks.php", payload);
-    if (!result.ok) return setError(result.message);
+    if (!result.ok) return setModalError(result.message || "Не вдалося зберегти задачу.");
     setNotice(result.message);
     closeModal();
     load();
@@ -483,6 +488,7 @@ export default function Tasks() {
           <TaskFormModal
             data={data}
             editing={editing}
+            error={modalError}
             projectIds={projectIds}
             assigneeIds={assigneeIds}
             clientIds={clientIds}
