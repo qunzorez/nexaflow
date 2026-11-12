@@ -112,7 +112,7 @@ export default function Tasks() {
   const [data, setData] = useState(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(() => window.localStorage.getItem("nexaflow.tasks.filter") || "all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(null);
@@ -146,6 +146,9 @@ export default function Tasks() {
   useEffect(() => {
     setPage(1);
   }, [filter, search]);
+  useEffect(() => {
+    window.localStorage.setItem("nexaflow.tasks.filter", filter);
+  }, [filter]);
   function createTask() {
     setEditing(null);
     setProjectIds([]);
