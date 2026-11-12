@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 const options = [
+  ['hourly', 'Щогодини'],
   ['daily', 'Щодня'],
   ['weekly', 'Щотижня'],
   ['monthly', 'Щомісяця'],
