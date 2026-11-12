@@ -1,0 +1,6 @@
+node_modules/
+.env
+*.db
+*.sqlite
+api/config.local.php
+dist/.DS_Store
