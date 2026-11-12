@@ -62,3 +62,10 @@
 .settings-section-icon { width: 28px; height: 28px; border-radius: 9px; font-size: 15px; }
 .profile-photo-row { padding: 12px; }
 .settings-grid-page { align-items: start; }
+.account-info-card { min-height: 214px; }
+.account-info-list { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.account-info-list > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.account-info-list span { color: var(--muted); font-size: 10px; }
+.account-info-list strong { font-size: 11px; text-align: right; }
+.account-email { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-verified { color: var(--green); }

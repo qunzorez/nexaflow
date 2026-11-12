@@ -203,6 +203,19 @@ export default function Settings() {
               </small>
             </>}
           </section>
+          <section className="panel account-info-card">
+            <div className="settings-section-title">
+              <div>
+                <h2><span className="settings-section-icon">✦</span>Про акаунт</h2>
+                <p>Ваш поточний статус у NexaFlow.</p>
+              </div>
+            </div>
+            <div className="account-info-list">
+              <div><span>Роль</span><strong>{roleNames[user.role] || "Користувач"}</strong></div>
+              <div><span>Пошта</span><strong className="account-email">{user.email}</strong></div>
+              <div><span>Статус пошти</span><strong className="account-verified">● Підтверджено</strong></div>
+            </div>
+          </section>
           <div className="settings-actions">
             <button className="primary-action">Зберегти зміни</button>
           </div>
