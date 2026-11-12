@@ -1,6 +1,65 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
+import "./time-log-modal-fix.css";
 
 export default function TimeLogModal({ onSubmit, onClose }) {
-  useEffect(() => { const previous = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = previous; }; }, []);
-  return <div className="task-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}><section className="time-modal task-modal"><button type="button" className="task-modal-close" onClick={onClose}>×</button><p className="eyebrow">ОБЛІК ЧАСУ</p><h2>Додати час</h2><p className="task-modal-subtitle">Запишіть, скільки часу ви витратили на цю задачу.</p><form className="task-form" onSubmit={onSubmit}><div className="task-form-grid"><label>Години<input type="number" name="hours" min="0" max="24" defaultValue="0" /></label><label>Хвилини<input type="number" name="minutes" min="0" max="59" defaultValue="30" /></label></div><label>Примітка<input name="note" placeholder="Наприклад, підготовка документів" /></label><div className="task-form-actions"><button className="primary-action">Зберегти час</button><button type="button" className="outline-btn" onClick={onClose}>Скасувати</button></div></form></section></div>;
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+  return (
+    <div
+      className="task-modal-backdrop"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section className="time-modal task-modal">
+        <button type="button" className="task-modal-close" onClick={onClose}>
+          ×
+        </button>
+        <div className="task-modal-scroll">
+          <p className="eyebrow">ОБЛІК ЧАСУ</p>
+          <h2>Додати час</h2>
+          <p className="task-modal-subtitle">
+            Запишіть, скільки часу ви витратили на цю задачу.
+          </p>
+          <form className="task-form" onSubmit={onSubmit}>
+          <div className="task-form-grid">
+            <label>
+              Години
+              <input
+                type="number"
+                name="hours"
+                min="0"
+                max="24"
+                defaultValue="0"
+              />
+            </label>
+            <label>
+              Хвилини
+              <input
+                type="number"
+                name="minutes"
+                min="0"
+                max="59"
+                defaultValue="30"
+              />
+            </label>
+          </div>
+          <label>
+            Примітка
+            <input name="note" placeholder="Наприклад, підготовка документів" />
+          </label>
+          <div className="task-form-actions">
+            <button className="primary-action">Зберегти час</button>
+            <button type="button" className="outline-btn" onClick={onClose}>
+              Скасувати
+            </button>
+          </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  );
 }

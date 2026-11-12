@@ -1,0 +1,13 @@
+.time-modal {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.time-modal .task-modal-scroll {
+  max-height: calc(100dvh - 32px);
+}
+
+@media (max-width: 600px) {
+  .time-modal {
+    width: calc(100vw - 16px);
+  }
+}
