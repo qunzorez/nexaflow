@@ -3,6 +3,7 @@ import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
 import "./settings.css";
 import "./settings-contact.css";
+import "./settings-modern.css";
 
 const roleNames = {
   admin: "Адміністратор",
@@ -93,7 +94,7 @@ export default function Settings() {
           <section className="panel settings-profile-card">
             <div className="settings-section-title">
               <div>
-                <h2>Профіль</h2>
+                <h2><span className="settings-section-icon">◎</span>Профіль</h2>
                 <p>Основна інформація користувача.</p>
               </div>
             </div>
@@ -124,7 +125,7 @@ export default function Settings() {
           <section className="panel settings-contact-card">
             <div className="settings-section-title">
               <div>
-                <h2>Контактна інформація</h2>
+                <h2><span className="settings-section-icon">⌁</span>Контактна інформація</h2>
                 <p>Додайте дані, за якими команда зможе з вами зв’язатися.</p>
               </div>
             </div>
@@ -164,7 +165,7 @@ export default function Settings() {
           <section className={`panel password-card${showPasswordFields ? " is-open" : ""}`}>
             <div className="settings-section-title password-section-heading">
               <div>
-                <h2>Безпека</h2>
+                <h2><span className="settings-section-icon">▣</span>Безпека</h2>
                 <p>Змініть пароль, якщо потрібно.</p>
               </div>
               <button
