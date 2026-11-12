@@ -1,0 +1,5 @@
+body[data-task-can-manage="false"] .task-form select[name="status"] option[value="review"],
+body[data-task-can-manage="false"] .task-form select[name="status"] option[value="cancelled"],
+body[data-task-can-manage="false"] .task-form select[name="status"] option[value="archived"] {
+  display: none;
+}
