@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS project_invitations (
   invited_by CHAR(32) NOT NULL,
   email VARCHAR(190) NOT NULL,
   role VARCHAR(30) NOT NULL DEFAULT 'member',
+  group_id CHAR(32) NULL,
   token_hash CHAR(64) NOT NULL UNIQUE,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   expires_at TIMESTAMP NOT NULL,

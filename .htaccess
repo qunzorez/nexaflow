@@ -1,0 +1,19 @@
+DirectoryIndex dist/index.html
+
+RewriteEngine On
+
+# HTTPS is required only on the live domain.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|dist\.test|nexaflow\.test)$ [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# The PHP API is served directly from the project root.
+RewriteRule ^api(?:/|$) - [L]
+
+# Serve React's generated assets and other files from dist/.
+RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/dist/$1 -d
+RewriteRule ^(.+)$ dist/$1 [L]
+
+# React Router handles /dashboard, /team and future application pages.
+RewriteRule ^ dist/index.html [L]

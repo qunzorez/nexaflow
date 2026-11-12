@@ -1,0 +1,25 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Layout from '../components/Layout.jsx';
+import { api, post } from '../services/api.js';
+import './notifications-page.css';
+
+const roleNames = { admin: 'Адміністратори', manager: 'Менеджери', user: 'Користувачі' };
+
+export default function NotificationsPage() {
+  const [user, setUser] = useState(null); const [counts, setCounts] = useState({}); const [history, setHistory] = useState([]); const [selectedGroups, setSelectedGroups] = useState(['all']); const [status, setStatus] = useState(''); const navigate = useNavigate();
+  useEffect(() => {
+    Promise.all([api('/api/me.php'), api('/api/notifications.php')]).then(([me, notifications]) => {
+      if (!me.ok || !['admin', 'owner'].includes(me.user.role)) return navigate('/dashboard', { replace: true });
+      setUser(me.user); setCounts(Object.fromEntries((notifications.audience_counts || []).map(item => [item.role, item.total]))); setHistory(notifications.notifications || []);
+    });
+  }, [navigate]);
+  function toggleGroup(group) { setSelectedGroups(current => { if (group === 'all') return ['all']; const next = current.includes(group) ? current.filter(item => item !== group) : [...current.filter(item => item !== 'all'), group]; return next.length ? next : ['all']; }); }
+  async function send(event) { event.preventDefault(); const form = new FormData(event.currentTarget); if (!selectedGroups.length) return setStatus('Оберіть хоча б одну групу.'); const html = String(form.get('html') || '').trim(); const fallback = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); setStatus('Відправлення…'); const result = await post('/api/notifications.php', { action: 'broadcast', title: form.get('title'), message: fallback, html, audiences: selectedGroups }); setStatus(result.message); if (result.ok) { event.currentTarget.reset(); setHistory(await getHistory()); } }
+  async function getHistory() { const result = await api('/api/notifications.php'); return result.notifications || []; }
+  if (!user) return <div className="loading-screen">Перевірка прав доступу…</div>;
+  const groupOptions = [['all', 'Усі користувачі', total(counts)], ['admin', 'Адміністратори', counts.admin || 0], ['manager', 'Менеджери', counts.manager || 0], ['user', 'Користувачі', counts.user || 0]];
+  return <Layout page="Сповіщення" user={user}><div className="content notifications-page"><section className="welcome-row"><div><p className="eyebrow">АДМІНІСТРУВАННЯ</p><h1>Сповіщення</h1><p className="subtext">Надсилайте внутрішні повідомлення всій системі або окремим групам.</p></div></section><div className="notifications-admin-grid"><section className="panel notification-compose"><div className="panel-heading"><div><h2>Нове повідомлення</h2><p>Оберіть групи та додайте звичайний або HTML-контент.</p></div></div><form onSubmit={send}><fieldset className="group-selector"><legend>Групи отримувачів</legend>{groupOptions.map(([value, label, amount]) => <label className={`group-option ${selectedGroups.includes(value) ? 'selected' : ''}`} key={value}><input type="checkbox" checked={selectedGroups.includes(value)} onChange={() => toggleGroup(value)} /><span>{label}</span><b>{amount}</b></label>)}</fieldset><label>Заголовок<input name="title" required maxLength="180" placeholder="Наприклад, Оновлення системи" /></label><label>Текст повідомлення — HTML<textarea name="html" required rows="9" placeholder={'<p>Важливе повідомлення</p>\n<img src="https://example.com/banner.jpg" alt="Банер">'} /></label><small className="html-help">Дозволені форматування, посилання та зображення. JavaScript автоматично видаляється.</small><button className="primary-action" type="submit">Відправити повідомлення</button>{status && <div className="notification-status">{status}</div>}</form></section><section className="panel notification-history"><div className="panel-heading"><div><h2>Останні сповіщення</h2><p>Ваші отримані системні повідомлення</p></div></div>{history.length ? history.slice(0, 12).map(item => <div className="history-row" key={item.id}><span className="notification-icon">{item.type === 'broadcast' ? '✦' : '▣'}</span><div><strong>{item.title}</strong><small>{item.message}</small><time>{new Date(String(item.created_at).replace(' ', 'T')).toLocaleString('uk-UA')}</time></div></div>) : <div className="notification-empty">Історія сповіщень порожня.</div>}</section></div></div></Layout>;
+}
+
+function total(counts) { return Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0); }

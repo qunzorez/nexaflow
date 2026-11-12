@@ -1,0 +1,2 @@
+/* The old inline member form was removed. Keep the new add-member panel visible. */
+.project-management > .legacy-add-member-row{display:none!important}

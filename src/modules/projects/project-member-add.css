@@ -1,0 +1,21 @@
+.section-head-actions{display:flex;align-items:center;gap:10px}
+.section-head-actions>span{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 9px;border:1px solid #cfe4d7;background:#eef8f2;color:#168363;border-radius:999px;font-size:12px;font-weight:800;line-height:1}
+.add-member-btn{white-space:nowrap;padding:10px 13px}
+.member-add-panel{border:1px solid #cfe4d7;background:#f7fbf8;border-radius:10px;padding:14px;margin:14px 0}
+.add-mode-tabs{display:flex;gap:8px;margin-bottom:12px}
+.add-mode-tabs button{border:1px solid #d8e6de;background:#fff;border-radius:7px;padding:8px 12px;color:#42635a;cursor:pointer}
+.add-mode-tabs button.active{background:#e1f2e9;border-color:#9bceb6;color:#147f61;font-weight:600}
+.member-add-panel .add-member-row{display:grid;grid-template-columns:minmax(0,1fr) 220px auto;gap:10px;align-items:center}
+.member-add-panel .existing-member-row{grid-template-columns:minmax(180px,1fr) 200px auto}
+.member-add-panel input,.member-add-panel select{width:100%;min-width:0}
+.searchable-user-select{position:relative;min-width:0}
+.searchable-user-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#fff;color:#283a34;font-size:11px;text-align:left;cursor:pointer;min-height:38px}
+.searchable-user-trigger span{color:#168363;font-size:15px;line-height:1}
+.searchable-user-trigger.is-open{border-color:#77b99b;box-shadow:0 0 0 3px #dff2e8}
+.searchable-user-menu{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 5px);padding:8px;background:#fff;border:1px solid #cfe4d7;border-radius:9px;box-shadow:0 12px 28px #315e491c;max-height:260px;overflow:auto}
+.searchable-user-menu>input{box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:9px 10px;margin-bottom:6px;font-size:11px}
+.searchable-user-option{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:0;background:#fff;border-radius:6px;padding:9px 10px;text-align:left;cursor:pointer;color:#1e3029;font-size:11px}
+.searchable-user-option:hover{background:#eef8f2;color:#168363}
+.searchable-user-option small{color:var(--muted);font-size:10px;margin-top:3px}
+.searchable-user-empty{padding:12px 10px;color:var(--muted);font-size:11px}
+@media (max-width:760px){.section-head-actions{align-items:flex-end;flex-direction:column}.member-add-panel .add-member-row,.member-add-panel .existing-member-row{grid-template-columns:1fr}.member-add-panel .primary-action{width:100%}}

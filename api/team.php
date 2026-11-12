@@ -30,22 +30,31 @@ try {
         if ($isAdmin) {
             $users = $pdo->query('SELECT id, name, email, role, created_at FROM users ORDER BY name')->fetchAll();
         } else {
-            $usersQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, u.role, u.created_at FROM users u JOIN project_invitations pi ON pi.email = u.email WHERE pi.invited_by = ? AND pi.status = 'accepted' ORDER BY u.name");
-            $usersQuery->execute([$_SESSION['user_id']]);
+            $usersQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, u.role, u.created_at, (SELECT pgm.group_id FROM project_group_members pgm JOIN project_groups pgg ON pgg.id = pgm.group_id WHERE pgm.user_id = u.id AND pgg.project_id IS NULL LIMIT 1) AS group_id FROM users u LEFT JOIN project_invitations pi ON pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted' LEFT JOIN user_invitations ui ON ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted' WHERE pi.id IS NOT NULL OR ui.id IS NOT NULL ORDER BY u.created_at DESC");
+            $usersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
             $users = $usersQuery->fetchAll();
         }
         if ($isAdmin) {
             $projects = $pdo->query('SELECT id, name FROM projects ORDER BY name')->fetchAll();
             $members = $pdo->query('SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id ORDER BY p.name, u.name')->fetchAll();
         } else {
-            $projectsQuery = $pdo->prepare("SELECT DISTINCT p.id, p.name FROM projects p JOIN project_members pm ON pm.project_id = p.id WHERE pm.user_id = ? AND pm.role IN ('admin', 'manager') ORDER BY p.name");
-            $projectsQuery->execute([$_SESSION['user_id']]);
+            $projectsQuery = $pdo->prepare('SELECT DISTINCT p.id, p.name FROM projects p LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR pm.user_id IS NOT NULL ORDER BY p.name');
+            $projectsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
             $projects = $projectsQuery->fetchAll();
             $membersQuery = $pdo->prepare("SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id JOIN project_invitations pi ON pi.project_id = pm.project_id AND pi.email = u.email WHERE pi.invited_by = ? AND pi.status = 'accepted' ORDER BY p.name, u.name");
             $membersQuery->execute([$_SESSION['user_id']]);
             $members = $membersQuery->fetchAll();
         }
-        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'projects' => $projects, 'members' => $members, 'permissions' => ['admin' => $isAdmin]]);
+        if ($isAdmin) {
+            $groups = $pdo->query("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name")->fetchAll();
+        } else {
+            $groupsQuery = $pdo->prepare("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE pg.project_id IS NULL OR p.owner_id = ? OR pm.user_id IS NOT NULL GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name");
+            $groupsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            $groups = $groupsQuery->fetchAll();
+        }
+        foreach ($groups as &$group) $group['permissions'] = $group['permissions'] ? (json_decode($group['permissions'], true) ?: []) : [];
+        unset($group);
+        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'permissions' => ['admin' => $isAdmin]]);
     }
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
@@ -53,10 +62,12 @@ try {
         $name = trim((string)($data['name'] ?? ''));
         if ($name === '') jsonResponse(false, 'Введіть назву проєкту.', [], 422);
         $description = trim((string)($data['description'] ?? ''));
+        $status = in_array(($data['status'] ?? 'active'), ['active', 'draft', 'paused', 'completed'], true) ? (string)$data['status'] : 'active';
+        $visibility = in_array(($data['visibility'] ?? 'private'), ['private', 'team'], true) ? (string)$data['visibility'] : 'private';
         $id = bin2hex(random_bytes(16));
         $pdo->beginTransaction();
-        $insert = $pdo->prepare('INSERT INTO projects (id, name, description, owner_id) VALUES (?, ?, ?, ?)');
-        $insert->execute([$id, $name, $description, $_SESSION['user_id']]);
+        $insert = $pdo->prepare('INSERT INTO projects (id, name, description, owner_id, status, visibility) VALUES (?, ?, ?, ?, ?, ?)');
+        $insert->execute([$id, $name, $description, $_SESSION['user_id'], $status, $visibility]);
         $member = $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, 'admin')");
         $member->execute([$id, $_SESSION['user_id']]);
         if ($canManage && !empty($data['members']) && is_array($data['members'])) {
@@ -69,7 +80,23 @@ try {
                 }
             }
         }
+        if ($canManage && !empty($data['groups']) && is_array($data['groups'])) {
+            $groupInsert = $pdo->prepare('INSERT INTO project_groups (id, project_id, name) VALUES (?, ?, ?)');
+            $groupMemberInsert = $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)');
+            foreach ($data['groups'] as $group) {
+                $groupName = trim((string)($group['name'] ?? ''));
+                if ($groupName === '') continue;
+                $groupId = bin2hex(random_bytes(16));
+                $groupInsert->execute([$groupId, $id, mb_substr($groupName, 0, 120)]);
+                foreach ((array)($group['user_ids'] ?? []) as $groupUserId) {
+                    $groupUserId = trim((string)$groupUserId);
+                    if ($groupUserId !== '') $groupMemberInsert->execute([$groupId, $groupUserId]);
+                }
+            }
+        }
         $invited = 0;
+        $sent = 0;
+        $failed = 0;
         if ($canManage && !empty($data['invite_emails']) && is_array($data['invite_emails'])) {
             $inviteRole = trim((string)($data['invite_role'] ?? 'member'));
             if (!in_array($inviteRole, ['manager', 'member', 'viewer'], true)) $inviteRole = 'member';
@@ -83,12 +110,29 @@ try {
                 $inviteInsert->execute([bin2hex(random_bytes(16)), $id, $_SESSION['user_id'], $inviteEmail, $inviteRole, hash('sha256', $token)]);
                 $subject = 'Вас запросили до проєкту NexaFlow';
                 $message = "Вас запросили до проєкту «{$name}» у NexaFlow.\n\nПрийняти запрошення: " . projectInviteUrl($token) . "\n\nПосилання дійсне 7 днів.";
-                sendProjectEmail($inviteEmail, $subject, $message);
+                $safeProjectName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+                $safeInviteUrl = htmlspecialchars(projectInviteUrl($token), ENT_QUOTES, 'UTF-8');
+                $htmlMessage = "<div style=\"font-family:Arial,sans-serif;max-width:600px;color:#17201e\"><h2>Вас запросили до проєкту</h2><p>Вас запросили до проєкту <strong>«{$safeProjectName}»</strong> у NexaFlow.</p><p><a href=\"{$safeInviteUrl}\" style=\"display:inline-block;padding:12px 20px;background:#1f8a68;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold\">Приєднатись до проєкту</a></p><p style=\"color:#7b8983;font-size:12px\">Посилання дійсне 7 днів.</p></div>";
+                $existingInviteUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+                $existingInviteUser->execute([$inviteEmail]);
+                $existingInviteUser = $existingInviteUser->fetch();
+                if ($existingInviteUser && $existingInviteUser['id'] !== $_SESSION['user_id']) {
+                    $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_invite', ?, ?, 'project', ?)")->execute([bin2hex(random_bytes(16)), $existingInviteUser['id'], $_SESSION['user_id'], 'Запрошення до нового проєкту', "Вас запросили до проєкту «{$name}». Відкрийте лист і натисніть «Приєднатись до проєкту».", $id]);
+                }
+                if (sendProjectEmail($inviteEmail, $subject, $message, $htmlMessage)) $sent++;
+                else $failed++;
                 $invited++;
             }
         }
         $pdo->commit();
-        jsonResponse(true, $invited ? "Проєкт створено. Запрошень відправлено: {$invited}." : 'Проєкт створено.', ['project' => ['id' => $id, 'name' => $name], 'invited' => $invited]);
+        $notificationUsers = $pdo->query('SELECT id FROM users')->fetchAll();
+        $notificationInsert = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_created', ?, ?, 'project', ?)");
+        foreach ($notificationUsers as $recipient) {
+            $notificationInsert->execute([bin2hex(random_bytes(16)), $recipient['id'], $_SESSION['user_id'], 'Створено новий проєкт', "Проєкт «{$name}» додано до робочого простору.", $id]);
+        }
+        $inviteMessage = $invited ? " Запрошень створено: {$invited}; успішно передано поштовому серверу: {$sent}." : '';
+        if ($failed) $inviteMessage .= " Не вдалося передати: {$failed}. Перевірте Mailpit або SMTP-конфігурацію.";
+        jsonResponse(true, 'Проєкт створено.' . $inviteMessage, ['project' => ['id' => $id, 'name' => $name], 'invited' => $invited, 'sent' => $sent, 'failed' => $failed]);
     }
 
     if ($action === 'assign_role') {

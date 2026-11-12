@@ -1,0 +1,14 @@
+DirectoryIndex index.html
+
+RewriteEngine On
+
+# HTTPS is enforced only on the live domain, not local development.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|dist\.test|nexaflow\.test)$ [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Keep API and real assets working, then let React Router handle page URLs.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.html [L]

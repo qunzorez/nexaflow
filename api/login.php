@@ -11,12 +11,13 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
 }
 
 try {
-    $query = db()->prepare('SELECT id, name, email, password_hash, role FROM users WHERE email = ? LIMIT 1');
+    $query = db()->prepare('SELECT id, name, email, password_hash, role, email_verified_at FROM users WHERE email = ? LIMIT 1');
     $query->execute([$email]);
     $user = $query->fetch();
     if (!$user || !password_verify($password, $user['password_hash'])) {
         jsonResponse(false, 'Невірна пошта або пароль.', [], 401);
     }
+    if (empty($user['email_verified_at'])) jsonResponse(false, 'Підтвердіть email перед входом.', ['code' => 'email_not_verified', 'email' => $email], 403);
 
     session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
     session_start();

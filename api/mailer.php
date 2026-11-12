@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function sendProjectEmail(string $to, string $subject, string $message): bool
+function sendProjectEmail(string $to, string $subject, string $message, string $html = ''): bool
 {
     $from = 'no-reply@nexaflow.top';
     if (file_exists(__DIR__ . '/config.local.php')) {
@@ -14,8 +14,16 @@ function sendProjectEmail(string $to, string $subject, string $message): bool
         $write('MAIL FROM:<' . $from . '>'); $read();
         $write('RCPT TO:<' . $to . '>'); $read();
         $write('DATA'); $read();
-        $headers = 'From: NexaFlow <' . $from . ">\r\n" . 'To: <' . $to . ">\r\n" . 'Subject: =?UTF-8?B?' . base64_encode($subject) . "?=\r\n" . "Content-Type: text/plain; charset=UTF-8\r\n" . "Content-Transfer-Encoding: 8bit\r\n";
-        $body = preg_replace('/\r?\n/', "\r\n", $message) ?? $message;
+        $headers = 'From: NexaFlow <' . $from . ">\r\n" . 'To: <' . $to . ">\r\n" . 'Subject: =?UTF-8?B?' . base64_encode($subject) . "?=\r\n";
+        if ($html !== '') {
+            $boundary = 'nexaflow_' . bin2hex(random_bytes(8));
+            $headers .= "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
+            $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$message}\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$html}\r\n--{$boundary}--\r\n";
+        } else {
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n";
+            $body = $message;
+        }
+        $body = preg_replace('/\r?\n/', "\r\n", $body) ?? $body;
         $body = preg_replace('/^\./m', '..', $body) ?? $body;
         fwrite($socket, $headers . "\r\n" . $body . "\r\n.\r\n");
         $response = $read();
@@ -23,6 +31,13 @@ function sendProjectEmail(string $to, string $subject, string $message): bool
         fclose($socket);
         return str_starts_with(trim($response), '250');
     }
-    $headers = "From: NexaFlow <{$from}>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
-    return mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $message, $headers, '-f' . $from);
+    if ($html !== '') {
+        $boundary = 'nexaflow_' . bin2hex(random_bytes(8));
+        $headers = "From: NexaFlow <{$from}>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
+        $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$message}\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$html}\r\n--{$boundary}--\r\n";
+    } else {
+        $headers = "From: NexaFlow <{$from}>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+        $body = $message;
+    }
+    return mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers, '-f' . $from);
 }

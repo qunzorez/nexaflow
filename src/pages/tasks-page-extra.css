@@ -1,0 +1,1 @@
+.task-list-tools{display:flex;align-items:center;gap:9px}.task-card{cursor:pointer;transition:transform .15s,box-shadow .15s}.task-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px #3e695514}

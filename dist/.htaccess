@@ -2,20 +2,13 @@ DirectoryIndex index.html
 
 RewriteEngine On
 
-# Always use the secure HTTPS version of the site.
+# HTTPS is enforced only on the live domain, not local development.
 RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|dist\.test|nexaflow\.test)$ [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
-# Redirect direct .html links to clean URLs.
-RewriteCond %{THE_REQUEST} \s/+dashboard\.html(?:[?\s]) [NC]
-RewriteRule ^dashboard\.html$ /dashboard [R=301,L]
-
-# Serve the static HTML files without exposing the .html extension.
-RewriteRule ^dashboard/?$ dashboard.html [L]
-RewriteRule ^team/?$ team.html [L]
-RewriteRule ^accept-invite/?$ accept-invite.html [L]
-
-# Keep real files and folders, including /api, working normally.
+# Keep API and real assets working, then let React Router handle page URLs.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
+RewriteRule ^ index.html [L]
