@@ -21,10 +21,10 @@ function sendProjectEmail(string $to, string $subject, string $message, string $
         if ($html !== '') {
             $boundary = 'nexaflow_' . bin2hex(random_bytes(8));
             $headers .= "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
-            $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$message}\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$html}\r\n--{$boundary}--\r\n";
+            $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($message), 76, "\r\n") . "\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($html), 76, "\r\n") . "\r\n--{$boundary}--\r\n";
         } else {
-            $headers .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n";
-            $body = $message;
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n";
+            $body = chunk_split(base64_encode($message), 76, "\r\n");
         }
         $body = preg_replace('/\r?\n/', "\r\n", $body) ?? $body;
         $body = preg_replace('/^\./m', '..', $body) ?? $body;
@@ -36,11 +36,13 @@ function sendProjectEmail(string $to, string $subject, string $message, string $
     }
     if ($html !== '') {
         $boundary = 'nexaflow_' . bin2hex(random_bytes(8));
-        $headers = "From: NexaFlow <{$from}>\r\nTo: <{$to}>\r\nReply-To: {$from}\r\nDate: " . date('r') . "\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
-        $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$message}\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$html}\r\n--{$boundary}--\r\n";
+        // mail() generates the recipient header itself from its first argument.
+        // Adding another To header makes Gmail reject the message as malformed.
+        $headers = "From: NexaFlow <{$from}>\r\nReply-To: {$from}\r\nDate: " . date('r') . "\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
+        $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($message), 76, "\r\n") . "\r\n--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($html), 76, "\r\n") . "\r\n--{$boundary}--\r\n";
     } else {
-        $headers = "From: NexaFlow <{$from}>\r\nTo: <{$to}>\r\nReply-To: {$from}\r\nDate: " . date('r') . "\r\nContent-Type: text/plain; charset=UTF-8\r\n";
-        $body = $message;
+        $headers = "From: NexaFlow <{$from}>\r\nReply-To: {$from}\r\nDate: " . date('r') . "\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n";
+        $body = chunk_split(base64_encode($message), 76, "\r\n");
     }
     $sent = mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
     if (!$sent) {
