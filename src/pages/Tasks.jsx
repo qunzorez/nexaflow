@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
@@ -56,20 +57,53 @@ const descriptionPreview = (value) => {
 
 function StatusMenu({ task, onChange }) {
   const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState({});
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const optionsRef = useRef(null);
   const current = statusOptions[task.status] || statusOptions.todo;
   const canManage = task.canManage !== false;
   const visibleOptions = Object.entries(statusOptions).filter(
     ([value]) =>
       canManage || !["review", "cancelled", "archived"].includes(value),
   );
+  useEffect(() => {
+    const close = (event) => {
+      if (rootRef.current?.contains(event.target) || optionsRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+  useEffect(() => {
+    if (!open || !triggerRef.current) return undefined;
+    const updatePosition = () => {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const width = 170;
+      const height = visibleOptions.length * 38 + 12;
+      const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
+      const below = rect.bottom + 7;
+      const top = below + height <= window.innerHeight - 8 ? below : Math.max(8, rect.top - height - 7);
+      setMenuStyle({ left, top, width });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, visibleOptions.length]);
   return (
     <div
       className={`status-menu status-menu-${task.status}${open ? " status-menu-open" : ""}`}
       onClick={(event) => event.stopPropagation()}
+      ref={rootRef}
     >
       <button
         type="button"
         className="status-menu-trigger"
+        ref={triggerRef}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="status-menu-icon">{current.icon}</span>
@@ -77,14 +111,14 @@ function StatusMenu({ task, onChange }) {
         <span className="status-menu-chevron">⌄</span>
       </button>
       {open && (
-        <>
+        createPortal(<>
           <button
             className="status-menu-overlay"
             type="button"
             aria-label="Закрити меню"
             onClick={() => setOpen(false)}
           />
-          <div className="status-menu-options">
+          <div ref={optionsRef} className="status-menu-options" style={menuStyle}>
             {visibleOptions.map(([value, option]) => (
               <button
                 type="button"
@@ -103,7 +137,7 @@ function StatusMenu({ task, onChange }) {
               </button>
             ))}
           </div>
-        </>
+        </>, document.body)
       )}
     </div>
   );
