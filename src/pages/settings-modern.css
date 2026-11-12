@@ -70,8 +70,8 @@
 .account-info-list strong { font-size: 11px; text-align: right; }
 .account-email { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-verified { color: var(--green); }
-.subscription-card { grid-column: 2; grid-row: 2; min-height: 214px; display: grid; grid-template-columns: 1fr; align-content: start; gap: 13px; background: linear-gradient(110deg, #f4fbf7, #fff); }
-.account-info-card { grid-column: 1; grid-row: 2; }
+.subscription-card { grid-column: 1; grid-row: 2; min-height: 214px; display: grid; grid-template-columns: 1fr; align-content: start; gap: 13px; background: linear-gradient(110deg, #f4fbf7, #fff); }
+.account-info-card { grid-column: 2; grid-row: 2; }
 .password-card { grid-column: 1 / -1; grid-row: 3; }
 .subscription-main { min-width: 0; }
 .subscription-main .settings-section-title { margin-bottom: 12px; }
