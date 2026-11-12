@@ -63,8 +63,9 @@ function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): 
         $due = htmlspecialchars($due, ENT_QUOTES, 'UTF-8');
         $caption = "<b>NexaFlow • Нагадування</b>\n\n🔔 Час повернутися до задачі\n\n<b>{$title}</b>\n\n📁 Проєкт: {$project}\n📅 Дедлайн: {$due}\n\nЗадача все ще очікує вашої уваги. Відкрийте її, щоб переглянути деталі та продовжити роботу.";
         $chatId = (string)$user['telegram_chat_id'];
-        $sent = sendTelegramPhoto($chatId, 'https://nexaflow.top/assets/logo-telegram.png', $caption, 'https://nexaflow.top/tasks/' . rawurlencode((string)$reminder['id']));
-        if (!$sent) sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)));
+        $taskUrl = 'https://nexaflow.top/tasks/' . rawurlencode((string)$reminder['id']);
+        $sent = sendTelegramPhoto($chatId, 'https://nexaflow.top/assets/logo-telegram.png', $caption, $taskUrl);
+        if (!$sent) sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)) . "\n\nВідкрити задачу: {$taskUrl}");
     } catch (Throwable $error) {
         error_log('Telegram reminder error: ' . $error->getMessage());
     }
