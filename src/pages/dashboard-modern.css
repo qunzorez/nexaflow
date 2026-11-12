@@ -113,6 +113,9 @@
 .dashboard-page .project-list.is-scrollable { height: 280px; max-height: 280px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
 .dashboard-page .project-row { min-height: 56px; box-sizing: border-box; }
 .dashboard-page .project-status { box-shadow: inset 0 0 0 1px #d1ecdc; }
+.dashboard-page .project-status-paused { background: #fff5dc; color: #a97818; box-shadow: inset 0 0 0 1px #f1d898; }
+.dashboard-page .project-status-completed { background: #e8f1ff; color: #4d74ad; box-shadow: inset 0 0 0 1px #c9dbf6; }
+.dashboard-page .project-status-draft { background: #f0edf9; color: #7661ae; box-shadow: inset 0 0 0 1px #ddd5f1; }
 .dashboard-page .reminders-panel { animation: dashboard-rise .55s ease both; }
 .dashboard-page .reminder-row { border-radius: 9px; }
 .dashboard-page .reminder-row:hover .reminder-arrow { transform: translateX(3px); }
