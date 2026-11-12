@@ -1,0 +1,6 @@
+.task-recurrence { display: grid; gap: 10px; margin-top: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdfb; }
+.task-recurrence-toggle { display: flex !important; align-items: center; gap: 8px; color: var(--ink) !important; font-weight: 700 !important; cursor: pointer; }
+.task-recurrence-toggle input { width: auto !important; margin: 0 !important; accent-color: var(--green); }
+.task-recurrence-select { display: grid !important; gap: 5px; max-width: 310px; }
+.task-recurrence-select select { margin-top: 0 !important; }
+.task-recurrence-select small { color: var(--muted); font-size: 9px; font-weight: 500; line-height: 1.35; }

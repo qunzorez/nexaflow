@@ -11,11 +11,14 @@ CREATE TABLE IF NOT EXISTS tasks (
   due_date DATE NULL,
   reminder_at DATETIME NULL,
   creator_reminder TINYINT(1) NOT NULL DEFAULT 0,
+  recurrence_rule VARCHAR(20) NOT NULL DEFAULT 'none',
+  recurrence_parent_id CHAR(32) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_tasks_assignee FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+  ,CONSTRAINT fk_tasks_recurrence_parent FOREIGN KEY (recurrence_parent_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS task_projects (
