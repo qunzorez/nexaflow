@@ -28,9 +28,9 @@ try {
         $users = [];
     }
     if ($isAdmin) {
-        $tasksQuery = $pdo->query("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC LIMIT 6");
+        $tasksQuery = $pdo->query("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
     } else {
-        $tasksQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE t.created_by = ? OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC LIMIT 6");
+        $tasksQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE t.created_by = ? OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
         $tasksQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     }
     $tasks = $tasksQuery->fetchAll();
