@@ -139,7 +139,7 @@ export default function Dashboard() {
           <section className="panel reminders-panel reminder-panel-enter">
             <div className="panel-heading">
               <div className="reminders-heading-copy">
-                <span className="reminders-heading-icon">⏰</span>
+                <span className="reminders-heading-icon" aria-hidden="true">◷</span>
                 <div>
                   <h2>Нагадування</h2>
                   <p>Час повернутися до задач, які потребують вашої уваги.</p>
@@ -156,7 +156,7 @@ export default function Dashboard() {
                   onClick={() => setReminderTask(task)}
                   key={task.id}
                 >
-                  <span className="reminder-leading-icon">⏱</span>
+                  <span className="reminder-leading-icon" aria-hidden="true">◷</span>
                   <span className={`task-status status-${task.status}`}>
                     {statusLabels[task.status]}
                   </span>
