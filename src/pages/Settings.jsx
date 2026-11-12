@@ -216,6 +216,19 @@ export default function Settings() {
               <div><span>Статус пошти</span><strong className="account-verified">● Підтверджено</strong></div>
             </div>
           </section>
+          <section className="panel subscription-card">
+            <div className="subscription-main">
+              <div className="settings-section-title">
+                <div>
+                  <h2><span className="settings-section-icon">◇</span>Підписка</h2>
+                  <p>Керуйте доступом до можливостей NexaFlow.</p>
+                </div>
+              </div>
+              <div className="subscription-plan"><strong>Стартовий план</strong><span>Поточний план</span></div>
+            </div>
+            <div className="subscription-meta"><div><span>Статус</span><strong>● Активна</strong></div><div><span>Оплата</span><b>Поки без оплати</b></div></div>
+            <button type="button" className="outline-btn subscription-button" disabled>Керувати підпискою</button>
+          </section>
           <div className="settings-actions">
             <button className="primary-action">Зберегти зміни</button>
           </div>

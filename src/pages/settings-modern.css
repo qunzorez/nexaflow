@@ -70,3 +70,15 @@
 .account-info-list strong { font-size: 11px; text-align: right; }
 .account-email { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-verified { color: var(--green); }
+.subscription-card { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 24px; background: linear-gradient(110deg, #f4fbf7, #fff); }
+.subscription-main { min-width: 0; }
+.subscription-main .settings-section-title { margin-bottom: 12px; }
+.subscription-plan { display: inline-flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #fff; border: 1px solid #dcece1; }
+.subscription-plan strong { font: 800 13px Manrope; }
+.subscription-plan span { color: var(--green); font-size: 9px; font-weight: 800; }
+.subscription-meta { display: flex; gap: 24px; }
+.subscription-meta div { display: grid; gap: 5px; }
+.subscription-meta span { color: var(--muted); font-size: 9px; }
+.subscription-meta strong, .subscription-meta b { color: var(--green); font-size: 10px; white-space: nowrap; }
+.subscription-button { opacity: .65; white-space: nowrap; }
+@media (max-width: 760px) { .subscription-card { grid-column: auto; grid-template-columns: 1fr; gap: 15px; } .subscription-meta { justify-content: space-between; } .subscription-button { justify-self: start; } }
