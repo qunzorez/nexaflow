@@ -35,7 +35,7 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
         static $columnReady = false;
         if (!$columnReady) {
             $columns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'telegram_notifications_enabled'")->fetchColumn();
-            if (!$columns) $pdo->exec("ALTER TABLE users ADD telegram_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0");
+            if (!$columns) { $pdo->exec("ALTER TABLE users ADD telegram_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0"); $pdo->exec("UPDATE users SET telegram_notifications_enabled = 1 WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id <> ''"); }
             $columnReady = true;
         }
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
@@ -62,7 +62,9 @@ function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): 
         $project = htmlspecialchars($project, ENT_QUOTES, 'UTF-8');
         $due = htmlspecialchars($due, ENT_QUOTES, 'UTF-8');
         $caption = "<b>NexaFlow • Нагадування</b>\n\n🔔 Час повернутися до задачі\n\n<b>{$title}</b>\n\n📁 Проєкт: {$project}\n📅 Дедлайн: {$due}\n\nЗадача все ще очікує вашої уваги. Відкрийте її, щоб переглянути деталі та продовжити роботу.";
-        sendTelegramPhoto((string)$user['telegram_chat_id'], 'https://nexaflow.top/assets/logo-telegram.png', $caption, 'https://nexaflow.top/tasks/' . rawurlencode((string)$reminder['id']));
+        $chatId = (string)$user['telegram_chat_id'];
+        $sent = sendTelegramPhoto($chatId, 'https://nexaflow.top/assets/logo-telegram.png', $caption, 'https://nexaflow.top/tasks/' . rawurlencode((string)$reminder['id']));
+        if (!$sent) sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)));
     } catch (Throwable $error) {
         error_log('Telegram reminder error: ' . $error->getMessage());
     }
