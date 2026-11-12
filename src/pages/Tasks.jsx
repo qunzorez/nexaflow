@@ -9,6 +9,7 @@ import './tasks-page-extra.css';
 import './tasks-status.css';
 import './tasks-table.css';
 import './tasks-dropdown-fix.css';
+import './tasks-status-centering.css';
 import '../modules/tasks/task-modal.css';
 
 const statusOptions = { todo: { label: 'До виконання', icon: '○' }, in_progress: { label: 'У роботі', icon: '◐' }, done: { label: 'Завершено', icon: '✓' }, cancelled: { label: 'Скасовано', icon: '×' }, archived: { label: 'Архів', icon: '▣' } };

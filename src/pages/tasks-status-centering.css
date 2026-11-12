@@ -1,0 +1,26 @@
+.status-menu-trigger,
+.task-status-select {
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.status-menu-icon,
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 1;
+  text-align: center;
+}
+
+.status-menu-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 18px;
+  margin-left: 2px;
+  line-height: 1;
+}
