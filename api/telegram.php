@@ -16,8 +16,10 @@ function sendTelegramMessage(string $chatId, string $message): bool
 
 function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
 {
-    $query = $pdo->prepare('SELECT telegram_chat_id FROM users WHERE id = ? LIMIT 1');
+    $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
     $query->execute([$userId]);
-    $chatId = (string)($query->fetchColumn() ?: '');
+    $user = $query->fetch();
+    if (!$user || (int)$user['telegram_notifications_enabled'] !== 1) return;
+    $chatId = (string)($user['telegram_chat_id'] ?? '');
     if ($chatId !== '') sendTelegramMessage($chatId, $message);
 }

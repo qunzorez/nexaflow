@@ -19,6 +19,7 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [telegramTag, setTelegramTag] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
+  const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [bio, setBio] = useState("");
   const [clientModule, setClientModule] = useState(
     () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
@@ -35,6 +36,7 @@ export default function Settings() {
       setPhone(result.user.phone || "");
       setTelegramTag(result.user.telegram_tag || "");
       setTelegramChatId(result.user.telegram_chat_id || "");
+      setTelegramEnabled(Boolean(Number(result.user.telegram_notifications_enabled)));
       setBio(result.user.bio || "");
     });
   }, []);
@@ -60,6 +62,7 @@ export default function Settings() {
       phone,
       telegram_tag: telegramTag,
       telegram_chat_id: telegramChatId,
+      telegram_notifications_enabled: telegramEnabled,
       bio,
       current_password: form.get("current_password"),
       new_password: form.get("new_password"),
@@ -70,6 +73,7 @@ export default function Settings() {
     setPhone(result.user.phone || "");
     setTelegramTag(result.user.telegram_tag || "");
     setTelegramChatId(result.user.telegram_chat_id || "");
+    setTelegramEnabled(Boolean(Number(result.user.telegram_notifications_enabled)));
     setBio(result.user.bio || "");
     window.dispatchEvent(
       new CustomEvent("nexaflow:profile-updated", { detail: result.user }),
@@ -174,17 +178,18 @@ export default function Settings() {
                 </small>
               </label>
             </div>
-            <label>
-              Про себе
-              <textarea
-                name="bio"
-                value={bio}
-                onChange={(event) => setBio(event.target.value)}
-                maxLength="1000"
-                rows="4"
-                placeholder="Коротко розкажіть про себе, свою роль або напрям роботи"
-              />
-            </label>
+            <div className="telegram-connect-box">
+              <div>
+                <strong>Telegram-сповіщення</strong>
+                <small>Отримуйте задачі та повідомлення прямо в Telegram.</small>
+              </div>
+              <label className="telegram-toggle">
+                <input type="checkbox" checked={telegramEnabled} onChange={(event) => setTelegramEnabled(event.target.checked)} />
+                <span />
+                <b>{telegramEnabled ? "Увімкнено" : "Вимкнено"}</b>
+              </label>
+              <a className="outline-btn telegram-bot-link" href="https://t.me/nexaflows_bot" target="_blank" rel="noreferrer">Відкрити бота →</a>
+            </div>
           </section>
           <section
             className={`panel password-card${showPasswordFields ? " is-open" : ""}`}
