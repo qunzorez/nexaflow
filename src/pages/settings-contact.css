@@ -1,0 +1,36 @@
+.settings-contact-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 15px;
+}
+
+.settings-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.settings-grid-page textarea {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 12px;
+  color: var(--ink);
+  font-size: 12px;
+  background: #fff;
+  resize: vertical;
+}
+
+.settings-grid-page input:focus,
+.settings-grid-page textarea:focus {
+  outline: 0;
+  border-color: #76bca1;
+  box-shadow: 0 0 0 3px #dff2e933;
+}
+
+@media (max-width: 760px) {
+  .settings-contact-card { grid-column: auto; }
+  .settings-contact-grid { grid-template-columns: 1fr; }
+}
