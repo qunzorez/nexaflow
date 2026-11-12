@@ -84,7 +84,7 @@ export default function DateTimePicker({ name, value, defaultValue = "", onChang
   return <div className={`date-time-picker ${open ? "is-open" : ""}`} ref={rootRef}>
     <input type="hidden" name={name} value={currentValue || ""} required={required} readOnly />
     <button ref={triggerRef} type="button" className="date-time-trigger" onClick={() => setOpen((state) => !state)} aria-expanded={open}>
-      <span className="date-time-icon">{withTime ? "◷" : "▣"}</span><span className={currentValue ? "date-time-value" : "date-time-placeholder"}>{displayValue(currentValue, withTime)}</span><span className="date-time-chevron">⌄</span>
+      <span className="date-time-icon">{withTime ? "◷" : "▣"}</span><span className={currentValue ? "date-time-value" : "date-time-placeholder"}>{displayValue(currentValue, withTime)}</span>
     </button>
     {open && createPortal(<div ref={popoverRef} className="date-time-popover" style={popoverStyle}>
       <div className="date-time-head"><button type="button" onClick={() => shiftMonth(-1)}>‹</button><strong>{monthName}</strong><button type="button" onClick={() => shiftMonth(1)}>›</button></div>
