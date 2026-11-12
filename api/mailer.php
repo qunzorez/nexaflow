@@ -29,7 +29,7 @@ function sendProjectEmail(string $to, string $subject, string $message, string $
         $response = $read();
         $write('QUIT');
         fclose($socket);
-        return str_starts_with(trim($response), '250');
+        return substr(ltrim($response), 0, 3) === '250';
     }
     if ($html !== '') {
         $boundary = 'nexaflow_' . bin2hex(random_bytes(8));
