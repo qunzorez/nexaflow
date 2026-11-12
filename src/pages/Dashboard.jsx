@@ -12,7 +12,7 @@ const reminderLabel = value => new Date(String(value || '').replace(' ', 'T')).t
 
 export default function Dashboard() {
   const [data, setData] = useState(null); const [reminderTask, setReminderTask] = useState(null); const [notice, setNotice] = useState(''); const [taskSearch, setTaskSearch] = useState(''); const [taskFilter, setTaskFilter] = useState('all'); const [teamSearch, setTeamSearch] = useState(''); const [teamSort, setTeamSort] = useState('time'); const navigate = useNavigate();
-  useEffect(() => { api('/api/dashboard.php').then(result => result.ok ? setData(result) : navigate('/')); }, [navigate]);
+  useEffect(() => { const refresh = () => api('/api/dashboard.php').then(result => result.ok ? setData(result) : navigate('/')); refresh(); const interval = window.setInterval(refresh, 15000); const refreshOnFocus = () => refresh(); window.addEventListener('focus', refreshOnFocus); return () => { window.clearInterval(interval); window.removeEventListener('focus', refreshOnFocus); }; }, [navigate]);
   if (!data) return <div className="loading-screen">Завантаження NexaFlow…</div>;
   const canManage = data.permissions.manage;
   const dashboardTasks = data.tasks?.filter(task => task.status !== 'archived').filter(task => taskFilter === 'all' || task.status === taskFilter).filter(task => `${task.title} ${task.project_name || ''} ${task.client_name || ''}`.toLowerCase().includes(taskSearch.trim().toLowerCase())) || [];

@@ -13,7 +13,7 @@ export default function Notifications() {
     const result = await api('/api/notifications.php');
     if (result.ok) { setItems(result.notifications || []); setUnread(Number(result.unread || 0)); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); const interval = window.setInterval(load, 15000); const refreshOnFocus = () => load(); window.addEventListener('focus', refreshOnFocus); return () => { window.clearInterval(interval); window.removeEventListener('focus', refreshOnFocus); }; }, []);
   useEffect(() => { const closeOnOutsideClick = event => { if (open && wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false); }; document.addEventListener('pointerdown', closeOnOutsideClick); return () => document.removeEventListener('pointerdown', closeOnOutsideClick); }, [open]);
   async function mark(item) { setOpen(false); setSelected(item); if (!Number(item.is_read)) { await post('/api/notifications.php', { action: 'read', id: item.id }); load(); } }
   async function markAll() { await post('/api/notifications.php', { action: 'read_all' }); load(); }
