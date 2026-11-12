@@ -24,15 +24,11 @@ try {
     $id = bin2hex(random_bytes(16));
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $insert = $pdo->prepare('INSERT INTO users (id, name, email, password_hash, role, requested_role, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, NULL)');
-    $insert->execute([$id, $name, $email, $hash, 'user', $requestedRole]);
+    $insert->execute([$id, $name, $email, $hash, $requestedRole, $requestedRole]);
     $notificationUsers = $pdo->query('SELECT id FROM users WHERE id <> ' . $pdo->quote($id))->fetchAll();
     $notificationInsert = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'user_created', ?, ?, 'user', ?)");
     foreach ($notificationUsers as $recipient) {
         $notificationInsert->execute([bin2hex(random_bytes(16)), $recipient['id'], $id, 'Новий користувач', "До NexaFlow приєднався користувач {$name}.", $id]);
-    }
-    if ($requestedRole === 'manager') {
-        $admins = $pdo->query("SELECT id FROM users WHERE role IN ('admin', 'owner') AND id <> " . $pdo->quote($id))->fetchAll();
-        foreach ($admins as $admin) $notificationInsert->execute([bin2hex(random_bytes(16)), $admin['id'], $id, 'Запит на роль менеджера', "Користувач {$name} просить надати роль менеджера.", $id]);
     }
     $sent = issueEmailVerification($pdo, $id, $email, $name);
     jsonResponse(true, $sent ? 'Акаунт створено. Перевірте пошту для підтвердження.' : 'Акаунт створено, але лист не вдалося відправити. Спробуйте повторити відправлення.', ['requires_verification' => true, 'email' => $email]);
