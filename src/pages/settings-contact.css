@@ -4,6 +4,12 @@
   gap: 15px;
 }
 
+.password-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 0; }
+.password-card.is-open .password-section-heading { margin-bottom: 3px; }
+.settings-switch { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #cfe4d7; border-radius: 999px; padding: 7px 11px 7px 7px; background: #f5fbf7; color: var(--green); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.settings-switch span { width: 16px; height: 16px; border-radius: 50%; background: #d5e9dc; box-shadow: inset 0 0 0 3px #fff; transition: transform .2s, background .2s; }
+.settings-switch.is-on span { background: var(--green); transform: translateX(2px); }
+
 .settings-contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

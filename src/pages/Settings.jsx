@@ -18,6 +18,7 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [telegramTag, setTelegramTag] = useState("");
   const [bio, setBio] = useState("");
+  const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
@@ -160,35 +161,46 @@ export default function Settings() {
               />
             </label>
           </section>
-          <section className="panel password-card">
-            <div className="settings-section-title">
+          <section className={`panel password-card${showPasswordFields ? " is-open" : ""}`}>
+            <div className="settings-section-title password-section-heading">
               <div>
                 <h2>Безпека</h2>
                 <p>Змініть пароль, якщо потрібно.</p>
               </div>
+              <button
+                type="button"
+                className={`settings-switch${showPasswordFields ? " is-on" : ""}`}
+                aria-expanded={showPasswordFields}
+                onClick={() => setShowPasswordFields((value) => !value)}
+              >
+                <span />
+                {showPasswordFields ? "Сховати" : "Змінити пароль"}
+              </button>
             </div>
-            <label>
-              Поточний пароль
-              <input
-                type="password"
-                name="current_password"
-                autoComplete="current-password"
-                placeholder="Введіть поточний пароль"
-              />
-            </label>
-            <label>
-              Новий пароль
-              <input
-                type="password"
-                name="new_password"
-                minLength="8"
-                autoComplete="new-password"
-                placeholder="Мінімум 8 символів"
-              />
-            </label>
-            <small className="settings-hint">
-              Залиште поля порожніми, якщо не хочете змінювати пароль.
-            </small>
+            {showPasswordFields && <>
+              <label>
+                Поточний пароль
+                <input
+                  type="password"
+                  name="current_password"
+                  autoComplete="current-password"
+                  placeholder="Введіть поточний пароль"
+                />
+              </label>
+              <label>
+                Новий пароль
+                <input
+                  type="password"
+                  name="new_password"
+                  minLength="8"
+                  autoComplete="new-password"
+                  placeholder="Мінімум 8 символів"
+                />
+              </label>
+              <small className="settings-hint">
+                Залиште поля порожніми, якщо не хочете змінювати пароль.
+              </small>
+            </>}
           </section>
           <div className="settings-actions">
             <button className="primary-action">Зберегти зміни</button>
