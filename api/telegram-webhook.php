@@ -13,9 +13,9 @@ $connectToken = strpos($text, '/start ') === 0 ? trim(substr($text, 7)) : '';
 if ($chatId === '') { http_response_code(200); echo 'ok'; exit; }
 
 if ($text === '/start' || strpos($text, '/start ') === 0) {
-    sendTelegramMessage($chatId, "NexaFlow підключено ✅\n\nТепер ви отримуватимете сповіщення про призначені задачі та перевірки.");
+    sendTelegramMessage($chatId, "NexaFlow • Telegram підключено ✅\n\n🎉 Готово! Цей чат під’єднано до вашого профілю NexaFlow.\n\nТепер сюди надходитимуть важливі сповіщення про призначені задачі, нагадування та перевірки.\n\nКерувати сповіщеннями можна в налаштуваннях профілю.");
 } elseif ($text === '/help') {
-    sendTelegramMessage($chatId, "NexaFlow надсилає сюди робочі сповіщення. Керування виконується у вашому профілі на сайті.");
+    sendTelegramMessage($chatId, "NexaFlow • Робочі сповіщення 🔔\n\nЦей бот надсилає повідомлення про задачі, дедлайни, нагадування та зміни статусів.\n\nКерування виконується у вашому профілі на сайті NexaFlow.");
 }
 try {
     require __DIR__ . '/db.php';
