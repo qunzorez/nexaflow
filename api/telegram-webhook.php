@@ -9,6 +9,7 @@ $chat = $message['chat'] ?? [];
 $chatId = (string)($chat['id'] ?? '');
 $username = strtolower(trim((string)($message['from']['username'] ?? '')));
 $text = trim((string)($message['text'] ?? ''));
+$connectToken = strpos($text, '/start ') === 0 ? trim(substr($text, 7)) : '';
 if ($chatId === '') { http_response_code(200); echo 'ok'; exit; }
 
 if ($text === '/start' || strpos($text, '/start ') === 0) {
@@ -19,12 +20,18 @@ if ($text === '/start' || strpos($text, '/start ') === 0) {
 try {
     require __DIR__ . '/db.php';
     $pdo = db();
-    if ($username !== '') {
+    $userId = '';
+    if ($connectToken !== '') {
+        $query = $pdo->prepare('SELECT id FROM users WHERE telegram_connect_token = ? LIMIT 1');
+        $query->execute([$connectToken]);
+        $userId = (string)($query->fetchColumn() ?: '');
+    }
+    if ($userId === '' && $username !== '') {
         $query = $pdo->prepare('SELECT id FROM users WHERE LOWER(REPLACE(telegram_tag, "@", "")) = ? LIMIT 1');
         $query->execute([$username]);
         $userId = $query->fetchColumn();
-        if ($userId) $pdo->prepare('UPDATE users SET telegram_chat_id = ?, telegram_notifications_enabled = 1 WHERE id = ?')->execute([$chatId, $userId]);
     }
+    if ($userId) $pdo->prepare('UPDATE users SET telegram_chat_id = ?, telegram_notifications_enabled = 1 WHERE id = ?')->execute([$chatId, $userId]);
 } catch (Throwable $error) {
     error_log('Telegram webhook database error: ' . $error->getMessage());
 }

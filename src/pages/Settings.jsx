@@ -19,6 +19,7 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [telegramTag, setTelegramTag] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
+  const [telegramConnectUrl, setTelegramConnectUrl] = useState("");
   const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [bio, setBio] = useState("");
   const [clientModule, setClientModule] = useState(
@@ -37,6 +38,7 @@ export default function Settings() {
       setTelegramTag(result.user.telegram_tag || "");
       setTelegramChatId(result.user.telegram_chat_id || "");
       setTelegramEnabled(Boolean(Number(result.user.telegram_notifications_enabled)));
+      setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
       setBio(result.user.bio || "");
     });
   }, []);
@@ -74,6 +76,7 @@ export default function Settings() {
     setTelegramTag(result.user.telegram_tag || "");
     setTelegramChatId(result.user.telegram_chat_id || "");
     setTelegramEnabled(Boolean(Number(result.user.telegram_notifications_enabled)));
+    setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
     setBio(result.user.bio || "");
     window.dispatchEvent(
       new CustomEvent("nexaflow:profile-updated", { detail: result.user }),
@@ -166,17 +169,6 @@ export default function Settings() {
                   placeholder="@username"
                 />
               </label>
-              <label>
-                Telegram chat ID
-                <input
-                  value={telegramChatId}
-                  onChange={(event) => setTelegramChatId(event.target.value)}
-                  placeholder="Наприклад, 123456789"
-                />
-                <small className="settings-hint">
-                  Відкрийте бота та натисніть /start, потім вкажіть chat ID.
-                </small>
-              </label>
             </div>
             <div className="telegram-connect-box">
               <div>
@@ -188,7 +180,7 @@ export default function Settings() {
                 <span />
                 <b>{telegramEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
-              <a className="outline-btn telegram-bot-link" href="https://t.me/nexaflows_bot" target="_blank" rel="noreferrer">Відкрити бота →</a>
+              <a className="outline-btn telegram-bot-link" href={telegramConnectUrl} target="_blank" rel="noreferrer">Підключити Telegram →</a>
             </div>
           </section>
           <section
