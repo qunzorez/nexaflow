@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
+import DateTimePicker from "../components/DateTimePicker.jsx";
 import "./clients.css";
 
 const specialTaxOptions = [
@@ -141,14 +142,10 @@ function ClientFormModal({ form, setForm, editing, onSave, onClose }) {
                   {form.module === "dentistry" && (
                     <label>
                       Дата народження
-                      <input
-                        type="date"
+                      <DateTimePicker
                         value={form.module_data?.birth_date || ""}
-                        onChange={(event) =>
-                          set("module_data", {
-                            ...form.module_data,
-                            birth_date: event.target.value,
-                          })
+                        onChange={(birth_date) =>
+                          set("module_data", { ...form.module_data, birth_date })
                         }
                       />
                     </label>

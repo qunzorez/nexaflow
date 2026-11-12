@@ -4,6 +4,7 @@ import SearchableMultiSelect from "../../components/SearchableMultiSelect.jsx";
 import TaskDescriptionEditor from "./TaskDescriptionEditor.jsx";
 import PrioritySelect from "./PrioritySelect.jsx";
 import TaskRecurrenceFields from "./TaskRecurrenceFields.jsx";
+import DateTimePicker from "../../components/DateTimePicker.jsx";
 import "./task-editor.css";
 import "./priority-field.css";
 import "./priority-field-fix.css";
@@ -132,23 +133,11 @@ export default function TaskFormModal({
             <div className="task-form-grid">
               <label>
                 Дедлайн
-                <input
-                  type="date"
-                  name="due_date"
-                  defaultValue={editing?.due_date || ""}
-                />
+                <DateTimePicker name="due_date" defaultValue={editing?.due_date || ""} />
               </label>
               <label>
                 Нагадування
-                <input
-                  type="datetime-local"
-                  name="reminder_at"
-                  defaultValue={
-                    editing?.reminder_at
-                      ? editing.reminder_at.replace(" ", "T").slice(0, 16)
-                      : ""
-                  }
-                />
+                <DateTimePicker name="reminder_at" withTime defaultValue={editing?.reminder_at ? editing.reminder_at.replace(" ", "T").slice(0, 16) : ""} />
               </label>
             </div>
             <TaskRecurrenceFields
