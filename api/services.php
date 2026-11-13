@@ -13,7 +13,7 @@ if (!$user) jsonResponse(false, 'Користувача не знайдено.',
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS service_packages (
   id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting',
-  description VARCHAR(500) NULL, client_price DECIMAL(12,2) NOT NULL DEFAULT 0, responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  description VARCHAR(500) NULL, client_price DECIMAL(12,2) NOT NULL DEFAULT 0, responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0, active TINYINT(1) NOT NULL DEFAULT 1,
   created_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_service_packages_created_by (created_by)
@@ -22,6 +22,7 @@ $packageColumns = array_column($pdo->query("SHOW COLUMNS FROM service_packages")
 $addedPackagePrices = false;
 if (!in_array('client_price', $packageColumns, true)) { $pdo->exec("ALTER TABLE service_packages ADD client_price DECIMAL(12,2) NOT NULL DEFAULT 0"); $addedPackagePrices = true; }
 if (!in_array('responsible_amount', $packageColumns, true)) { $pdo->exec("ALTER TABLE service_packages ADD responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0"); $addedPackagePrices = true; }
+if (!in_array('active', $packageColumns, true)) $pdo->exec("ALTER TABLE service_packages ADD active TINYINT(1) NOT NULL DEFAULT 1");
 $pdo->exec("CREATE TABLE IF NOT EXISTS service_catalog (
   id CHAR(32) PRIMARY KEY, package_id CHAR(32) NOT NULL, name VARCHAR(190) NOT NULL,
   client_price DECIMAL(12,2) NOT NULL DEFAULT 0, responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -50,8 +51,8 @@ $moduleLabel = static fn(string $module): string => [
 if ($method === 'GET') {
     if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише менеджерам і адміністраторам.', [], 403);
     $packageQuery = $isAdmin
-        ? $pdo->query('SELECT id, name, module, description, client_price, responsible_amount, created_at FROM service_packages ORDER BY name')
-        : $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, created_at FROM service_packages WHERE module IN (?, 'all') ORDER BY name");
+        ? $pdo->query('SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages ORDER BY name')
+        : $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages WHERE module IN (?, 'all') ORDER BY name");
     if (!$isAdmin) $packageQuery->execute([$activeModule]);
     $packages = $packageQuery->fetchAll();
     $items = $pdo->query('SELECT s.id, s.package_id, s.name, s.client_price, s.responsible_amount, s.responsible_user_id, s.active, u.name AS responsible_name FROM service_catalog s LEFT JOIN users u ON u.id = s.responsible_user_id WHERE s.active = 1 ORDER BY s.name')->fetchAll();
@@ -61,6 +62,7 @@ if ($method === 'GET') {
         $package['services'] = array_values(array_filter($items, static fn(array $item): bool => (string)$item['package_id'] === (string)$package['id']));
         $package['client_price'] = (float)$package['client_price'];
         $package['responsible_amount'] = (float)$package['responsible_amount'];
+        $package['active'] = (bool)$package['active'];
         $package['services_count'] = count($package['services']);
     }
     unset($package);
@@ -89,6 +91,14 @@ if (in_array($action, ['create_package', 'update_package'], true)) {
     $query = $pdo->prepare('INSERT INTO service_packages (id, name, module, description, client_price, responsible_amount, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
     $query->execute([$newId(), $name, $module, $description ?: null, $clientPrice, $responsibleAmount, $userId]);
     jsonResponse(true, 'Пакет створено.');
+}
+
+if ($action === 'toggle_package') {
+    if ($packageId === '') jsonResponse(false, 'Пакет не знайдено.', [], 422);
+    $active = !empty($data['active']) ? 1 : 0;
+    $query = $pdo->prepare('UPDATE service_packages SET active = ? WHERE id = ?');
+    $query->execute([$active, $packageId]);
+    jsonResponse(true, $active ? 'Пакет активовано.' : 'Пакет деактивовано.');
 }
 
 if ($action === 'delete_package') {
