@@ -134,13 +134,6 @@ export default function Calendar() {
     return Array.from({ length: 42 }, (_, index) => addDays(start, index));
   }, [cursor, view]);
 
-  const miniMonthDays = useMemo(() => {
-    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-    const start = new Date(first);
-    start.setDate(1 - ((first.getDay() + 6) % 7));
-    return Array.from({ length: 42 }, (_, index) => addDays(start, index));
-  }, [cursor]);
-
   const upcoming = useMemo(() => events
     .filter(event => event.date >= new Date(new Date().setHours(0, 0, 0, 0)))
     .slice(0, 8), [events]);
@@ -194,10 +187,6 @@ export default function Calendar() {
           </section>
 
           <section className="panel upcoming-deadlines-panel">
-            <div className="calendar-mini-header"><strong>{formatDate(cursor, { month: "long", year: "numeric" }).replace(/^./, char => char.toUpperCase())}</strong><span>Мінікалендар</span></div>
-            <div className="calendar-mini-weekdays">{WEEKDAYS.map(day => <span key={day}>{day.slice(0, 1)}</span>)}</div>
-            <div className="calendar-mini-grid">{miniMonthDays.map(date => { const currentMonth = date.getMonth() === cursor.getMonth(); const selected = dateKey(date) === dateKey(cursor); const hasEvents = Boolean(eventsByDay[dateKey(date)]?.length); return <button type="button" className={`${currentMonth ? "" : "outside"}${selected ? " selected" : ""}${dateKey(date) === dateKey(new Date()) ? " today" : ""}`} key={dateKey(date)} onClick={() => { setCursor(date); setView("day"); }}><span>{date.getDate()}</span>{hasEvents && <i />}</button>; })}</div>
-            <div className="calendar-sidebar-divider" />
             <div className="panel-heading"><div><h2>Найближчі дедлайни</h2><p>Задачі та послуги, які потребують уваги.</p></div><span className="task-count-badge">{upcoming.length}</span></div>
             <div className="upcoming-deadlines">{upcoming.length ? upcoming.map(event => <button type="button" className="upcoming-deadline" key={event.id} onClick={() => openEvent(event)}>
               <span className={`upcoming-icon ${event.kind}`}><Icon name={event.kind === "task" ? "check" : "calendar"} /></span>
