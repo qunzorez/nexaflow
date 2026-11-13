@@ -84,10 +84,12 @@ $isAdmin = in_array($project['user_role'], ['admin', 'owner'], true);
 $claims = resourceClaims($pdo, $userId, 'project', $projectId);
 requireClaim($claims, 'read');
 $isProjectOwner = $project['owner_id'] === $userId || $isAdmin;
-$canEdit = $isProjectOwner;
+$canEdit = $isProjectOwner || ($claims['assigned'] && hasClaim($claims, 'edit'));
+$canUpdate = $isProjectOwner || ($claims['assigned'] && hasClaim($claims, 'update'));
+$canDelete = $isProjectOwner || ($claims['assigned'] && hasClaim($claims, 'delete'));
 $canManageTeam = $isProjectOwner;
-if ($method === 'POST') {
-    if (!$isProjectOwner) jsonResponse(false, 'Змінювати проєкт і його команду може лише власник проєкту.', [], 403);
+if ($method === 'POST' && in_array($action, ['add_member', 'remove_member', 'create_group', 'delete_group', 'update_group', 'assign_global_group'], true)) {
+    if (!$isProjectOwner) jsonResponse(false, 'Змінювати команду і групи може лише власник проєкту.', [], 403);
 }
 
 
@@ -113,11 +115,11 @@ if ($method === 'GET') {
     $projectTasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at FROM tasks t WHERE {$taskWhere} ORDER BY t.created_at DESC, t.due_date IS NULL, t.due_date");
     $projectTasksQuery->execute($taskParams);
     $projectTasks = $projectTasksQuery->fetchAll();
-    jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'project_tasks' => $projectTasks, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'update' => $canEdit, 'delete' => $canEdit, 'manage_team' => $canManageTeam, 'admin' => $isAdmin]]);
+    jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'project_tasks' => $projectTasks, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'update' => $canUpdate, 'delete' => $canDelete, 'manage_team' => $canManageTeam, 'admin' => $isAdmin]]);
 }
 if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
-if (!$canEdit && !($action === 'update' && hasClaim($claims, 'update') && ($canManageTeam || $claims['assigned'])) && !($action === 'delete' && hasClaim($claims, 'delete') && ($canManageTeam || $claims['assigned']))) jsonResponse(false, 'Недостатньо прав для редагування цього проєкту.', [], 403);
-$action = (string)($data['action'] ?? 'update');
+if ($action === 'update' && !$canUpdate) jsonResponse(false, 'Недостатньо прав для оновлення цього проєкту.', [], 403);
+if ($action === 'delete' && !$canDelete) jsonResponse(false, 'Недостатньо прав для видалення цього проєкту.', [], 403);
 if ($method === 'POST' && $action === 'assign_global_group') {
     $manager = $pdo->prepare("SELECT role FROM users WHERE id = ? AND role IN ('admin', 'owner', 'manager') LIMIT 1");
     $manager->execute([$userId]);
