@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_by CHAR(32) NOT NULL,
   status VARCHAR(30) NOT NULL DEFAULT 'todo',
   priority VARCHAR(20) NOT NULL DEFAULT 'normal',
-  due_date DATE NULL,
+  due_date DATETIME NULL,
   reminder_at DATETIME NULL,
   creator_reminder TINYINT(1) NOT NULL DEFAULT 0,
   recurrence_rule VARCHAR(20) NOT NULL DEFAULT 'none',

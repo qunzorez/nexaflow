@@ -38,7 +38,7 @@ const pageSize = 10;
 const nonOverdueStatuses = new Set(["done", "cancelled", "archived"]);
 function isOverdueTask(task) {
   if (!task.due_date || nonOverdueStatuses.has(task.status)) return false;
-  const dueDate = new Date(`${task.due_date}T00:00:00`);
+  const dueDate = new Date(`${String(task.due_date).slice(0, 10)}T00:00:00`);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return !Number.isNaN(dueDate.getTime()) && dueDate < today;
@@ -48,10 +48,10 @@ function taskSort(a, b) {
     (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9);
   if (priorityDifference) return priorityDifference;
   const dueA = a.due_date
-    ? new Date(`${a.due_date}T00:00:00`).getTime()
+    ? new Date(`${String(a.due_date).slice(0, 10)}T00:00:00`).getTime()
     : Number.POSITIVE_INFINITY;
   const dueB = b.due_date
-    ? new Date(`${b.due_date}T00:00:00`).getTime()
+    ? new Date(`${String(b.due_date).slice(0, 10)}T00:00:00`).getTime()
     : Number.POSITIVE_INFINITY;
   if (dueA !== dueB) return dueA - dueB;
   return String(b.created_at || "").localeCompare(String(a.created_at || ""));
@@ -440,7 +440,7 @@ export default function Tasks() {
                       <span className="table-date">
                         {task.due_date
                           ? new Date(
-                              `${task.due_date}T00:00:00`,
+                              `${String(task.due_date).slice(0, 10)}T00:00:00`,
                             ).toLocaleDateString("uk-UA")
                           : "—"}
                       </span>

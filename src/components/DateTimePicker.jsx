@@ -31,7 +31,7 @@ function monthDays(year, month) {
   return [...Array(firstDay).fill(null), ...Array.from({ length: count }, (_, i) => i + 1)];
 }
 
-export default function DateTimePicker({ name, value, defaultValue = "", onChange, withTime = false, required = false }) {
+export default function DateTimePicker({ name, value, defaultValue = "", onChange, withTime = false, timeLabel = "Час", required = false }) {
   const initial = value ?? defaultValue;
   const [internalValue, setInternalValue] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -91,7 +91,7 @@ export default function DateTimePicker({ name, value, defaultValue = "", onChang
       <div className="date-time-head"><button type="button" onClick={() => shiftMonth(-1)} aria-label="Попередня сторінка"><Icon name="left" /></button><strong>{monthName}</strong><button type="button" onClick={() => shiftMonth(1)} aria-label="Наступна сторінка"><Icon name="right" /></button></div>
       <div className="calendar-weekdays">{WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div>
       <div className="calendar-grid">{days.map((day, index) => day ? <button type="button" key={day} className={day === selected.day && selected.month === view.month && selected.year === view.year ? "selected" : ""} onClick={() => selectDay(day)}>{day}</button> : <span key={`empty-${index}`} />)}</div>
-      {withTime && <div className="time-picker-row"><span className="time-picker-label">Час нагадування</span><input className="time-number-input" type="number" min="0" max="23" value={pad(view.hour)} onChange={(event) => updateTime("hour", Math.min(23, Math.max(0, Number(event.target.value || 0))))} aria-label="Години" /><b>:</b><input className="time-number-input" type="number" min="0" max="59" value={pad(view.minute)} onChange={(event) => updateTime("minute", Math.min(59, Math.max(0, Number(event.target.value || 0))))} aria-label="Хвилини" /></div>}
+      {withTime && <div className="time-picker-row"><span className="time-picker-label">{timeLabel}</span><input className="time-number-input" type="number" min="0" max="23" value={pad(view.hour)} onChange={(event) => updateTime("hour", Math.min(23, Math.max(0, Number(event.target.value || 0))))} aria-label="Години" /><b>:</b><input className="time-number-input" type="number" min="0" max="59" value={pad(view.minute)} onChange={(event) => updateTime("minute", Math.min(59, Math.max(0, Number(event.target.value || 0))))} aria-label="Хвилини" /></div>}
       <div className="date-time-actions"><button type="button" className="date-time-today" onClick={today}>Сьогодні</button><button type="button" className="date-time-done" onClick={() => setOpen(false)}>Готово</button></div>
     </div>, document.body)}
   </div>;

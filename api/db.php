@@ -23,6 +23,8 @@ function db(): PDO
     // working while the rest of the schema is being bootstrapped.
     $hasTasksTable = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks'")->fetchColumn();
     if ($hasTasksTable > 0) {
+        $dueDateType = $pdo->query("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'due_date' LIMIT 1")->fetchColumn();
+        if (strtolower((string)$dueDateType) === 'date') $pdo->exec('ALTER TABLE tasks MODIFY due_date DATETIME NULL');
         $pdo->exec("CREATE TABLE IF NOT EXISTS time_entries (
             id CHAR(32) PRIMARY KEY,
             task_id CHAR(32) NOT NULL,

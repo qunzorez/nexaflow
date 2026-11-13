@@ -70,7 +70,7 @@ function EventChip({ event, onOpen, compact = false }) {
   return (
     <button type="button" className={`calendar-event-chip ${event.kind}${compact ? " compact" : ""}`} onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event); }} title={`${event.title} · ${event.subtitle}`}>
       {!compact && <Icon name={event.kind === "task" ? "check" : "calendar"} />}
-      {compact ? <strong>{event.title}</strong> : <span>{event.title}</span>}
+      {compact ? <strong>{event.time ? `${event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · ` : ""}{event.title}</strong> : <span>{event.title}</span>}
     </button>
   );
 }
@@ -111,8 +111,10 @@ export default function Calendar() {
       .filter(task => task.due_date && !["archived", "cancelled"].includes(task.status))
       .map(task => {
         const date = parseDate(task.due_date);
+        const dueTime = /[T ]\d{2}:\d{2}/.test(String(task.due_date || "")) ? parseDateTime(task.due_date) : null;
         const reminder = parseDateTime(task.reminder_at);
-        return { id: `task-${task.id}`, kind: "task", title: task.title, subtitle: task.primary_project_name || "Без проєкту", date, time: reminder && date && dateKey(reminder) === dateKey(date) ? reminder : null, task };
+        const time = dueTime || (reminder && date && dateKey(reminder) === dateKey(date) ? reminder : null);
+        return { id: `task-${task.id}`, kind: "task", title: task.title, subtitle: task.primary_project_name || "Без проєкту", date, time, task };
       });
     return [...serviceEvents, ...taskEvents].filter(item => item.date).sort((a, b) => a.date - b.date);
   }, [data]);

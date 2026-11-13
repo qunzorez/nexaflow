@@ -254,7 +254,7 @@ export default function TaskDetail() {
                   value={
                     task.due_date
                       ? new Date(
-                          `${task.due_date}T00:00:00`,
+                          `${String(task.due_date).slice(0, 10)}T00:00:00`,
                         ).toLocaleDateString("uk-UA")
                       : "Не встановлено"
                   }

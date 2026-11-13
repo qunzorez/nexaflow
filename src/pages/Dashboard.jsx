@@ -111,8 +111,8 @@ export default function Dashboard() {
           (dashboardStatusOrder[left.status] ?? 99) -
           (dashboardStatusOrder[right.status] ?? 99);
         if (statusDifference) return statusDifference;
-        const leftDue = left.due_date ? new Date(`${left.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
-        const rightDue = right.due_date ? new Date(`${right.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+        const leftDue = left.due_date ? new Date(`${String(left.due_date).slice(0, 10)}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+        const rightDue = right.due_date ? new Date(`${String(right.due_date).slice(0, 10)}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
         if (leftDue !== rightDue) return leftDue - rightDue;
         return String(right.created_at || "").localeCompare(String(left.created_at || ""));
       }) || [];
@@ -140,8 +140,8 @@ export default function Dashboard() {
     ? [...(data.tasks || [])]
         .filter((task) => task.status === "review")
         .sort((left, right) => {
-          const leftDue = left.due_date ? new Date(`${left.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
-          const rightDue = right.due_date ? new Date(`${right.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+          const leftDue = left.due_date ? new Date(`${String(left.due_date).slice(0, 10)}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+          const rightDue = right.due_date ? new Date(`${String(right.due_date).slice(0, 10)}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
           if (leftDue !== rightDue) return leftDue - rightDue;
           return String(right.created_at || "").localeCompare(String(left.created_at || ""));
         })
@@ -252,7 +252,7 @@ export default function Dashboard() {
                   {reviewTasks.map((task) => (
                     <Link className="review-notification-row" to={`/tasks/${task.id}`} key={task.id}>
                       <span className="task-status status-review"><Icon name="urgent" /> На перевірці</span>
-                      <div><strong>{task.title}</strong><small>{task.project_name || "Без проєкту"}{task.due_date ? ` · до ${new Date(`${task.due_date}T00:00:00`).toLocaleDateString("uk-UA")}` : ""}</small></div>
+                      <div><strong>{task.title}</strong><small>{task.project_name || "Без проєкту"}{task.due_date ? ` · до ${new Date(`${String(task.due_date).slice(0, 10)}T00:00:00`).toLocaleDateString("uk-UA")}` : ""}</small></div>
                       <Icon name="right" />
                     </Link>
                   ))}
@@ -366,7 +366,7 @@ export default function Dashboard() {
                       <small>
                         {task.project_name || "Без проєкту"}
                         {task.due_date
-                          ? ` · до ${new Date(`${task.due_date}T00:00:00`).toLocaleDateString("uk-UA")}`
+                          ? ` · до ${new Date(`${String(task.due_date).slice(0, 10)}T00:00:00`).toLocaleDateString("uk-UA")}`
                           : ""}
                       </small>
                     </div>
@@ -395,7 +395,7 @@ export default function Dashboard() {
                 <Link to="/tasks?priority=urgent" className="attention-card attention-urgent"><strong>{managerAttention.urgent || 0}</strong><span>Термінові</span></Link>
               </div>
             </article>
-            <article className="panel manager-widget"><div className="panel-heading"><div><h2>Найближчі дедлайни</h2><p>Задачі на наступні 7 днів.</p></div><Link className="panel-link" to="/tasks">Усі <Icon name="forward" /></Link></div><div className="manager-list">{(managerDashboard.upcoming_deadlines || []).length ? managerDashboard.upcoming_deadlines.map(task => <Link className="manager-list-row" to={`/tasks/${task.id}`} key={task.id}><span className={`task-status status-${task.status}`}>{statusLabels[task.status]}</span><div><strong>{task.title}</strong><small>{task.project_name || 'Без проєкту'}</small></div><time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString('uk-UA')}</time></Link>) : <p className="muted-note">Найближчих дедлайнів немає.</p>}</div></article>
+            <article className="panel manager-widget"><div className="panel-heading"><div><h2>Найближчі дедлайни</h2><p>Задачі на наступні 7 днів.</p></div><Link className="panel-link" to="/tasks">Усі <Icon name="forward" /></Link></div><div className="manager-list">{(managerDashboard.upcoming_deadlines || []).length ? managerDashboard.upcoming_deadlines.map(task => <Link className="manager-list-row" to={`/tasks/${task.id}`} key={task.id}><span className={`task-status status-${task.status}`}>{statusLabels[task.status]}</span><div><strong>{task.title}</strong><small>{task.project_name || 'Без проєкту'}</small></div><time>{new Date(`${String(task.due_date).slice(0, 10)}T00:00:00`).toLocaleDateString('uk-UA')}</time></Link>) : <p className="muted-note">Найближчих дедлайнів немає.</p>}</div></article>
             <article className="panel manager-widget"><div className="panel-heading manager-project-heading"><div><h2>Прогрес проєктів</h2><p>Ваші створені та запрошені проєкти.</p></div><Link className="panel-link" to="/projects">Усі <Icon name="forward" /></Link></div><div className="manager-project-tools"><label><Icon name="search" /><input type="search" value={projectSearch} onChange={(event) => setProjectSearch(event.target.value)} placeholder="Пошук проєкту…" /></label><select value={projectProgressFilter} onChange={(event) => setProjectProgressFilter(event.target.value)}><option value="all">За замовчуванням</option><option value="done">Більше виконано</option><option value="in_progress">Більше в роботі</option></select></div><div className="manager-list">{visibleProjectProgress.length ? visibleProjectProgress.map(project => { const donePercent = project.total ? Math.round(project.done / project.total * 100) : 0; const inProgressPercent = project.total ? Math.round((project.in_progress || 0) / project.total * 100) : 0; return <Link className="progress-row" to={`/projects/${project.id}`} key={project.id}><div><strong>{project.name}</strong><small>Усього задач: {project.total}</small></div><b>{donePercent}%</b><div className="project-progress-lines"><div className="project-progress-line"><span>Виконано</span><div className="progress-track"><i className="progress-done" style={{width: `${donePercent}%`}} /></div><b>{project.done}</b></div><div className="project-progress-line"><span>У роботі</span><div className="progress-track"><i className="progress-in-progress" style={{width: `${inProgressPercent}%`}} /></div><b>{project.in_progress || 0}</b></div></div></Link>}) : <p className="muted-note">Проєктів за цим пошуком немає.</p>}</div></article>
             {isManager && <><article className="panel manager-widget"><div className="panel-heading"><div><h2>Завантаженість команди</h2><p>Активні задачі за виконавцями.</p></div></div><div className="manager-list">{(managerDashboard.team_workload || []).slice(0, 6).map(person => <div className="manager-list-row" key={person.id}><span className="member-avatar">{person.avatar_url ? <img src={person.avatar_url} alt="" /> : <Icon name="user" />}</span><div><strong>{person.name}</strong><small>{person.email}</small></div><b>{person.tasks} задач</b></div>)}</div></article><article className="panel manager-widget"><div className="panel-heading"><div><h2>Остання активність</h2><p>Останні зміни у задачах.</p></div></div><div className="manager-list">{(managerDashboard.recent_activity || []).map(item => <Link className="activity-row" to={`/tasks/${item.task_id}`} key={`${item.task_id}-${item.created_at}`}><span className="activity-dot" /><div><strong>{item.user_name || 'Користувач'} · {item.task_title}</strong><small>{item.message}</small></div></Link>)}</div></article></>}
           </section>

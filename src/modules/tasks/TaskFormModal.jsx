@@ -138,11 +138,11 @@ export default function TaskFormModal({
             <div className="task-form-grid">
               <label>
                 Дедлайн
-                <DateTimePicker name="due_date" defaultValue={editing?.due_date || initialDueDate || ""} />
+                <DateTimePicker name="due_date" withTime timeLabel="Час дедлайну" defaultValue={editing?.due_date || initialDueDate || ""} />
               </label>
               <label>
                 Нагадування
-                <DateTimePicker name="reminder_at" withTime defaultValue={editing?.reminder_at ? editing.reminder_at.replace(" ", "T").slice(0, 16) : ""} />
+                <DateTimePicker name="reminder_at" withTime timeLabel="Час нагадування" defaultValue={editing?.reminder_at ? editing.reminder_at.replace(" ", "T").slice(0, 16) : ""} />
               </label>
             </div>
             <TaskRecurrenceFields
