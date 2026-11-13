@@ -14,9 +14,10 @@ export default function ClientEditPage() {
   const [notice, setNotice] = useState("");
   const [availableUsers, setAvailableUsers] = useState([]);
   const [availableUsersByClient, setAvailableUsersByClient] = useState({});
+  const [servicePackages, setServicePackages] = useState([]);
 
   useEffect(() => {
-    api("/api/clients.php").then((result) => {
+    api("/api/clients.php").then(async (result) => {
       if (!result.ok) return navigate("/", { replace: true });
       if (!result.permissions?.manage) return navigate("/clients", { replace: true });
       const client = result.clients.find((item) => String(item.id) === String(id));
@@ -24,6 +25,8 @@ export default function ClientEditPage() {
       setUser(result.user);
       setAvailableUsers(result.available_users || []);
       setAvailableUsersByClient(result.available_users_by_client || {});
+      const packagesResult = await api("/api/services.php?module=accounting");
+      if (packagesResult.ok) setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
       setForm({
         ...emptyForm,
         ...client,
@@ -123,7 +126,7 @@ export default function ClientEditPage() {
         <section className="welcome-row clients-hero"><div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Редагувати клієнта</h1><p className="subtext">Оновіть дані клієнта в полях активного модуля.</p></div></section>
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
-        <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} clientId={id} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
+        <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} clientId={id} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>
   );

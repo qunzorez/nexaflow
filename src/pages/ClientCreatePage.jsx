@@ -10,6 +10,7 @@ export default function ClientCreatePage() {
   const [user, setUser] = useState(null);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [availableUsersByClient, setAvailableUsersByClient] = useState({});
+  const [servicePackages, setServicePackages] = useState([]);
   const [form, setForm] = useState({
     ...emptyForm,
     module: window.localStorage.getItem("nexaflow.client.module") || "accounting",
@@ -17,12 +18,14 @@ export default function ClientCreatePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api("/api/clients.php").then((result) => {
+    api("/api/clients.php").then(async (result) => {
       if (!result.ok) return navigate("/", { replace: true });
       if (!result.permissions?.manage) return navigate("/clients", { replace: true });
       setUser(result.user);
       setAvailableUsers(result.available_users || []);
       setAvailableUsersByClient(result.available_users_by_client || {});
+      const packagesResult = await api("/api/services.php?module=accounting");
+      if (packagesResult.ok) setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
     });
   }, [navigate]);
 
@@ -77,7 +80,7 @@ export default function ClientCreatePage() {
           <div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Створити клієнта</h1><p className="subtext">Заповніть дані клієнта за полями активного модуля.</p></div>
         </section>
         {error && <div className="form-notice">{error}</div>}
-        <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
+        <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>
   );

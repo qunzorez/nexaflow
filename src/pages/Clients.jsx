@@ -161,10 +161,13 @@ export function serviceTaskPayload(client, service, clientId) {
     "Разово": "none",
   };
   const recurrenceRule = recurrenceByPeriod[service.period || "Разово"] || "none";
+  const packageDetails = service.is_package && (service.package_services || []).length
+    ? `\nПакет містить послуги: ${service.package_services.join(", ")}.`
+    : "";
   return {
     action: "create",
     title: `${service.name} — ${client.name}`,
-    description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
+    description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}.${packageDetails}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
     client_ids: normalizedClientId ? [normalizedClientId] : [],
     assignee_ids: normalizeId(service.accountant_id) ? [normalizeId(service.accountant_id)] : [],
     project_ids: [],
@@ -274,8 +277,9 @@ function FieldTip({ children }) {
     <span className={`client-field-tooltip${open ? " is-open" : ""}`} role="tooltip">{children}</span>
   </span>;
 }
-export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "" }) {
+export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [] }) {
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
+  const [selectedPackageId, setSelectedPackageId] = useState("");
   const formElementRef = useRef(null);
   const set = (field, value) =>
     setForm((current) => {
@@ -297,6 +301,13 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     return { ...service, [field]: value };
   }));
   const addService = () => set("services", [{ name: "", price: 0, period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  const addPackage = () => {
+    const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
+    if (!packageItem) return;
+    const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
+    set("services", [{ name: packageItem.name, price: Number(packageItem.client_price || 0), period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+    setSelectedPackageId("");
+  };
   const saveNewService = async (index) => {
     const nameInput = formElementRef.current?.elements?.namedItem("name");
     const currentForm = {
@@ -549,12 +560,13 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
             {form.module === "accounting" && <fieldset className="client-services-fieldset">
               <legend>Необхідні бухгалтерські послуги</legend>
               <p className="client-field-hint">Додайте послуги для цього клієнта та їхню вартість.</p>
-              <div className="client-services-add-box"><div><strong>Додати послугу</strong><small>Оберіть послугу — дата заповниться автоматично за відомим строком.</small></div><button type="button" className="primary-action" onClick={addService}><Icon name="plus" /> Додати</button></div>
+              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>Оберіть послугу — дата заповниться автоматично за відомим строком.</small></div><button type="button" className="primary-action" onClick={addService}><Icon name="plus" /> Додати послугу</button></div>
+              {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><select value={selectedPackageId} onChange={(event) => setSelectedPackageId(event.target.value)}><option value="">Оберіть пакет</option>{servicePackages.map((packageItem) => <option value={packageItem.id} key={packageItem.id}>{packageItem.name} — {Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</option>)}</select><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
               <div className="client-services-list-label">Додані послуги <span>{(form.services || []).length}</span></div>
               <div className="client-services-list">
                 {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}`} key={`${index}-${service.name}`}>
                   <div className="client-service-row">
-                    <ServiceSelect value={service.name} legalForm={form.legal_form} onChange={(value) => updateService(index, "name", value)} />
+                    {service.is_package ? <div className="client-package-name"><span className="client-package-badge">ПАКЕТ</span><strong>{service.package_name || service.name}</strong><small>{(service.package_services || service.parameters || []).length} послуг у пакеті</small></div> : <ServiceSelect value={service.name} legalForm={form.legal_form} onChange={(value) => updateService(index, "name", value)} />}
                     <span className="client-service-price"><input type="number" min="0" step="0.01" value={service.price} onChange={(event) => updateService(index, "price", event.target.value)} onBlur={(event) => rememberServicePrice(service.name, event.target.value)} placeholder="0" aria-label="Ціна послуги" /><b>грн</b></span>
                     <select value={service.period || "Місяць"} onChange={(event) => updateService(index, "period", event.target.value)} aria-label="Періодичність"><option>Щогодини</option><option>Щодня</option><option>Щотижня</option><option>Місяць</option><option>Квартал</option><option>Рік</option><option>Разово</option></select>
                     <button type="button" className="client-service-remove" onClick={() => removeService(index)} aria-label="Видалити послугу"><Icon name="close" /></button>
