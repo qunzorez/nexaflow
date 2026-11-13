@@ -16,5 +16,9 @@
 .claim-check { display: inline-flex !important; align-items: center; justify-content: center; justify-self: end; margin-left: auto; width: 20px; height: 20px; border-radius: 50%; color: transparent; background: transparent; font-size: 10px; }
 .claim-card.selected .claim-check { color: #fff; background: #20946c; }
 .managed-group-edit { display: grid !important; gap: 14px; }
+.claims-edit-heading { display: grid; gap: 4px; padding: 2px 2px 12px; border-bottom: 1px solid var(--line); }
+.claims-edit-heading > span { color: var(--green); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.claims-edit-heading > strong { font: 800 16px Manrope; color: var(--ink); }
+.claims-edit-heading > small { color: var(--muted); font-size: 10px; line-height: 1.45; }
 @media (max-width: 1050px) { .claims-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 550px) { .claims-grid { grid-template-columns: 1fr; } }
