@@ -1,3 +1,4 @@
+import Icon from '../../components/Icon.jsx';
 import { useState } from 'react';
 import { post } from '../../services/api.js';
 import SearchableUserSelect from './SearchableUserSelect.jsx';
@@ -6,19 +7,44 @@ import './project-management-buttons.css';
 import './project-management-cleanup.css';
 import './project-member-add.css';
 
-const permissionLabels = { sign_documents: 'Керування підписом документів', manage_documents: 'Керування документами', manage_tasks: 'Керування задачами', view_finance: 'Перегляд фінансів' };
 const initials = name => String(name || '?').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
 
-export default function ProjectManagement({ projectId, isAdmin = false, members = [], groups = [], availableUsers = [], onChanged }) {
-  const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [editing, setEditing] = useState(null); const [showAdd, setShowAdd] = useState(false); const [mode, setMode] = useState('existing'); const [selectedUser, setSelectedUser] = useState(''); const [assignment, setAssignment] = useState('member'); const [inviteEmail, setInviteEmail] = useState(''); const [group, setGroup] = useState({ name: '', role_name: '', permissions: [] });
-  async function action(payload) { setNotice(''); setError(''); const result = await post('/api/project.php', { id: projectId, ...payload }); if (!result.ok) return setError(result.message); setNotice(result.message); setEditing(null); onChanged(); }
-  function assignmentValue(item) { return item.group_ids?.[0] || item.role; }
-  function changeAssignment(item, value) { const customGroup = groups.some(groupItem => groupItem.id === value); action({ action: 'add_member', user_id: item.user_id, role: customGroup ? 'member' : value, group_id: customGroup ? value : '' }); }
-  function addExisting() { const customGroup = groups.some(item => item.id === assignment); if (!selectedUser) return setError('Оберіть користувача.'); action({ action: 'add_member', user_id: selectedUser, role: customGroup ? 'member' : assignment, group_id: customGroup ? assignment : '' }); setSelectedUser(''); setAssignment('member'); setShowAdd(false); }
-  async function inviteNew(event) { event.preventDefault(); setNotice(''); setError(''); const form = new FormData(event.currentTarget); const result = await post('/api/invite.php', { action: 'send', email: form.get('email'), project_id: projectId, group_id: form.get('group_id'), role: 'member' }); if (!result.ok) return setError(result.message); setNotice(result.message); event.currentTarget.reset(); setShowAdd(false); }
-  function togglePermission(key) { setGroup(current => ({ ...current, permissions: current.permissions.includes(key) ? current.permissions.filter(item => item !== key) : [...current.permissions, key] })); }
-  function editPermission(key) { setEditing(current => ({ ...current, permissions: current.permissions.includes(key) ? current.permissions.filter(item => item !== key) : [...current.permissions, key] })); }
-  const adminOption = isAdmin && <option value="admin">Адмін</option>;
-  const availableForProject = availableUsers.filter(item => !members.some(memberItem => memberItem.user_id === item.id));
-  return <div className="project-management"><div className="management-title"><p className="eyebrow">КЕРУВАННЯ ПРОЄКТОМ</p><h2>Команда та групи</h2><p>Стандартна роль — «Учасник». Створені групи додають спеціальні функціональні права.</p></div>{notice && <div className="team-notice success">{notice}</div>}{error && <div className="form-notice">{error}</div>}<section className="management-section"><div className="management-section-head"><div><h3>Команда проєкту</h3><p>Виберіть стандартну роль або створену групу для кожного користувача.</p></div><div className="section-head-actions"><button type="button" className="primary-action add-member-btn" onClick={() => setShowAdd(value => !value)}>＋ Додати учасника</button><span>{members.length}</span></div></div>{showAdd && <div className="member-add-panel"><div className="add-mode-tabs"><button type="button" className={mode === 'existing' ? 'active' : ''} onClick={() => setMode('existing')}>Додати наявного</button><button type="button" className={mode === 'invite' ? 'active' : ''} onClick={() => setMode('invite')}>Запросити по email</button></div>{mode === 'existing' ? <div className="add-member-row existing-member-row"><SearchableUserSelect users={availableForProject} value={selectedUser} onChange={setSelectedUser} /><select value={assignment} onChange={event => setAssignment(event.target.value)}>{adminOption}<option value="member">Учасник</option><option value="viewer">Переглядач</option>{groups.map(item => <option key={item.id} value={item.id}>{item.role_name || item.name}</option>)}</select><button type="button" className="primary-action" onClick={addExisting}>Додати</button></div> : <form className="add-member-row" onSubmit={inviteNew}><input type="email" name="email" required placeholder="name@company.com" /><select name="group_id"><option value="">Без групи</option>{groups.map(item => <option key={item.id} value={item.id}>{item.role_name || item.name}</option>)}</select><button className="primary-action">Відправити запрошення</button></form>}</div>}<div className="member-management-list">{members.map(item => <div className="managed-member" key={item.user_id}><span className="member-avatar">{initials(item.name)}</span><div className="member-info"><strong>{item.name}</strong><small>{item.email}</small></div><select value={assignmentValue(item)} onChange={event => changeAssignment(item, event.target.value)}>{adminOption}<option value="member">Учасник</option><option value="viewer">Переглядач</option>{groups.map(groupItem => <option key={groupItem.id} value={groupItem.id}>{groupItem.role_name || groupItem.name}</option>)}</select><button type="button" className="remove-member" onClick={() => action({ action: 'remove_member', user_id: item.user_id })}>Видалити</button></div>)}</div></section><section className="management-section"><div className="management-section-head"><div><h3>Групи та функціональні ролі</h3><p>Наприклад: «Бухгалтерія» — роль «Головний бухгалтер» із правом підпису документів.</p></div><span>{groups.length}</span></div><div className="group-create-grid"><label>Назва групи<input value={group.name} onChange={event => setGroup({ ...group, name: event.target.value })} placeholder="Бухгалтерія" /></label><label>Роль у групі<input value={group.role_name} onChange={event => setGroup({ ...group, role_name: event.target.value })} placeholder="Головний бухгалтер" /></label></div><div className="permission-list">{Object.entries(permissionLabels).map(([key, label]) => <label key={key}><input type="checkbox" checked={group.permissions.includes(key)} onChange={() => togglePermission(key)} />{label}</label>)}</div><button type="button" className="primary-action" disabled={!group.name.trim()} onClick={() => { action({ action: 'create_group', ...group }); setGroup({ name: '', role_name: '', permissions: [] }); }}>Створити глобальну групу</button><div className="managed-groups">{groups.map(item => editing?.id === item.id ? <div className="managed-group managed-group-edit" key={item.id}><div className="group-create-grid"><label>Назва<input value={editing.name} onChange={event => setEditing({ ...editing, name: event.target.value })} /></label><label>Роль<input value={editing.role_name || ''} onChange={event => setEditing({ ...editing, role_name: event.target.value })} /></label></div><div className="permission-list">{Object.entries(permissionLabels).map(([key, label]) => <label key={key}><input type="checkbox" checked={editing.permissions.includes(key)} onChange={() => editPermission(key)} />{label}</label>)}</div><div className="group-edit-actions"><button type="button" className="primary-action" onClick={() => action({ action: 'update_group', group_id: editing.id, name: editing.name, role_name: editing.role_name, permissions: editing.permissions })}>Зберегти</button><button type="button" className="outline-btn" onClick={() => setEditing(null)}>Скасувати</button></div></div> : <div className="managed-group" key={item.id}><div><strong>{item.name}</strong><small>{item.role_name || 'Функціональна група'} · {(item.permissions || []).map(permission => permissionLabels[permission]).join(', ') || 'Без спеціальних прав'}</small></div><button type="button" className="outline-btn" onClick={() => setEditing({ ...item, permissions: item.permissions || [] })}>Редагувати</button><button type="button" className="remove-member" onClick={() => action({ action: 'delete_group', group_id: item.id })}>Видалити</button></div>)}</div></section></div>;
+export default function ProjectManagement({ projectId, canManageTeam = false, members = [], groups = [], availableUsers = [], onChanged }) {
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [mode, setMode] = useState('existing');
+  const [selectedUser, setSelectedUser] = useState('');
+
+  async function action(payload) {
+    setNotice(''); setError('');
+    const result = await post('/api/project.php', { id: projectId, ...payload });
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message); onChanged();
+  }
+
+  function addExisting() {
+    if (!selectedUser) return setError('Оберіть користувача.');
+    action({ action: 'add_member', user_id: selectedUser, role: 'member', group_id: '' });
+    setSelectedUser(''); setShowAdd(false);
+  }
+  async function inviteNew(event) {
+    event.preventDefault(); setNotice(''); setError('');
+    const form = new FormData(event.currentTarget);
+    const result = await post('/api/invite.php', { action: 'send', email: form.get('email'), project_id: projectId, role: 'member' });
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message); event.currentTarget.reset(); setShowAdd(false);
+  }
+
+  const availableForProject = availableUsers.filter(item => !members.some(member => member.user_id === item.id));
+
+  return <div className="project-management">
+    <div className="management-title"><p className="eyebrow">КЕРУВАННЯ ПРОЄКТОМ</p><h2>Команда проєкту</h2><p>Додавайте учасників до цього проєкту. Глобальні claims створюються та призначаються на сторінці «Команда».</p></div>
+    {notice && <div className="team-notice success">{notice}</div>}{error && <div className="form-notice">{error}</div>}
+    <section className="management-section">
+      <div className="management-section-head"><div><h3>Учасники проєкту</h3><p>Переглядайте учасників і призначені їм claims. Керування виконується на сторінці «Команда».</p></div><div className="section-head-actions"><button type="button" className="primary-action add-member-btn" disabled={!canManageTeam} onClick={() => setShowAdd(value => !value)}><Icon name="plus" /> Додати учасника</button><span>{members.length}</span></div></div>
+      {showAdd && canManageTeam && <div className="member-add-panel"><div className="add-mode-tabs"><button type="button" className={mode === 'existing' ? 'active' : ''} onClick={() => setMode('existing')}>Додати наявного</button><button type="button" className={mode === 'invite' ? 'active' : ''} onClick={() => setMode('invite')}>Запросити по email</button></div>{mode === 'existing' ? <div className="add-member-row existing-member-row"><SearchableUserSelect users={availableForProject} value={selectedUser} onChange={setSelectedUser} /><button type="button" className="primary-action" onClick={addExisting}>Додати</button></div> : <form className="add-member-row" onSubmit={inviteNew}><input type="email" name="email" required placeholder="name@company.com" /><button className="primary-action">Відправити запрошення</button></form>}</div>}
+      <div className="member-management-list">{members.map(item => <div className="managed-member" key={item.user_id}><span className="member-avatar">{initials(item.name)}</span><div className="member-info"><strong>{item.name}</strong><small>{item.email}</small></div><span className="role-badge project-member-claim">{item.group_names || 'Учасник'}</span><button type="button" className="remove-member" disabled={!canManageTeam} onClick={() => action({ action: 'remove_member', user_id: item.user_id })}>Видалити</button></div>)}</div>
+    </section>
+  </div>;
 }

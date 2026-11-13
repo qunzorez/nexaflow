@@ -35,6 +35,11 @@ $projectId = trim((string)($data['project_id'] ?? ''));
 $role = trim((string)($data['role'] ?? 'member'));
 $groupId = trim((string)($data['group_id'] ?? ''));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) jsonResponse(false, 'Введіть коректний email і роль.', [], 422);
+$actorRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+$actorRoleQuery->execute([$_SESSION['user_id']]);
+$actorRole = (string)$actorRoleQuery->fetchColumn();
+$actorRoleQuery->closeCursor();
+$actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
 
 if ($projectId === '' && $groupId !== '') {
     $groupProject = $pdo->prepare('SELECT project_id FROM project_groups WHERE id = ? LIMIT 1');
@@ -50,6 +55,7 @@ if ($projectId === '') {
         $groupCheck = $pdo->prepare('SELECT id FROM project_groups WHERE id = ? AND project_id IS NULL LIMIT 1');
         $groupCheck->execute([$groupId]);
         if (!$groupCheck->fetch()) jsonResponse(false, 'Обрана група не є глобальною.', [], 422);
+        if (!$actorAdmin) manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
     }
     try {
         $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE email = ? AND status = 'pending'")->execute([$email]);
@@ -69,9 +75,11 @@ $access->execute([$_SESSION['user_id'], $_SESSION['user_id'], $projectId, $_SESS
 $project = $access->fetch();
 if (!$project) jsonResponse(false, 'У вас немає прав запрошувати людей у цей проєкт.', [], 403);
 if ($groupId !== '') {
-    $groupCheck = $pdo->prepare('SELECT id FROM project_groups WHERE id = ? AND (project_id = ? OR project_id IS NULL) LIMIT 1');
+    $groupCheck = $pdo->prepare('SELECT id, project_id FROM project_groups WHERE id = ? AND (project_id = ? OR project_id IS NULL) LIMIT 1');
     $groupCheck->execute([$groupId, $projectId]);
-    if (!$groupCheck->fetch()) jsonResponse(false, 'Обрана група не належить цьому проєкту.', [], 422);
+    $selectedGroup = $groupCheck->fetch();
+    if (!$selectedGroup) jsonResponse(false, 'Обрана група не належить цьому проєкту.', [], 422);
+    if (!$actorAdmin && $selectedGroup['project_id'] === null) manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
 }
 
 try {

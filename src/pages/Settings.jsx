@@ -1,3 +1,4 @@
+import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
@@ -131,7 +132,7 @@ export default function Settings() {
             <div className="settings-section-title">
               <div>
                 <h2>
-                  <span className="settings-section-icon">◎</span>Профіль
+                  <span className="settings-section-icon"><Icon name="user" /></span>Профіль
                 </h2>
                 <p>Основна інформація користувача.</p>
               </div>
@@ -164,7 +165,7 @@ export default function Settings() {
             <div className="settings-section-title">
               <div>
                 <h2>
-                  <span className="settings-section-icon">⌁</span>Контактна
+                  <span className="settings-section-icon"><Icon name="contact" /></span>Контактна
                   інформація
                 </h2>
                 <p>Додайте дані, за якими команда зможе з вами зв’язатися.</p>
@@ -201,7 +202,7 @@ export default function Settings() {
                 <span />
                 <b>{telegramEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
-              <a className="outline-btn telegram-bot-link" href={telegramConnectUrl} target="_blank" rel="noreferrer">Підключити Telegram →</a>
+              <a className="outline-btn telegram-bot-link" href={telegramConnectUrl} target="_blank" rel="noreferrer">Підключити Telegram <Icon name="forward" /></a>
             </div>
             <div className="telegram-connect-box email-notification-box">
               <div>
@@ -221,7 +222,7 @@ export default function Settings() {
             <div className="settings-section-title password-section-heading">
               <div>
                 <h2>
-                  <span className="settings-section-icon">▣</span>Безпека
+                  <span className="settings-section-icon"><Icon name="security" /></span>Безпека
                 </h2>
                 <p>Змініть пароль, якщо потрібно.</p>
               </div>
@@ -266,7 +267,7 @@ export default function Settings() {
             <div className="settings-section-title">
               <div>
                 <h2>
-                  <span className="settings-section-icon">✦</span>Про акаунт
+                  <span className="settings-section-icon"><Icon name="sparkle" /></span>Про акаунт
                 </h2>
                 <p>Ваш поточний статус у NexaFlow.</p>
               </div>
@@ -282,7 +283,7 @@ export default function Settings() {
               </div>
               <div>
                 <span>Статус пошти</span>
-                <strong className="account-verified">● Підтверджено</strong>
+                <strong className="account-verified"><Icon name="check" /> Підтверджено</strong>
               </div>
             </div>
           </section>
@@ -291,7 +292,7 @@ export default function Settings() {
               <div className="settings-section-title">
                 <div>
                   <h2>
-                    <span className="settings-section-icon">◇</span>Підписка
+                    <span className="settings-section-icon"><Icon name="subscription" /></span>Підписка
                   </h2>
                   <p>Керуйте доступом до можливостей NexaFlow.</p>
                 </div>
@@ -302,7 +303,7 @@ export default function Settings() {
               </div>
               <div className="subscription-module-select">
                 <div className="subscription-module-label">
-                  <span>✦</span>
+                  <span><Icon name="sparkle" /></span>
                   <div>
                     <strong>Модуль клієнтів</strong>
                     <small>Оберіть напрям для форми клієнта</small>
@@ -324,14 +325,14 @@ export default function Settings() {
                     <option value="legal">Юридичні послуги</option>
                     <option value="real_estate">Нерухомість</option>
                   </select>
-                  <span>⌄</span>
+                  <span><Icon name="down" /></span>
                 </label>
               </div>
             </div>
             <div className="subscription-meta">
               <div>
                 <span>Статус</span>
-                <strong>● Активна</strong>
+                <strong><Icon name="check" /> Активна</strong>
               </div>
               <div>
                 <span>Оплата</span>

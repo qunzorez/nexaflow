@@ -1,3 +1,4 @@
+import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
@@ -146,11 +147,11 @@ export default function TaskDetail() {
   const task = data.task;
   const canManage = ["admin", "owner", "manager"].includes(data.user?.role);
   const priorityInfo = {
-    low: ["Низький", "↓"],
-    normal: ["Звичайний", "—"],
-    high: ["Високий", "↑"],
-    urgent: ["Терміновий", "!"],
-  }[task.priority] || ["Звичайний", "—"];
+    low: ["Низький", <Icon name="low" />],
+    normal: ["Звичайний", <Icon name="normal" />],
+    high: ["Високий", <Icon name="high" />],
+    urgent: ["Терміновий", <Icon name="urgent" />],
+  }[task.priority] || ["Звичайний", <Icon name="normal" />];
   const descriptionHtml = task.description
     ? /<[a-z][\s\S]*>/i.test(task.description)
       ? task.description
@@ -176,7 +177,7 @@ export default function TaskDetail() {
           type="button"
           onClick={() => navigate("/tasks")}
         >
-          ← Назад до задач
+          <Icon name="back" /> Назад до задач
         </button>
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
@@ -204,7 +205,7 @@ export default function TaskDetail() {
               type="button"
               onClick={() => setTimeModal(true)}
             >
-              ＋ Лог часу
+              <Icon name="plus" /> Лог часу
             </button>
             <button className="primary-action" type="button" onClick={edit}>
               Редагувати задачу

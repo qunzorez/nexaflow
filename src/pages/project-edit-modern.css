@@ -1,0 +1,329 @@
+/* Project workspace visual layer */
+.project-edit-page {
+  position: relative;
+}
+
+.project-edit-page::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 20px;
+  right: 4%;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(78, 184, 132, .13), transparent 68%);
+  pointer-events: none;
+}
+
+.page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: transform .18s ease, color .18s ease;
+}
+
+.page-back:hover {
+  color: #146d53;
+  transform: translateX(-3px);
+}
+
+.project-edit-header {
+  position: relative;
+  overflow: hidden;
+  padding: 28px 30px;
+  border: 1px solid #deede4;
+  border-radius: 20px;
+  background: linear-gradient(115deg, #f1faf4 0%, #fff 68%);
+  box-shadow: 0 10px 28px rgba(44, 103, 76, .06);
+  animation: project-header-in .42s ease-out both;
+}
+
+.project-edit-header::after {
+  content: '';
+  position: absolute;
+  right: 4%;
+  bottom: -92px;
+  width: 200px;
+  height: 200px;
+  border: 1px solid rgba(31, 138, 104, .14);
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px rgba(31, 138, 104, .035), 0 0 0 38px rgba(31, 138, 104, .025);
+  pointer-events: none;
+}
+
+.project-edit-header > div,
+.project-edit-header > .project-status {
+  position: relative;
+  z-index: 1;
+}
+
+.project-edit-header .subtext {
+  max-width: 650px;
+  line-height: 1.55;
+}
+
+.project-status.large {
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.project-status.large:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 16px rgba(31, 138, 104, .14);
+}
+
+.project-edit-form,
+.project-info-card,
+.project-next-card,
+.project-management .management-section {
+  position: relative;
+  overflow: hidden;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.project-edit-form::before,
+.project-info-card::before,
+.project-next-card::before,
+.project-management .management-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1f8a68, #75c89b, transparent 88%);
+}
+
+.project-edit-form:hover,
+.project-info-card:hover,
+.project-next-card:hover,
+.project-management .management-section:hover {
+  transform: translateY(-2px);
+  border-color: #d1e7da;
+  box-shadow: 0 15px 34px rgba(33, 91, 67, .10);
+}
+
+.project-edit-form input,
+.project-edit-form textarea,
+.project-edit-form select {
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.project-edit-form input:focus,
+.project-edit-form textarea:focus,
+.project-edit-form select:focus {
+  outline: 0;
+  border-color: #8fc9aa;
+  box-shadow: 0 0 0 4px rgba(31, 138, 104, .10);
+}
+
+.save-project,
+.delete-project-btn,
+.add-member-btn {
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.save-project:hover,
+.add-member-btn:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+  box-shadow: 0 11px 22px rgba(31, 138, 104, .24);
+}
+
+.project-info-card .large-icon {
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.project-info-card:hover .large-icon {
+  transform: rotate(-5deg) scale(1.06);
+  box-shadow: 0 9px 19px rgba(117, 100, 200, .18);
+}
+
+.project-info-card dl div {
+  padding: 7px 0;
+  border-radius: 8px;
+  transition: background .18s ease, padding .18s ease;
+}
+
+.project-info-card dl div:hover {
+  padding-left: 8px;
+  padding-right: 8px;
+  background: #f7fbf8;
+}
+
+.project-next-card {
+  background: linear-gradient(145deg, #fff 0%, #fffaf8 100%);
+}
+
+.delete-project-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(197, 95, 77, .14);
+}
+
+.project-management {
+  animation: project-section-in .48s .08s ease-out both;
+}
+
+@keyframes project-header-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes project-section-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 850px) {
+  .project-edit-header {
+    padding: 24px 22px;
+    border-radius: 16px;
+  }
+
+  .project-edit-grid {
+    gap: 14px;
+  }
+
+  .project-side-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .project-edit-header {
+    padding: 21px 18px;
+    margin-bottom: 20px;
+  }
+
+  .project-edit-header h1 {
+    font-size: 30px;
+    line-height: 1.08;
+  }
+
+  .project-edit-form,
+  .project-info-card,
+  .project-next-card,
+  .project-management .management-section {
+    padding: 18px;
+    border-radius: 13px;
+  }
+
+  .project-edit-form .panel-heading {
+    align-items: flex-start;
+  }
+
+  .project-side-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .project-management .management-section-head {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .project-management .section-head-actions {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .project-management .add-member-btn {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-edit-header,
+  .project-management { animation: none; }
+  .project-edit-form,
+  .project-info-card,
+  .project-next-card,
+  .project-management .management-section,
+  .page-back,
+  .project-status.large { transition: none; }
+}
+
+.project-tasks-panel {
+  margin-top: 18px;
+  padding: 26px 28px 24px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.project-tasks-panel .panel-heading {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.project-tasks-panel .panel-heading h2 {
+  margin-bottom: 6px;
+}
+
+.project-tasks-panel .panel-heading p {
+  margin: 0;
+}
+
+.project-tasks-list {
+  max-height: 330px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.project-task-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background .18s ease, padding-left .18s ease;
+}
+
+.project-task-row:first-child {
+  border-top: 0;
+}
+
+.project-task-row:hover {
+  padding-left: 10px;
+  background: #f7fbf8;
+}
+
+.project-task-row > svg { margin-left: auto; color: var(--green); flex: none; }
+.project-task-main { min-width: 0; flex: 1; }
+.project-task-main strong, .project-task-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-task-main strong { font-size: 12px; }
+.project-task-main small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.project-task-status { flex: none; border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 700; background: #f0f4f1; color: #687a70; }
+.project-task-status-in_progress { background: #eaf2ff; color: #527db6; }
+.project-task-status-review { background: #fff4dc; color: #aa7a1e; }
+.project-task-status-done { background: #e5f5ec; color: #218260; }
+.project-task-status-archived { background: #eef0f0; color: #76817c; }
+.project-tasks-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 92px;
+  margin: 0;
+  padding: 18px 22px;
+  border: 1px dashed #cfe3d6;
+  border-radius: 12px;
+  background: #f8fcf9;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .project-tasks-panel { padding: 20px 16px 18px; }
+  .project-task-row { gap: 9px; align-items: flex-start; }
+  .project-task-status { font-size: 9px; padding: 5px 7px; }
+}

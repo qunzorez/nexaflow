@@ -1,3 +1,4 @@
+import Icon from '../../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import SearchableMultiSelect from "../../components/SearchableMultiSelect.jsx";
@@ -44,8 +45,8 @@ export default function TaskFormModal({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section className="task-modal">
-        <button type="button" className="task-modal-close" onClick={onClose}>
-          ×
+        <button type="button" className="task-modal-close" onClick={onClose} aria-label="Закрити">
+          <Icon name="close" />
         </button>
         <div className="task-modal-scroll">
           <p className="eyebrow">ЗАДАЧА</p>

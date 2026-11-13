@@ -7,6 +7,7 @@ session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 
 $pdo = db();
+$pdo->exec("CREATE TABLE IF NOT EXISTS client_members (client_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, assigned_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (client_id, user_id), INDEX idx_client_members_user (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 function projectInviteUrl(string $token): string
 {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
@@ -52,9 +53,36 @@ try {
             $groupsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
             $groups = $groupsQuery->fetchAll();
         }
-        foreach ($groups as &$group) $group['permissions'] = $group['permissions'] ? (json_decode($group['permissions'], true) ?: []) : [];
+        foreach ($groups as &$group) $group = exposeGroupPolicy($group);
         unset($group);
-        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'permissions' => ['admin' => $isAdmin]]);
+        $groups = array_values(array_filter($groups, static function ($group) use ($isAdmin): bool { return $group['project_id'] === null && ($isAdmin || $group['group_owner_id'] === (string)$_SESSION['user_id']); }));
+        foreach ($users as &$teamUser) {
+            $teamUser['group_id'] = '';
+            foreach ($groups as $visibleGroup) {
+                $membership = $pdo->prepare('SELECT 1 FROM project_group_members WHERE group_id = ? AND user_id = ?');
+                $membership->execute([$visibleGroup['id'], $teamUser['id']]);
+                if ($membership->fetchColumn()) { $teamUser['group_id'] = $visibleGroup['id']; break; }
+            }
+        }
+        unset($teamUser);
+        if ($isAdmin) {
+            $clients = $pdo->query('SELECT id, name, created_by FROM clients ORDER BY name')->fetchAll();
+        } else {
+            $clientsQuery = $pdo->prepare('SELECT DISTINCT c.id, c.name, c.created_by FROM clients c LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.created_by = ? OR cm.user_id IS NOT NULL ORDER BY c.name');
+            $clientsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            $clients = $clientsQuery->fetchAll();
+        }
+        $clientAssignments = [];
+        if ($clients) {
+            $clientIds = array_column($clients, 'id');
+            $marks = implode(',', array_fill(0, count($clientIds), '?'));
+            $assignmentsQuery = $pdo->prepare("SELECT client_id, user_id FROM client_members WHERE client_id IN ({$marks})");
+            $assignmentsQuery->execute($clientIds);
+            foreach ($assignmentsQuery->fetchAll() as $assignment) $clientAssignments[(string)$assignment['user_id']][] = (string)$assignment['client_id'];
+        }
+        foreach ($users as &$teamUser) $teamUser['client_ids'] = $clientAssignments[(string)$teamUser['id']] ?? [];
+        unset($teamUser);
+        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'clients' => $clients, 'permissions' => ['admin' => $isAdmin]]);
     }
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
@@ -63,7 +91,7 @@ try {
         if ($name === '') jsonResponse(false, 'Введіть назву проєкту.', [], 422);
         $description = trim((string)($data['description'] ?? ''));
         $status = in_array(($data['status'] ?? 'active'), ['active', 'draft', 'paused', 'completed'], true) ? (string)$data['status'] : 'active';
-        $visibility = in_array(($data['visibility'] ?? 'private'), ['private', 'team'], true) ? (string)$data['visibility'] : 'private';
+        $visibility = in_array(($data['visibility'] ?? 'team'), ['private', 'team'], true) ? (string)$data['visibility'] : 'team';
         $id = bin2hex(random_bytes(16));
         $pdo->beginTransaction();
         $insert = $pdo->prepare('INSERT INTO projects (id, name, description, owner_id, status, visibility) VALUES (?, ?, ?, ?, ?, ?)');
@@ -148,6 +176,31 @@ try {
         $upsert = $pdo->prepare('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), updated_at = CURRENT_TIMESTAMP');
         $upsert->execute([$projectId, $userId, $role]);
         jsonResponse(true, 'Роль користувача оновлено.');
+    }
+
+    if ($action === 'assign_clients') {
+        $targetUserId = trim((string)($data['user_id'] ?? ''));
+        $requestedClientIds = array_values(array_unique(array_filter(array_map(static fn($item): string => trim((string)$item), (array)($data['client_ids'] ?? [])))));
+        if ($targetUserId === '') jsonResponse(false, 'Оберіть користувача.', [], 422);
+        if (!$isAdmin) {
+            $memberCheck = $pdo->prepare("SELECT 1 FROM users u WHERE u.id = ? AND (EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted')) LIMIT 1");
+            $memberCheck->execute([$targetUserId, $_SESSION['user_id'], $_SESSION['user_id']]);
+            if (!$memberCheck->fetchColumn()) jsonResponse(false, 'Цей користувач не входить до вашої команди.', [], 403);
+        }
+        $ownedClientsQuery = $isAdmin
+            ? $pdo->query('SELECT id FROM clients')
+            : $pdo->prepare('SELECT id FROM clients WHERE created_by = ?');
+        if (!$isAdmin) $ownedClientsQuery->execute([$_SESSION['user_id']]);
+        $manageableClientIds = array_map('strval', array_column($ownedClientsQuery->fetchAll(), 'id'));
+        $selectedClientIds = array_values(array_intersect($requestedClientIds, $manageableClientIds));
+        if ($manageableClientIds) {
+            $marks = implode(',', array_fill(0, count($manageableClientIds), '?'));
+            $delete = $pdo->prepare("DELETE FROM client_members WHERE user_id = ? AND client_id IN ({$marks})");
+            $delete->execute(array_merge([$targetUserId], $manageableClientIds));
+        }
+        $insert = $pdo->prepare('INSERT IGNORE INTO client_members (client_id, user_id, assigned_by) VALUES (?, ?, ?)');
+        foreach ($selectedClientIds as $clientId) $insert->execute([$clientId, $targetUserId, $_SESSION['user_id']]);
+        jsonResponse(true, 'Доступ до клієнтів оновлено.');
     }
 
     if ($action === 'set_user_role') {

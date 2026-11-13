@@ -1,3 +1,4 @@
+import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
@@ -41,6 +42,8 @@ export default function Dashboard() {
   const [taskFilter, setTaskFilter] = useState("all");
   const [teamSearch, setTeamSearch] = useState("");
   const [teamSort, setTeamSort] = useState("time");
+  const [projectSearch, setProjectSearch] = useState(() => window.localStorage.getItem("nexaflow.dashboard.projectSearch") || "");
+  const [projectProgressFilter, setProjectProgressFilter] = useState(() => window.localStorage.getItem("nexaflow.dashboard.projectProgressFilter") || "all");
   const navigate = useNavigate();
   useEffect(() => {
     const refresh = () =>
@@ -56,13 +59,26 @@ export default function Dashboard() {
       window.removeEventListener("focus", refreshOnFocus);
     };
   }, [navigate]);
+  useEffect(() => {
+    window.localStorage.setItem("nexaflow.dashboard.projectSearch", projectSearch);
+    window.localStorage.setItem("nexaflow.dashboard.projectProgressFilter", projectProgressFilter);
+  }, [projectSearch, projectProgressFilter]);
   if (!data)
     return <div className="loading-screen">Завантаження NexaFlow…</div>;
   const canManage = data.permissions.manage;
   const isAdmin = ["admin", "owner"].includes(data.user.role);
-  const firstMetric = isAdmin
-    ? { value: data.metrics.clients, title: "Активні клієнти" }
-    : canManage
+  const isManager = data.user.role === "manager";
+  const showProjectInsights = !isAdmin;
+  const adminMetrics = isAdmin
+    ? [
+        { value: data.metrics.users || 0, title: "Користувачі" },
+        { value: data.metrics.online || 0, title: "Онлайн зараз" },
+        { value: data.metrics.all_projects || 0, title: "Усі проєкти" },
+        { value: data.metrics.open_tasks || 0, title: "Відкриті задачі" },
+        { value: data.metrics.all_clients || 0, title: "Усі клієнти" },
+      ]
+    : null;
+  const firstMetric = canManage
       ? { value: data.users?.length || 0, title: "Моя команда" }
       : {
           value:
@@ -98,6 +114,16 @@ export default function Dashboard() {
     ...productivityRows.map((person) => Number(person.minutes || 0)),
     1,
   );
+  const managerDashboard = data.manager_dashboard || {};
+  const managerAttention = managerDashboard.attention || {};
+  const visibleProjectProgress = (managerDashboard.project_progress || []).filter((project) => {
+    const matchesName = String(project.name || "").toLocaleLowerCase("uk").includes(projectSearch.trim().toLocaleLowerCase("uk"));
+    return matchesName;
+  }).sort((a, b) => projectProgressFilter === "done"
+    ? Number(b.done || 0) - Number(a.done || 0)
+    : projectProgressFilter === "in_progress"
+      ? Number(b.in_progress || 0) - Number(a.in_progress || 0)
+      : 0);
   async function saveReminder(reminderAt) {
     const result = await post("/api/tasks.php", {
       action: "set_reminder",
@@ -118,7 +144,7 @@ export default function Dashboard() {
           <div>
             <p className="eyebrow">ВАШ РОБОЧИЙ ПРОСТІР</p>
             <h1>
-              Доброго дня, <span>{data.user.name.split(" ")[0]}</span> ✦
+              Доброго дня, <span>{data.user.name.split(" ")[0]}</span> <Icon name="sparkle" />
             </h1>
             <p className="subtext">
               Ваші проєкти, задачі та доступи — в одному робочому просторі.
@@ -126,11 +152,11 @@ export default function Dashboard() {
           </div>
           <div className="dashboard-actions">
             <Link className="primary-action" to="/tasks?create=1">
-              ＋ Створити задачу
+              <Icon name="plus" /> Створити задачу
             </Link>
             {canManage && (
               <Link className="outline-btn" to="/projects/new">
-                ＋ Створити проєкт
+                <Icon name="plus" /> Створити проєкт
               </Link>
             )}
           </div>
@@ -139,7 +165,7 @@ export default function Dashboard() {
           <section className="panel reminders-panel reminder-panel-enter">
             <div className="panel-heading">
               <div className="reminders-heading-copy">
-                <span className="reminders-heading-icon" aria-hidden="true">◷</span>
+                <span className="reminders-heading-icon" aria-hidden="true"><Icon name="clock" /></span>
                 <div>
                   <h2>Нагадування</h2>
                   <p>Час повернутися до задач, які потребують вашої уваги.</p>
@@ -147,7 +173,7 @@ export default function Dashboard() {
               </div>
               <span className="task-count-badge reminder-count-pulse">{data.reminders.length}</span>
             </div>
-            <div className="reminders-callout"><span>✦</span><strong>У вас є важливі задачі</strong><small>Натисніть на задачу, щоб перенести або вимкнути нагадування.</small></div>
+            <div className="reminders-callout"><span><Icon name="sparkle" /></span><strong>У вас є важливі задачі</strong><small>Натисніть на задачу, щоб перенести або вимкнути нагадування.</small></div>
             <div className="reminder-list">
               {data.reminders.map((task) => (
                 <button
@@ -156,8 +182,9 @@ export default function Dashboard() {
                   onClick={() => setReminderTask(task)}
                   key={task.id}
                 >
-                  <span className="reminder-leading-icon" aria-hidden="true">◷</span>
+                  <span className="reminder-leading-icon" aria-hidden="true"><Icon name="clock" /></span>
                   <span className={`task-status status-${task.status}`}>
+                      {task.status === "review" && <Icon name="urgent" />}
                     {statusLabels[task.status]}
                   </span>
                   <div>
@@ -165,17 +192,19 @@ export default function Dashboard() {
                     <small>{task.project_name || "Без проєкту"}</small>
                   </div>
                   <time>{reminderLabel(task.reminder_at)}</time>
-                  <span className="reminder-arrow">›</span>
+                  <span className="reminder-arrow"><Icon name="right" /></span>
                 </button>
               ))}
             </div>
           </section>
         )}
-        <section className="stat-grid">
-          <Stat value={firstMetric.value} title={firstMetric.title} />
-          <Stat value={data.metrics.projects} title="Активні проєкти" />
-          <Stat value={data.metrics.tasks} title="Відкриті задачі" />
-          <Stat value={`${data.metrics.hours} год`} title="Мій час" />
+        <section className={`stat-grid${isAdmin ? " admin-stat-grid" : ""}`}>
+          {(adminMetrics || [
+            firstMetric,
+            { value: data.metrics.projects, title: "Активні проєкти" },
+            { value: data.metrics.tasks, title: "Відкриті задачі" },
+            { value: `${data.metrics.hours} год`, title: "Мій час" },
+          ]).map((metric) => <Stat key={metric.title} value={metric.value} title={metric.title} />)}
         </section>
         <section className="grid-two">
           <article className="panel">
@@ -190,8 +219,8 @@ export default function Dashboard() {
                 className={`project-list${data.projects.length > 5 ? " is-scrollable" : ""}`}
               >
                 {data.projects.map((project) => (
-                  <div className="project-row" key={project.id}>
-                    <span className="project-icon">▣</span>
+                  <Link className="project-row dashboard-project-link" key={project.id} to={`/projects/${project.id}`}>
+                    <span className="project-icon"><Icon name="project" /></span>
                     <div>
                       <strong>{project.name}</strong>
                       <small>
@@ -205,12 +234,12 @@ export default function Dashboard() {
                       {projectStatusLabels[project.status] ||
                         projectStatusLabels.active}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-illustration">▣</div>
+                <div className="empty-illustration"><Icon name="project" /></div>
                 <h3>Проєктів ще немає</h3>
                 <p>
                   {canManage
@@ -219,7 +248,7 @@ export default function Dashboard() {
                 </p>
                 {canManage && (
                   <Link className="outline-btn" to="/projects/new">
-                    ＋ Створити проєкт
+                    <Icon name="plus" /> Створити проєкт
                   </Link>
                 )}
               </div>
@@ -232,12 +261,12 @@ export default function Dashboard() {
                 <p>Найближча робота та призначені вам задачі.</p>
               </div>
               <Link className="panel-link" to="/tasks">
-                Усі задачі →
+                Усі задачі <Icon name="forward" />
               </Link>
             </div>
             <div className="dashboard-task-tools">
               <label>
-                <span>⌕</span>
+                <span><Icon name="search" /></span>
                 <input
                   value={taskSearch}
                   onChange={(event) => setTaskSearch(event.target.value)}
@@ -265,6 +294,7 @@ export default function Dashboard() {
                     key={task.id}
                   >
                     <span className={`task-status status-${task.status}`}>
+                      {task.status === "review" && <Icon name="urgent" />}
                       {statusLabels[task.status]}
                     </span>
                     <div>
@@ -276,13 +306,13 @@ export default function Dashboard() {
                           : ""}
                       </small>
                     </div>
-                    <span>›</span>
+                    <span><Icon name="right" /></span>
                   </Link>
                 ))}
               </div>
             ) : (
               <div className="dashboard-task-empty">
-                <span>✓</span>
+                <span><Icon name="check" /></span>
                 <p>Задач за цим фільтром немає.</p>
                 <Link className="outline-btn" to="/tasks?create=1">
                   Створити задачу
@@ -291,6 +321,21 @@ export default function Dashboard() {
             )}
           </article>
         </section>
+        {showProjectInsights && (
+          <section className="manager-dashboard-grid">
+            <article className="panel manager-attention-panel">
+              <div className="panel-heading"><div><h2>Потребує уваги</h2><p>Ключові речі, які варто перевірити.</p></div><Icon name="urgent" /></div>
+              <div className="attention-cards">
+                <Link to="/tasks?status=overdue" className="attention-card attention-danger"><strong>{managerAttention.overdue || 0}</strong><span>Прострочені задачі</span></Link>
+                <Link to="/tasks?status=review" className="attention-card attention-warning"><strong>{managerAttention.review || 0}</strong><span>На перевірці</span></Link>
+                <Link to="/tasks?priority=urgent" className="attention-card attention-urgent"><strong>{managerAttention.urgent || 0}</strong><span>Термінові</span></Link>
+              </div>
+            </article>
+            <article className="panel manager-widget"><div className="panel-heading"><div><h2>Найближчі дедлайни</h2><p>Задачі на наступні 7 днів.</p></div><Link className="panel-link" to="/tasks">Усі <Icon name="forward" /></Link></div><div className="manager-list">{(managerDashboard.upcoming_deadlines || []).length ? managerDashboard.upcoming_deadlines.map(task => <Link className="manager-list-row" to={`/tasks/${task.id}`} key={task.id}><span className={`task-status status-${task.status}`}>{statusLabels[task.status]}</span><div><strong>{task.title}</strong><small>{task.project_name || 'Без проєкту'}</small></div><time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString('uk-UA')}</time></Link>) : <p className="muted-note">Найближчих дедлайнів немає.</p>}</div></article>
+            <article className="panel manager-widget"><div className="panel-heading manager-project-heading"><div><h2>Прогрес проєктів</h2><p>Ваші створені та запрошені проєкти.</p></div><Link className="panel-link" to="/projects">Усі <Icon name="forward" /></Link></div><div className="manager-project-tools"><label><Icon name="search" /><input type="search" value={projectSearch} onChange={(event) => setProjectSearch(event.target.value)} placeholder="Пошук проєкту…" /></label><select value={projectProgressFilter} onChange={(event) => setProjectProgressFilter(event.target.value)}><option value="all">За замовчуванням</option><option value="done">Більше виконано</option><option value="in_progress">Більше в роботі</option></select></div><div className="manager-list">{visibleProjectProgress.length ? visibleProjectProgress.map(project => { const donePercent = project.total ? Math.round(project.done / project.total * 100) : 0; const inProgressPercent = project.total ? Math.round((project.in_progress || 0) / project.total * 100) : 0; return <Link className="progress-row" to={`/projects/${project.id}`} key={project.id}><div><strong>{project.name}</strong><small>Усього задач: {project.total}</small></div><b>{donePercent}%</b><div className="project-progress-lines"><div className="project-progress-line"><span>Виконано</span><div className="progress-track"><i className="progress-done" style={{width: `${donePercent}%`}} /></div><b>{project.done}</b></div><div className="project-progress-line"><span>У роботі</span><div className="progress-track"><i className="progress-in-progress" style={{width: `${inProgressPercent}%`}} /></div><b>{project.in_progress || 0}</b></div></div></Link>}) : <p className="muted-note">Проєктів за цим пошуком немає.</p>}</div></article>
+            {isManager && <><article className="panel manager-widget"><div className="panel-heading"><div><h2>Завантаженість команди</h2><p>Активні задачі за виконавцями.</p></div></div><div className="manager-list">{(managerDashboard.team_workload || []).slice(0, 6).map(person => <div className="manager-list-row" key={person.id}><span className="member-avatar"><Icon name="user" /></span><div><strong>{person.name}</strong><small>{person.email}</small></div><b>{person.tasks} задач</b></div>)}</div></article><article className="panel manager-widget"><div className="panel-heading"><div><h2>Остання активність</h2><p>Останні зміни у задачах.</p></div></div><div className="manager-list">{(managerDashboard.recent_activity || []).map(item => <Link className="activity-row" to={`/tasks/${item.task_id}`} key={`${item.task_id}-${item.created_at}`}><span className="activity-dot" /><div><strong>{item.user_name || 'Користувач'} · {item.task_title}</strong><small>{item.message}</small></div></Link>)}</div></article></>}
+          </section>
+        )}
         {canManage && (
           <section className="panel team-time-panel">
             <div className="panel-heading">
@@ -301,7 +346,7 @@ export default function Dashboard() {
             </div>
             <div className="team-time-tools">
               <label>
-                <span>⌕</span>
+                <span><Icon name="search" /></span>
                 <input
                   value={teamSearch}
                   onChange={(event) => setTeamSearch(event.target.value)}
@@ -389,21 +434,32 @@ export default function Dashboard() {
 }
 function Stat({ value, title }) {
   const icons = {
-    "Активні клієнти": "◉",
-    "Моя команда": "♧",
-    "Мої дедлайни": "⌛",
-    "Активні проєкти": "▣",
-    "Відкриті задачі": "✓",
-    "Мій час": "◷",
+    "Активні клієнти": <Icon name="users" />,
+    "Усі клієнти": <Icon name="users" />,
+    "Користувачі": <Icon name="users" />,
+    "Онлайн зараз": <Icon name="pulse" />,
+    "Моя команда": <Icon name="users" />,
+    "Мої дедлайни": <Icon name="hourglass" />,
+    "Активні проєкти": <Icon name="project" />,
+    "Відкриті задачі": <Icon name="check" />,
+    "Мій час": <Icon name="clock" />,
   };
-  return (
+  const links = {
+    "Моя команда": "/team",
+    "Користувачі": "/team",
+    "Усі проєкти": "/projects",
+    "Активні проєкти": "/projects",
+    "Відкриті задачі": "/tasks",
+  };
+  const content = (
     <article className="stat-card dashboard-stat-card">
       <span className="stat-icon green">
-        <span>{icons[title] || "✦"}</span>
+        <span>{icons[title] || <Icon name="sparkle" />}</span>
       </span>
       <strong>{value}</strong>
       <span>{title}</span>
       <small>Дані робочого простору</small>
     </article>
   );
+  return links[title] ? <Link className="dashboard-stat-link" to={links[title]}>{content}</Link> : content;
 }

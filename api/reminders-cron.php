@@ -12,6 +12,9 @@ require __DIR__ . '/telegram.php';
 require __DIR__ . '/mailer.php';
 
 $pdo = db();
+// Додаткове очищення під час cron гарантує видалення старих записів навіть
+// якщо ніхто не відкриває сторінку сповіщень.
+$pdo->exec("DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
 $notificationColumns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME IN ('telegram_sent_at', 'email_sent_at')")->fetchAll(PDO::FETCH_COLUMN);
 if (!in_array('telegram_sent_at', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD telegram_sent_at DATETIME NULL");
 if (!in_array('email_sent_at', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD email_sent_at DATETIME NULL");

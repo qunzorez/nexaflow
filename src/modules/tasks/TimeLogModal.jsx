@@ -1,3 +1,4 @@
+import Icon from '../../components/Icon.jsx';
 import { useEffect } from "react";
 import "./time-log-modal-fix.css";
 
@@ -15,8 +16,8 @@ export default function TimeLogModal({ onSubmit, onClose }) {
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section className="time-modal task-modal">
-        <button type="button" className="task-modal-close" onClick={onClose}>
-          ×
+        <button type="button" className="task-modal-close" onClick={onClose} aria-label="Закрити">
+          <Icon name="close" />
         </button>
         <div className="task-modal-scroll">
           <p className="eyebrow">ОБЛІК ЧАСУ</p>

@@ -1,3 +1,4 @@
+import Icon from '../../components/Icon.jsx';
 import { useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 
@@ -38,5 +39,5 @@ export default function TaskDescriptionEditor({ value = '', onChange }) {
     };
     reader.readAsDataURL(file);
   }
-  return <div className="task-editor"><div className="task-editor-toolbar"><button type="button" onClick={() => command('bold')}><b>B</b></button><button type="button" onClick={() => command('italic')}><i>I</i></button><button type="button" onClick={() => command('insertUnorderedList')}>• Список</button><button type="button" onClick={() => document.getElementById('task-description-file').click()}>＋ Фото або файл</button><input id="task-description-file" className="task-description-file" type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={insertFile} /></div><div ref={editorRef} className="task-editor-area" contentEditable suppressContentEditableWarning onInput={update} data-placeholder="Опишіть задачу, результат і важливі деталі..." /><input type="hidden" name="description" value={value} readOnly /></div>;
+  return <div className="task-editor"><div className="task-editor-toolbar"><button type="button" aria-label="Жирний" onClick={() => command('bold')}><Icon name="bold" /></button><button type="button" aria-label="Курсив" onClick={() => command('italic')}><Icon name="italic" /></button><button type="button" onClick={() => command('insertUnorderedList')}><Icon name="list" /> Список</button><button type="button" onClick={() => document.getElementById('task-description-file').click()}><Icon name="attachment" /> Фото або файл</button><input id="task-description-file" className="task-description-file" type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={insertFile} /></div><div ref={editorRef} className="task-editor-area" contentEditable suppressContentEditableWarning onInput={update} data-placeholder="Опишіть задачу, результат і важливі деталі..." /><input type="hidden" name="description" value={value} readOnly /></div>;
 }

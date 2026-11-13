@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/runtime-config.php';
+require_once __DIR__ . '/claims.php';
 
 function db(): PDO
 {
@@ -15,6 +16,13 @@ function db(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
     ]);
+    // Normalize the legacy typo in existing claims groups so it is never shown again.
+    // The try/catch keeps first-run database initialization safe before project_groups exists.
+    try {
+        $pdo->exec("UPDATE project_groups SET name = 'Бухгалтер' WHERE name = 'Бугалтер'");
+    } catch (Throwable $ignored) {
+        // The schema migration will handle it after the table is created.
+    }
     return $pdo;
 }
 

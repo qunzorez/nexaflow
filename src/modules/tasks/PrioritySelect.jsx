@@ -1,10 +1,11 @@
+import Icon from '../../components/Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 
 const options = [
-  { value: 'low', label: 'Низький', icon: '↓' },
-  { value: 'normal', label: 'Звичайний', icon: '—' },
-  { value: 'high', label: 'Високий', icon: '↑' },
-  { value: 'urgent', label: 'Терміновий', icon: '!' },
+  { value: 'low', label: 'Низький', icon: <Icon name="low" /> },
+  { value: 'normal', label: 'Звичайний', icon: <Icon name="normal" /> },
+  { value: 'high', label: 'Високий', icon: <Icon name="high" /> },
+  { value: 'urgent', label: 'Терміновий', icon: <Icon name="urgent" /> },
 ];
 
 export default function PrioritySelect({ value = 'normal' }) {
@@ -27,7 +28,7 @@ export default function PrioritySelect({ value = 'normal' }) {
       <button type="button" className="priority-dropdown-trigger" onClick={() => setOpen(opened => !opened)} aria-expanded={open}>
         <span className="priority-dropdown-icon">{current.icon}</span>
         <span>{current.label}</span>
-        <span className="priority-dropdown-chevron" aria-hidden="true" />
+        <span className="priority-dropdown-chevron" aria-hidden="true"><Icon name="down" /></span>
       </button>
       {open && <div className="priority-dropdown-menu">
         {options.map(option => <button type="button" className={option.value === current.value ? 'active' : ''} key={option.value} onClick={() => {
@@ -36,7 +37,7 @@ export default function PrioritySelect({ value = 'normal' }) {
         }}>
           <span className={`priority-dropdown-icon priority-dropdown-icon-${option.value}`}>{option.icon}</span>
           <span>{option.label}</span>
-          {option.value === current.value && <b>✓</b>}
+          {option.value === current.value && <b><Icon name="check" /></b>}
         </button>)}
       </div>}
     </div>

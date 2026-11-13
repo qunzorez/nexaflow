@@ -1,21 +1,36 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
-import { api, post } from '../services/api.js';
+import { api } from '../services/api.js';
 import ManagerTeamView from '../modules/team/ManagerTeamView.jsx';
-
-const roles = { admin: 'Адміністратор', manager: 'Менеджер', member: 'Учасник', viewer: 'Переглядач', user: 'Користувач' };
-const initials = name => String(name || '?').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
+import '../modules/team/team-modern.css';
 
 export default function Team() {
-  const [data, setData] = useState(null); const [currentUser, setCurrentUser] = useState(null); const [query, setQuery] = useState(''); const [notice, setNotice] = useState(''); const navigate = useNavigate();
-  async function load() { const [result, me] = await Promise.all([api('/api/team.php'), api('/api/me.php')]); if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.role)) return navigate('/dashboard', { replace: true }); if (!result.ok) return navigate('/dashboard'); setData(result); setCurrentUser(me.user); }
+  const [data, setData] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const navigate = useNavigate();
+
+  async function load() {
+    const [result, me] = await Promise.all([api('/api/team.php'), api('/api/me.php')]);
+    if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.role)) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    if (!result.ok) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    setData(result);
+    setCurrentUser(me.user);
+  }
+
   useEffect(() => { load(); }, []);
+
   if (!data) return <div className="loading-screen">Завантаження команди…</div>;
-  if (!data.permissions?.admin) return <Layout page="Команда" user={currentUser}><div className="content"><ManagerTeamView data={data} onReload={load} /></div></Layout>;
-  const visibleUsers = data.users.filter(user => `${user.name} ${user.email}`.toLowerCase().includes(query.toLowerCase()));
-  async function invite(event) { event.preventDefault(); const form = new FormData(event.currentTarget); const result = await post('/api/invite.php', { action: 'send', email: form.get('email'), project_id: form.get('project_id'), role: form.get('role') }); setNotice(result.message); if (result.ok) event.currentTarget.reset(); }
-  async function changeRole(event, id) { const result = await post('/api/team.php', { action: 'set_user_role', user_id: id, role: event.target.value }); setNotice(result.message); if (result.ok) load(); }
-  async function assign(event) { event.preventDefault(); const form = new FormData(event.currentTarget); const result = await post('/api/team.php', { action: 'assign_role', project_id: form.get('project_id'), user_id: form.get('user_id'), role: form.get('role') }); setNotice(result.message); if (result.ok) load(); }
-  return <Layout page="Команда" user={currentUser || { role: data.permissions?.admin ? 'admin' : 'manager' }}><div className="content"><section className="welcome-row"><div><p className="eyebrow">КЕРУВАННЯ ДОСТУПОМ</p><h1>Команда</h1><p className="subtext">Запрошуйте користувачів і визначайте ролі в кожному проєкті.</p></div></section>{notice && <div className="team-notice success">{notice}</div>}<section className="team-grid"><article className="panel team-panel"><div className="panel-heading"><div><h2>Учасники команди</h2><p>{data.permissions?.admin ? 'Адміністратор бачить усіх користувачів системи' : 'Менеджер бачить лише запрошених ним користувачів'}</p></div><span className="count-pill">{data.users.length}</span></div><div className="team-search"><span>⌕</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Пошук за ім’ям або email…" /></div><div className="member-list">{visibleUsers.map(user => <div className="member-row" key={user.id}><span className="member-avatar">{initials(user.name)}</span><div className="member-info"><strong>{user.name}</strong><small>{user.email}</small></div>{data.permissions?.admin ? <select value={user.role} onChange={event => changeRole(event, user.id)}><option value="user">Користувач</option><option value="manager">Менеджер</option><option value="admin">Адміністратор</option></select> : <span className="role-badge">{roles[user.role] || user.role}</span>}</div>)}</div></article><article className="panel assign-panel"><h2>Запросити в проєкт</h2><p className="panel-subtitle">Користувач створиться після прийняття запрошення.</p><form className="invite-form" onSubmit={invite}><label>Email користувача<input name="email" type="email" required placeholder="name@company.com" /></label><label>Проєкт<select name="project_id" required><option value="">Оберіть проєкт</option>{data.projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Роль у проєкті<select name="role" defaultValue="member"><option value="manager">Менеджер</option><option value="member">Учасник</option><option value="viewer">Переглядач</option></select></label><button className="primary-action">Відправити запрошення</button></form><form className="role-edit-form" onSubmit={assign}><h3>Змінити роль у проєкті</h3><label>Проєкт<select name="project_id" required><option value="">Оберіть проєкт</option>{data.projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Користувач<select name="user_id" required><option value="">Оберіть користувача</option>{data.users.map(user => <option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}</select></label><label>Роль<select name="role" defaultValue="member"><option value="admin">Адміністратор</option><option value="manager">Менеджер</option><option value="member">Учасник</option><option value="viewer">Переглядач</option></select></label><button className="outline-btn">Зберегти роль</button></form></article></section><section className="panel assignments-panel"><h2>Розподіл ролей</h2><div className="assignment-list">{data.members.map(member => <div className="assignment-row" key={`${member.project_id}-${member.user_id}`}><span className="member-avatar">{initials(member.user_name)}</span><div className="member-info"><strong>{member.user_name}</strong><small>{member.user_email}</small></div><span>{member.project_name}</span><span className="role-badge">{roles[member.role] || member.role}</span></div>)}</div></section></div></Layout>;
+
+  return <Layout page="Команда" user={currentUser}>
+    <div className="content">
+      <ManagerTeamView data={data} onReload={load} isAdmin={Boolean(data.permissions?.admin)} />
+    </div>
+  </Layout>;
 }

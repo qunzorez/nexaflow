@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   title VARCHAR(180) NOT NULL,
   message TEXT NOT NULL,
   content_html TEXT NULL,
+  is_banner TINYINT(1) NOT NULL DEFAULT 0,
+  banner_dismissed_at DATETIME NULL,
+  banner_view_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
   entity_type VARCHAR(40) NULL,
   entity_id CHAR(32) NULL,
   is_read TINYINT(1) NOT NULL DEFAULT 0,
@@ -17,3 +20,4 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at);
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);

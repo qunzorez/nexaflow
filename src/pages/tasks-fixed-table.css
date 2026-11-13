@@ -17,6 +17,26 @@
 .tasks-redesign .task-table th:nth-child(7),
 .tasks-redesign .task-table td:nth-child(7) { width: 7%; }
 
+/* The status pill contains an icon, label and chevron.  Do not let the
+   fixed-height table cells clip the right side of that control. */
+.tasks-redesign .task-table th:nth-child(7),
+.tasks-redesign .task-table td:nth-child(7) {
+  width: 11%;
+  min-width: 122px;
+}
+.tasks-redesign .task-table th:nth-child(8),
+.tasks-redesign .task-table td:nth-child(8) {
+  width: 5%;
+  min-width: 42px;
+}
+.tasks-redesign .task-status-cell,
+.tasks-redesign .task-actions-cell {
+  overflow: visible !important;
+}
+.tasks-redesign .task-status-cell .status-menu-trigger {
+  max-width: 100%;
+}
+
 .tasks-redesign .table-task-title small,
 .tasks-redesign .table-secondary small {
   overflow: hidden;

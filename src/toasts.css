@@ -1,0 +1,78 @@
+/* Global feedback toasts: keep important messages visible regardless of page scroll. */
+.team-notice,
+.form-notice {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2000;
+  box-sizing: border-box;
+  width: min(390px, calc(100vw - 32px));
+  margin: 0 !important;
+  padding: 14px 18px;
+  border: 1px solid #d8e9df;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #167c60;
+  box-shadow: 0 18px 42px rgba(20, 55, 43, .18), 0 3px 10px rgba(20, 55, 43, .08);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 700;
+  pointer-events: none;
+  animation: nexaflow-toast-in .24s ease-out both;
+}
+
+.team-notice {
+  background: linear-gradient(135deg, #ffffff 0%, #f0faf5 100%);
+}
+
+.team-notice::before,
+.form-notice::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.team-notice::before {
+  content: '✓';
+  background: #dff4e9;
+  color: #168767;
+}
+
+.form-notice {
+  border-color: #f0d6cf;
+  background: linear-gradient(135deg, #ffffff 0%, #fff5f2 100%);
+  color: #b4543f;
+}
+
+.form-notice::before {
+  content: '!';
+  background: #fde8e2;
+  color: #c45b45;
+}
+
+@keyframes nexaflow-toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(22px, 14px, 0) scale(.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .team-notice,
+  .form-notice {
+    right: 16px;
+    bottom: 16px;
+    width: calc(100vw - 32px);
+  }
+}

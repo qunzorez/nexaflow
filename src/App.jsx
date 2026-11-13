@@ -13,6 +13,9 @@ import Settings from "./pages/Settings.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
 import Clients from "./pages/Clients.jsx";
+import ClientCreatePage from "./pages/ClientCreatePage.jsx";
+import ClientEditPage from "./pages/ClientEditPage.jsx";
+import Calendar from "./pages/Calendar.jsx";
 
 export default function App() {
   return (
@@ -22,6 +25,9 @@ export default function App() {
       <Route path="/team" element={<Team />} />
       <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/clients" element={<Clients />} />
+      <Route path="/clients/new" element={<ClientCreatePage />} />
+      <Route path="/clients/:id/edit" element={<ClientEditPage />} />
+      <Route path="/calendar" element={<Calendar />} />
       <Route path="/projects" element={<Projects />} />
       <Route path="/projects/new" element={<ProjectCreatePage />} />
       <Route path="/projects/:id" element={<ProjectEditPage />} />

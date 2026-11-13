@@ -1,0 +1,17 @@
+.client-assignment-panel{display:grid;gap:16px}
+.manager-team-grid{grid-template-columns:minmax(280px,.75fr) minmax(0,1.25fr)}
+.client-access-search{display:flex;align-items:center;gap:8px;margin:16px 0 10px;padding:0 12px;border:1px solid var(--line);border-radius:9px;color:var(--muted)}
+.client-access-search input{width:100%;border:0;outline:0;padding:11px 0;background:transparent;color:var(--ink);font-size:11px}
+.client-assignment-panel{width:100%;padding:26px 28px}.client-access-table{max-height:580px;min-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;scrollbar-width:thin}
+.client-access-head,.client-access-row{display:grid;grid-template-columns:minmax(150px,.75fr) minmax(170px,.95fr) minmax(240px,1.3fr);gap:14px;align-items:center;padding:11px 13px}
+.client-access-head{position:sticky;top:0;z-index:1;background:#f8fbf9;border-bottom:1px solid var(--line);color:#84928b;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800}
+.client-access-row{min-height:64px;border-bottom:1px solid var(--line);font-size:10px;color:var(--muted)}
+.client-access-row:last-child{border-bottom:0}.client-access-row .member-info{min-width:0}.client-access-row .member-info strong{color:var(--ink);font-size:11px}.client-access-row .searchable-multi{min-width:0}.client-access-empty{padding:26px;text-align:center;color:var(--muted);font-size:11px}
+.client-assignment-list{border-top:1px solid var(--line);max-height:430px;overflow-y:auto;padding-right:8px;scrollbar-width:thin;scrollbar-color:#a8b9b0 transparent}
+.client-assignment-row{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(280px,1.3fr);align-items:center;gap:18px;border-bottom:1px solid var(--line);padding:13px 0}
+.client-assignment-row .searchable-multi{min-width:0}
+.client-assignment-row .searchable-multi-trigger{min-height:42px}
+.client-assignment-row .multi-chips{max-width:100%}
+@media(max-width:650px){.client-assignment-row{grid-template-columns:1fr;gap:9px}}
+@media(max-width:700px){.client-access-head,.client-access-row{grid-template-columns:130px 170px 240px;min-width:580px}}
+@media(max-width:850px){.manager-team-grid{grid-template-columns:1fr}}

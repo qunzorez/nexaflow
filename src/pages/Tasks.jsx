@@ -1,3 +1,4 @@
+import Icon from '../components/Icon.jsx';
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -18,12 +19,12 @@ import "./task-actions.css";
 import "../modules/tasks/task-modal.css";
 
 const statusOptions = {
-  todo: { label: "До виконання", icon: "○" },
-  in_progress: { label: "У роботі", icon: "◐" },
-  review: { label: "На перевірці", icon: "!" },
-  done: { label: "Завершено", icon: "✓" },
-  cancelled: { label: "Скасовано", icon: "×" },
-  archived: { label: "Архів", icon: "▣" },
+  todo: { label: "До виконання", icon: <Icon name="todo" /> },
+  in_progress: { label: "У роботі", icon: <Icon name="progress" /> },
+  review: { label: "На перевірці", icon: <Icon name="urgent" /> },
+  done: { label: "Завершено", icon: <Icon name="check" /> },
+  cancelled: { label: "Скасовано", icon: <Icon name="close" /> },
+  archived: { label: "Архів", icon: <Icon name="archive" /> },
 };
 const priorityLabels = {
   low: "Низький",
@@ -33,6 +34,14 @@ const priorityLabels = {
 };
 const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
 const pageSize = 10;
+const nonOverdueStatuses = new Set(["done", "cancelled", "archived"]);
+function isOverdueTask(task) {
+  if (!task.due_date || nonOverdueStatuses.has(task.status)) return false;
+  const dueDate = new Date(`${task.due_date}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return !Number.isNaN(dueDate.getTime()) && dueDate < today;
+}
 function taskSort(a, b) {
   const priorityDifference =
     (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9);
@@ -108,7 +117,7 @@ function StatusMenu({ task, onChange }) {
       >
         <span className="status-menu-icon">{current.icon}</span>
         <span>{current.label}</span>
-        <span className="status-menu-chevron">⌄</span>
+        <span className="status-menu-chevron"><Icon name="down" /></span>
       </button>
       {open && (
         createPortal(<>
@@ -133,7 +142,7 @@ function StatusMenu({ task, onChange }) {
                   {option.icon}
                 </span>
                 <span>{option.label}</span>
-                {value === task.status && <b>✓</b>}
+                {value === task.status && <b><Icon name="check" /></b>}
               </button>
             ))}
           </div>
@@ -148,8 +157,9 @@ export default function Tasks() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
+  const [params] = useSearchParams();
   const [filter, setFilter] = useState(
-    () => window.localStorage.getItem("nexaflow.tasks.filter") || "all",
+    () => params.get("status") || (params.get("priority") === "urgent" ? "urgent" : null) || window.localStorage.getItem("nexaflow.tasks.filter") || "all",
   );
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -159,7 +169,6 @@ export default function Tasks() {
   const [assigneeIds, setAssigneeIds] = useState([]);
   const [clientIds, setClientIds] = useState([]);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
   const openedFromQuery = useRef(false);
   async function load() {
     const [result, clients] = await Promise.all([
@@ -195,7 +204,8 @@ export default function Tasks() {
     setModalError("");
     setEditing(null);
     setProjectIds([]);
-    setAssigneeIds([]);
+    const canManage = ["admin", "owner", "manager"].includes(data?.user?.role);
+    setAssigneeIds(!canManage && data?.user?.id ? [data.user.id] : []);
     setClientIds([]);
     setModalOpen(true);
   }
@@ -261,7 +271,13 @@ export default function Tasks() {
   const filteredTasks = data.tasks
     .filter((task) => {
       const matchesFilter =
-        filter === "all" ? task.status !== "archived" : task.status === filter;
+        filter === "all"
+          ? task.status !== "archived"
+          : filter === "overdue"
+            ? isOverdueTask(task)
+            : filter === "urgent"
+              ? task.priority === "urgent" && !nonOverdueStatuses.has(task.status)
+            : task.status === filter;
       const haystack =
         `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
       return (
@@ -297,7 +313,7 @@ export default function Tasks() {
             type="button"
             onClick={createTask}
           >
-            ＋ Створити задачу
+            <Icon name="plus" /> Створити задачу
           </button>
         </section>
         {notice && <div className="team-notice success">{notice}</div>}
@@ -314,7 +330,7 @@ export default function Tasks() {
           </div>
           <div className="task-toolbar">
             <label className="task-search">
-              <span>⌕</span>
+              <span><Icon name="search" /></span>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -327,6 +343,8 @@ export default function Tasks() {
               onChange={(event) => setFilter(event.target.value)}
             >
               <option value="all">Активні задачі</option>
+              <option value="overdue">Прострочені</option>
+              <option value="urgent">Термінові</option>
               <option value="todo">До виконання</option>
               <option value="in_progress">У роботі</option>
               <option value="done">Завершені</option>
@@ -375,7 +393,7 @@ export default function Tasks() {
                     </td>
                     <td>
                       <div className="table-clients">
-                        <span className="table-client-icon">♙</span>
+                        <span className="table-client-icon"><Icon name="users" /></span>
                         <div className="table-client-list">
                           {(
                             task.client_names ||
@@ -412,10 +430,10 @@ export default function Tasks() {
                           : "—"}
                       </span>
                     </td>
-                    <td>
+                    <td className="task-status-cell">
                       <StatusMenu task={task} onChange={changeStatus} />
                     </td>
-                    <td>
+                    <td className="task-actions-cell">
                       <button
                         className="table-more"
                         type="button"
@@ -425,7 +443,7 @@ export default function Tasks() {
                         }}
                         aria-label="Редагувати"
                       >
-                        ⋯
+                        <Icon name="edit" />
                       </button>
                     </td>
                   </tr>
@@ -434,10 +452,12 @@ export default function Tasks() {
             </table>
             {!pageTasks.length && (
               <div className="task-table-empty">
-                <div className="empty-illustration">✓</div>
+                <div className="empty-illustration"><Icon name="check" /></div>
                 <h3>
                   {search
                     ? "Нічого не знайдено"
+                    : filter === "overdue"
+                      ? "Прострочених задач немає"
                     : filter === "archived"
                       ? "Архів порожній"
                       : "Задач поки немає"}
@@ -459,8 +479,8 @@ export default function Tasks() {
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => setPage((value) => value - 1)}
-              >
-                ‹
+               aria-label="Попередня сторінка">
+                <Icon name="left" />
               </button>
               {Array.from({ length: totalPages }, (_, index) => index + 1)
                 .slice(Math.max(0, currentPage - 3), currentPage + 2)
@@ -478,8 +498,8 @@ export default function Tasks() {
                 type="button"
                 disabled={currentPage === totalPages}
                 onClick={() => setPage((value) => value + 1)}
-              >
-                ›
+               aria-label="Наступна сторінка">
+                <Icon name="right" />
               </button>
             </div>
           </div>

@@ -10,17 +10,31 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
 if ($method === 'POST') $projectId = trim((string)($data['id'] ?? $projectId));
 $action = (string)($data['action'] ?? 'update');
+$actorQuery = $pdo->prepare('SELECT role FROM users WHERE id = ?');
+$actorQuery->execute([$userId]); $actorRole = (string)$actorQuery->fetchColumn(); $actorQuery->closeCursor();
+$actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
+if ($method === 'POST' && in_array($action, ['update_global_group', 'delete_global_group'], true)) {
+    $managedGroup = manageableGroup($pdo, trim((string)($data['group_id'] ?? '')), $userId, $actorAdmin);
+}
+if ($method === 'POST' && $action === 'assign_global_group') {
+    $memberIdCheck = trim((string)($data['user_id'] ?? ''));
+    if (!$actorAdmin) {
+        $q = $pdo->prepare("SELECT u.id FROM users u WHERE u.id = ? AND u.role NOT IN ('admin', 'owner', 'manager') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted'))");
+        $q->execute([$memberIdCheck, $userId, $userId]); $invited = $q->fetchColumn(); $q->closeCursor();
+        if (!$invited) jsonResponse(false, 'Можна призначати групи лише запрошеним учасникам своєї команди.', [], 403);
+    }
+    if (!empty($data['group_id'])) manageableGroup($pdo, (string)$data['group_id'], $userId, $actorAdmin);
+}
+
 if ($method === 'POST' && $action === 'create_global_group') {
     $creator = $pdo->prepare("SELECT role FROM users WHERE id = ? AND role IN ('admin', 'owner', 'manager') LIMIT 1");
     $creator->execute([$userId]);
     if (!$creator->fetch()) jsonResponse(false, 'Недостатньо прав для створення групи.', [], 403);
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
-    $permissions = array_values(array_intersect((array)($data['permissions'] ?? []), ['sign_documents', 'manage_documents', 'manage_tasks', 'view_finance']));
+    $permissions = encodeGroupPolicy($data, $userId);
     $groupId = bin2hex(random_bytes(16));
-    $pdo->prepare('INSERT INTO project_groups (id, project_id, name, role_name, permissions) VALUES (?, NULL, ?, ?, ?)')->execute([$groupId, $groupName, trim((string)($data['role_name'] ?? '')), json_encode($permissions, JSON_UNESCAPED_UNICODE)]);
-    $groupMember = $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)');
-    foreach ((array)($data['member_ids'] ?? []) as $memberId) $groupMember->execute([$groupId, trim((string)$memberId)]);
+    $pdo->prepare('INSERT INTO project_groups (id, project_id, name, role_name, permissions) VALUES (?, NULL, ?, ?, ?)')->execute([$groupId, $groupName, '', $permissions]);
     jsonResponse(true, 'Глобальну групу створено.', ['group_id' => $groupId]);
 }
 if ($method === 'POST' && in_array($action, ['update_global_group', 'delete_global_group'], true)) {
@@ -35,8 +49,8 @@ if ($method === 'POST' && in_array($action, ['update_global_group', 'delete_glob
     }
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
-    $permissions = array_values(array_intersect((array)($data['permissions'] ?? []), ['sign_documents', 'manage_documents', 'manage_tasks', 'view_finance']));
-    $pdo->prepare('UPDATE project_groups SET name = ?, role_name = ?, permissions = ? WHERE id = ? AND project_id IS NULL')->execute([$groupName, trim((string)($data['role_name'] ?? '')), json_encode($permissions, JSON_UNESCAPED_UNICODE), $groupId]);
+    $permissions = encodeGroupPolicy($data, (string)(groupPolicy($managedGroup['permissions'] ?? null)['owner_id'] ?? $userId));
+    $pdo->prepare('UPDATE project_groups SET name = ?, role_name = ?, permissions = ? WHERE id = ? AND project_id IS NULL')->execute([$groupName, '', $permissions, $groupId]);
     jsonResponse(true, 'Групу оновлено.');
 }
 if ($method === 'POST' && $action === 'assign_global_group') {
@@ -51,7 +65,11 @@ if ($method === 'POST' && $action === 'assign_global_group') {
         $groupCheck->execute([$groupId]);
         if (!$groupCheck->fetch()) jsonResponse(false, 'Глобальну групу не знайдено.', [], 422);
     }
-    $pdo->prepare('DELETE pgm FROM project_group_members pgm JOIN project_groups pg ON pg.id = pgm.group_id WHERE pgm.user_id = ? AND pg.project_id IS NULL')->execute([$memberId]);
+    $ownedMemberships = $pdo->prepare('SELECT pg.id, pg.permissions FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
+    $ownedMemberships->execute([$memberId]);
+    foreach ($ownedMemberships->fetchAll() as $membership) {
+        if ($actorAdmin || (groupPolicy($membership['permissions'])['owner_id'] ?? '') === $userId) $pdo->prepare('DELETE FROM project_group_members WHERE group_id = ? AND user_id = ?')->execute([$membership['id'], $memberId]);
+    }
     if ($groupId !== '') $pdo->prepare('INSERT INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
     jsonResponse(true, $groupId === '' ? 'Групу користувача скасовано.' : 'Групу користувача оновлено.');
 }
@@ -63,6 +81,15 @@ $project = $access->fetch();
 if (!$project) jsonResponse(false, 'У вас немає доступу до цього проєкту.', [], 403);
 $canEdit = in_array($project['user_role'], ['admin', 'owner'], true) || $project['owner_id'] === $userId || in_array($project['project_role'], ['admin', 'manager'], true);
 $isAdmin = in_array($project['user_role'], ['admin', 'owner'], true);
+$claims = resourceClaims($pdo, $userId, 'project', $projectId);
+requireClaim($claims, 'read');
+$isProjectOwner = $project['owner_id'] === $userId || $isAdmin;
+$canEdit = $isProjectOwner;
+$canManageTeam = $isProjectOwner;
+if ($method === 'POST') {
+    if (!$isProjectOwner) jsonResponse(false, 'Змінювати проєкт і його команду може лише власник проєкту.', [], 403);
+}
+
 
 if ($method === 'GET') {
     $membersQuery = $pdo->prepare("SELECT pm.user_id, pm.role, u.name, u.email, GROUP_CONCAT(DISTINCT pgm.group_id) AS group_ids, GROUP_CONCAT(DISTINCT pg.name SEPARATOR ', ') AS group_names FROM project_members pm JOIN users u ON u.id = pm.user_id LEFT JOIN project_group_members pgm ON pgm.user_id = pm.user_id LEFT JOIN project_groups pg ON pg.id = pgm.group_id AND (pg.project_id = pm.project_id OR pg.project_id IS NULL) WHERE pm.project_id = ? AND pm.user_id <> ? GROUP BY pm.user_id, pm.role, u.name, u.email ORDER BY u.name");
@@ -70,7 +97,7 @@ if ($method === 'GET') {
     $groupsQuery = $pdo->prepare('SELECT id, name, role_name, permissions FROM project_groups WHERE project_id = ? OR project_id IS NULL ORDER BY name');
     $groupsQuery->execute([$projectId]);
     $groups = $groupsQuery->fetchAll();
-    foreach ($groups as &$group) $group['permissions'] = $group['permissions'] ? (json_decode($group['permissions'], true) ?: []) : [];
+    foreach ($groups as &$group) $group = exposeGroupPolicy($group);
     unset($group);
     if (in_array($project['user_role'], ['admin', 'owner'], true)) {
         $usersQuery = $pdo->query('SELECT id, name, email, role FROM users ORDER BY name');
@@ -81,10 +108,15 @@ if ($method === 'GET') {
     $members = $membersQuery->fetchAll();
     foreach ($members as &$memberItem) $memberItem['group_ids'] = $memberItem['group_ids'] ? explode(',', $memberItem['group_ids']) : [];
     unset($memberItem);
-    jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'admin' => $isAdmin]]);
+    $taskWhere = '(t.project_id = ? OR EXISTS (SELECT 1 FROM task_projects tp WHERE tp.task_id = t.id AND tp.project_id = ?))';
+    $taskParams = [$projectId, $projectId];
+    $projectTasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at FROM tasks t WHERE {$taskWhere} ORDER BY t.created_at DESC, t.due_date IS NULL, t.due_date");
+    $projectTasksQuery->execute($taskParams);
+    $projectTasks = $projectTasksQuery->fetchAll();
+    jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'project_tasks' => $projectTasks, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'update' => $canEdit, 'delete' => $canEdit, 'manage_team' => $canManageTeam, 'admin' => $isAdmin]]);
 }
 if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
-if (!$canEdit) jsonResponse(false, 'Недостатньо прав для редагування цього проєкту.', [], 403);
+if (!$canEdit && !($action === 'update' && hasClaim($claims, 'update') && ($canManageTeam || $claims['assigned'])) && !($action === 'delete' && hasClaim($claims, 'delete') && ($canManageTeam || $claims['assigned']))) jsonResponse(false, 'Недостатньо прав для редагування цього проєкту.', [], 403);
 $action = (string)($data['action'] ?? 'update');
 if ($method === 'POST' && $action === 'assign_global_group') {
     $manager = $pdo->prepare("SELECT role FROM users WHERE id = ? AND role IN ('admin', 'owner', 'manager') LIMIT 1");
@@ -98,7 +130,13 @@ if ($method === 'POST' && $action === 'assign_global_group') {
         $groupCheck->execute([$groupId]);
         if (!$groupCheck->fetch()) jsonResponse(false, 'Глобальну групу не знайдено.', [], 422);
     }
-    $pdo->prepare('DELETE FROM project_group_members pgm WHERE pgm.user_id = ? AND pgm.group_id IN (SELECT id FROM project_groups WHERE project_id IS NULL)')->execute([$memberId]);
+    $ownedMemberships = $pdo->prepare('SELECT pg.id, pg.permissions FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
+    $ownedMemberships->execute([$memberId]);
+    foreach ($ownedMemberships->fetchAll() as $membership) {
+        if ($actorAdmin || (groupPolicy($membership['permissions'])['owner_id'] ?? '') === $userId) {
+            $pdo->prepare('DELETE FROM project_group_members WHERE group_id = ? AND user_id = ?')->execute([$membership['id'], $memberId]);
+        }
+    }
     if ($groupId !== '') $pdo->prepare('INSERT INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
     jsonResponse(true, $groupId === '' ? 'Групу користувача скасовано.' : 'Групу користувача оновлено.');
 }
@@ -134,11 +172,11 @@ if ($action === 'remove_member') {
 if ($action === 'create_group') {
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
-    $permissions = array_values(array_intersect((array)($data['permissions'] ?? []), ['sign_documents', 'manage_documents', 'manage_tasks', 'view_finance']));
+    $permissions = encodeGroupPolicy($data, $userId);
     $groupId = bin2hex(random_bytes(16));
-    $pdo->prepare('INSERT INTO project_groups (id, project_id, name, role_name, permissions) VALUES (?, NULL, ?, ?, ?)')->execute([$groupId, $groupName, trim((string)($data['role_name'] ?? '')), json_encode($permissions, JSON_UNESCAPED_UNICODE)]);
+    $pdo->prepare('INSERT INTO project_groups (id, project_id, name, role_name, permissions) VALUES (?, NULL, ?, ?, ?)')->execute([$groupId, $groupName, '', $permissions]);
     $insert = $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)');
-    foreach ((array)($data['member_ids'] ?? []) as $memberId) $insert->execute([$groupId, trim((string)$memberId)]);
+    foreach ([] as $memberId) $insert->execute([$groupId, trim((string)$memberId)]);
     jsonResponse(true, 'Групу створено.');
 }
 if ($action === 'delete_group') {
@@ -149,9 +187,9 @@ if ($action === 'update_group') {
     $groupId = trim((string)($data['group_id'] ?? ''));
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupId === '' || $groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
-    $permissions = array_values(array_intersect((array)($data['permissions'] ?? []), ['sign_documents', 'manage_documents', 'manage_tasks', 'view_finance']));
+    $permissions = encodeGroupPolicy($data, $userId);
     $updateGroup = $pdo->prepare('UPDATE project_groups SET name = ?, role_name = ?, permissions = ? WHERE id = ? AND (project_id = ? OR project_id IS NULL)');
-    $updateGroup->execute([$groupName, trim((string)($data['role_name'] ?? '')), json_encode($permissions, JSON_UNESCAPED_UNICODE), $groupId, $projectId]);
+    $updateGroup->execute([$groupName, '', $permissions, $groupId, $projectId]);
     jsonResponse(true, 'Групу оновлено.');
 }
 

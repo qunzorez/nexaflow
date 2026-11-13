@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   bio TEXT NULL,
   email_notifications_enabled INTEGER NOT NULL DEFAULT 0,
   role TEXT NOT NULL DEFAULT 'user',
+  last_seen_at TIMESTAMP NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS clients (
   has_employees INTEGER NOT NULL DEFAULT 0,
   employee_count INTEGER NULL,
   special_taxes TEXT NULL,
+  services TEXT NULL,
   module TEXT NOT NULL DEFAULT 'accounting',
   module_data TEXT NULL,
   created_by TEXT NOT NULL,

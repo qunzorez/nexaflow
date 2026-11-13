@@ -1,3 +1,4 @@
+import Icon from '../../components/Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 
 export default function SearchableUserSelect({ users, value, onChange }) {
@@ -14,7 +15,7 @@ export default function SearchableUserSelect({ users, value, onChange }) {
   }, []);
 
   return <div className="searchable-user-select" ref={ref}>
-    <button type="button" className={`searchable-user-trigger${open ? ' is-open' : ''}`} onClick={() => setOpen(current => !current)}>{selected ? `${selected.name} — ${selected.email}` : 'Оберіть користувача'}<span>⌄</span></button>
+    <button type="button" className={`searchable-user-trigger${open ? ' is-open' : ''}`} onClick={() => setOpen(current => !current)}>{selected ? `${selected.name} — ${selected.email}` : 'Оберіть користувача'}<span><Icon name="down" /></span></button>
     {open && <div className="searchable-user-menu"><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Пошук за ім’ям або email..." />{filtered.length ? filtered.map(user => <button type="button" className="searchable-user-option" key={user.id} onClick={() => { onChange(user.id); setQuery(''); setOpen(false); }}>{user.name}<small>{user.email}</small></button>) : <div className="searchable-user-empty">Користувачів не знайдено</div>}</div>}
   </div>;
 }

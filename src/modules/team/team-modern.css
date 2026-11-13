@@ -1,0 +1,460 @@
+/* Team workspace refresh: airy cards, subtle motion and mobile-first tables. */
+.team-grid,
+.manager-team-grid,
+.team-panel,
+.assign-panel,
+.assignments-panel,
+.manager-team-view > .panel {
+  min-width: 0;
+}
+
+.team-grid,
+.manager-team-grid {
+  align-items: stretch;
+}
+
+.admin-role-panel {
+  margin-bottom: 18px;
+}
+
+.admin-role-table {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.admin-role-table {
+  max-height: 430px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.admin-role-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 420px;
+  margin-top: 16px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  background: #fbfdfb;
+}
+
+.admin-role-search:focus-within {
+  border-color: #8fc9aa;
+  box-shadow: 0 0 0 4px rgba(31, 138, 104, .10);
+}
+
+.admin-role-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+.admin-role-head,
+.admin-role-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr) 180px;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.admin-role-head {
+  background: #f7fbf8;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.admin-role-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.admin-role-row {
+  border-top: 1px solid var(--line);
+  transition: background .18s ease;
+}
+
+.admin-role-row:hover { background: #fbfefc; }
+.admin-role-row select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
+.admin-role-row select:disabled { opacity: .55; cursor: not-allowed; background: #f2f5f3; }
+
+.admin-group-owner {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0 14px;
+  margin-top: 12px;
+  background: #fbfdfb;
+}
+
+.admin-group-owner-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  color: var(--ink);
+}
+
+.admin-group-owner-title small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.admin-group-owner .managed-group {
+  background: #fff;
+  margin: 0 -14px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.claims-group-search {
+  max-width: 460px;
+}
+
+.claims-group-list {
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 700px) {
+  .admin-role-head { display: none; }
+  .admin-role-row { grid-template-columns: 1fr; gap: 8px; }
+}
+
+.manager-team-grid > .panel {
+  height: 100%;
+}
+
+.manager-team-grid > .panel:first-child {
+  z-index: 5;
+  overflow: visible;
+}
+
+.manager-team-grid > .panel:first-child .searchable-select-menu {
+  z-index: 60;
+}
+
+.content > .welcome-row,
+.manager-team-view > .welcome-row {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 142px;
+  margin: -12px -12px 24px;
+  padding: 30px 32px;
+  border: 1px solid #e2eee7;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(93, 191, 142, .18), transparent 30%),
+    linear-gradient(120deg, #f4fbf6 0%, #ffffff 62%);
+}
+
+.content > .welcome-row::after,
+.manager-team-view > .welcome-row::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: 6%;
+  bottom: -70px;
+  width: 190px;
+  height: 190px;
+  border: 1px solid rgba(31, 138, 104, .14);
+  border-radius: 50%;
+  box-shadow: 0 0 0 20px rgba(31, 138, 104, .035), 0 0 0 42px rgba(31, 138, 104, .025);
+}
+
+.content > .welcome-row .eyebrow,
+.manager-team-view > .welcome-row .eyebrow {
+  margin-bottom: 9px;
+}
+
+.content > .welcome-row h1,
+.manager-team-view > .welcome-row h1 {
+  letter-spacing: -1.5px;
+}
+
+.team-grid > .panel,
+.manager-team-grid > .panel,
+.manager-team-view > .panel,
+.assignments-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.team-grid > .panel::before,
+.manager-team-grid > .panel::before,
+.manager-team-view > .panel::before,
+.assignments-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1f8a68, #75c89b, transparent 86%);
+  opacity: .8;
+}
+
+.team-grid > .panel,
+.manager-team-grid > .panel,
+.manager-team-view > .panel,
+.assignments-panel {
+  animation: team-card-in .42s ease-out both;
+}
+
+.team-grid > .panel:nth-child(2),
+.manager-team-grid > .panel:nth-child(2) {
+  animation-delay: .07s;
+}
+
+.team-panel,
+.assign-panel,
+.manager-team-view .panel,
+.assignments-panel {
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.team-panel:hover,
+.assign-panel:hover,
+.manager-team-view .panel:hover,
+.assignments-panel:hover {
+  transform: translateY(-2px);
+  border-color: #d1e7da;
+  box-shadow: 0 14px 30px rgba(33, 91, 67, .10);
+}
+
+.team-panel .panel-heading,
+.assign-panel > h2,
+.manager-team-view .panel-heading {
+  gap: 14px;
+}
+
+.team-panel .panel-heading h2,
+.assign-panel > h2,
+.manager-team-view .panel-heading h2,
+.assignments-panel > h2 {
+  letter-spacing: -.2px;
+}
+
+.team-panel .panel-heading p,
+.manager-team-view .panel-heading p {
+  max-width: 560px;
+  line-height: 1.5;
+}
+
+.team-search {
+  background: #fbfdfb;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.team-search span {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: #e7f5eb;
+  color: var(--green);
+}
+
+.team-search:focus-within,
+.group-table-toolbar input:focus,
+.invite-form input:focus,
+.invite-form select:focus,
+.role-edit-form select:focus {
+  border-color: #8fc9aa;
+  box-shadow: 0 0 0 4px rgba(31, 138, 104, .10);
+  outline: 0;
+}
+
+.member-list,
+.assignment-list {
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.member-row,
+.assignment-row {
+  transition: background .18s ease, padding-left .18s ease;
+}
+
+.member-row:hover,
+.assignment-row:hover {
+  padding-left: 7px;
+  padding-right: 7px;
+  background: linear-gradient(90deg, #f8fcf9, #fff);
+}
+
+.member-avatar {
+  flex: 0 0 34px;
+  box-shadow: 0 4px 12px rgba(117, 100, 200, .12);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.member-row:hover .member-avatar,
+.assignment-row:hover .member-avatar {
+  transform: scale(1.07) rotate(-3deg);
+  box-shadow: 0 7px 15px rgba(117, 100, 200, .18);
+}
+
+.member-row select,
+.role-edit-form select,
+.invite-form select {
+  background: #fff;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.assign-panel .invite-form,
+.manager-team-view .invite-form {
+  background: #f8fcf9;
+  border: 1px solid #e1eee5;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+.assign-panel .primary-action,
+.manager-team-view .primary-action {
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.assign-panel .primary-action:hover,
+.manager-team-view .primary-action:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+  box-shadow: 0 11px 22px rgba(31, 138, 104, .25);
+}
+
+.team-grid .panel-heading .count-pill,
+.manager-team-view .count-pill {
+  flex: 0 0 auto;
+  min-width: 30px;
+  text-align: center;
+}
+
+@keyframes team-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 850px) {
+  .content > .welcome-row,
+  .manager-team-view > .welcome-row {
+    margin: -8px 0 20px;
+    padding: 25px 22px;
+  }
+
+  .team-grid,
+  .manager-team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-grid > .panel,
+  .manager-team-grid > .panel {
+    width: 100%;
+  }
+
+  .assignments-panel {
+    overflow: hidden;
+  }
+
+  .assignment-list {
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 560px) {
+  .content > .welcome-row,
+  .manager-team-view > .welcome-row {
+    min-height: 126px;
+    padding: 22px 18px;
+    border-radius: 15px;
+  }
+
+  .content > .welcome-row .subtext,
+  .manager-team-view > .welcome-row .subtext {
+    max-width: 88%;
+    line-height: 1.45;
+  }
+
+  .team-grid .panel,
+  .manager-team-view .panel,
+  .assignments-panel {
+    padding: 17px;
+    border-radius: 12px;
+  }
+
+  .team-panel .panel-heading,
+  .manager-team-view .panel-heading {
+    align-items: flex-start;
+  }
+
+  .member-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .member-row select,
+  .member-row .role-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .assignment-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+
+  .assignment-row > span:nth-last-child(2),
+  .assignment-row > .role-badge {
+    grid-column: 2;
+    margin-left: 0;
+  }
+
+  .manager-team-view .invite-form,
+  .assign-panel .invite-form {
+    padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-grid > .panel,
+  .manager-team-grid > .panel,
+  .manager-team-view > .panel,
+  .assignments-panel { animation: none; }
+  .team-panel,
+  .assign-panel,
+  .manager-team-view .panel,
+  .assignments-panel,
+  .member-row,
+  .assignment-row { transition: none; }
+}
+
+.manager-team-view .manager-team-grid > .panel:first-child {
+  position: relative;
+  z-index: 20;
+  overflow: visible !important;
+}
+
+.manager-team-view .manager-team-grid > .panel:first-child .searchable-select-menu {
+  z-index: 80;
+}

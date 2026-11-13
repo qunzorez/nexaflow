@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import Icon from '../components/Icon.jsx';
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
@@ -6,7 +7,7 @@ import { api, post } from "../services/api.js";
 import DateTimePicker from "../components/DateTimePicker.jsx";
 import "./clients.css";
 
-const specialTaxOptions = [
+export const specialTaxOptions = [
   ["tourist", "Туристичний збір"],
   ["land", "Земельний податок"],
   ["property", "Податок на нерухомість"],
@@ -16,7 +17,7 @@ const specialTaxOptions = [
   ["retail_excise", "Роздрібний акциз"],
   ["other", "Інші специфічні податки"],
 ];
-const legalForms = [
+export const legalForms = [
   "ТОВ",
   "ФОП",
   "ПрАТ",
@@ -24,14 +25,158 @@ const legalForms = [
   "Неприбуткова організація",
   "Інше",
 ];
-const taxSystems = [
+export const taxSystems = [
   "Загальна система",
   "Єдиний податок 3 група",
   "Єдиний податок 5 група",
   "Єдиний податок 4 група",
   "Без системи оподаткування",
 ];
-const emptyForm = {
+export const serviceOptions = [
+  "Ведення бухгалтерського обліку",
+  "Податкова звітність",
+  "Податкова звітність ТОВ",
+  "Єдиний податок та декларація ФОП",
+  "ПДВ та податкові накладні",
+  "Реєстрація платника ПДВ",
+  "Зарплата і кадровий облік",
+  "ЄСВ та звітність за працівників",
+  "Первинні документи",
+  "Фінансова звітність",
+  "Управлінський облік",
+  "Банківські операції та платежі",
+  "Облік основних засобів",
+  "Податкові консультації",
+  "Підготовка до перевірки",
+  "Відновлення обліку",
+  "Реєстрація та закриття ФОП",
+  "Реєстрація та зміни ТОВ",
+  "Інше",
+];
+export const serviceOptionsByLegalForm = {
+  ФОП: [
+    "Ведення обліку ФОП",
+    "Єдиний податок та декларація ФОП",
+    "Реєстрація та закриття ФОП",
+    "Податкова звітність",
+    "ЄСВ та звітність за працівників",
+    "ПДВ та податкові накладні",
+    "Реєстрація платника ПДВ",
+    "Зарплата і кадровий облік",
+    "Первинні документи",
+    "Банківські операції та платежі",
+    "Податкові консультації",
+    "Підготовка до перевірки",
+    "Відновлення обліку",
+    "Інше",
+  ],
+  ТОВ: [
+    "Ведення бухгалтерського обліку",
+    "Податкова звітність ТОВ",
+    "Реєстрація та зміни ТОВ",
+    "ПДВ та податкові накладні",
+    "Реєстрація платника ПДВ",
+    "Фінансова звітність",
+    "Управлінський облік",
+    "Зарплата і кадровий облік",
+    "ЄСВ та звітність за працівників",
+    "Первинні документи",
+    "Банківські операції та платежі",
+    "Облік основних засобів",
+    "Податкові консультації",
+    "Підготовка до перевірки",
+    "Відновлення обліку",
+    "Інше",
+  ],
+  ПрАТ: serviceOptions,
+  АТ: serviceOptions,
+  "Неприбуткова організація": serviceOptions,
+  Інше: serviceOptions,
+};
+function officialDateForService(name = "", period = "Місяць") {
+  const today = new Date();
+  const lower = name.toLocaleLowerCase("uk");
+  const result = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (lower.includes("туристич") || lower.includes("земельн") || lower.includes("нерухом") || lower.includes("транспорт")) {
+    const quarterEndMonth = Math.floor(result.getMonth() / 3) * 3 + 2;
+    const quarterEnd = new Date(result.getFullYear(), quarterEndMonth + 1, 0);
+    result.setTime(quarterEnd.getTime());
+    result.setDate(result.getDate() + (lower.includes("туристич") ? 40 : 30));
+  } else if (lower.includes("зарплат") || lower.includes("єсв")) {
+    result.setMonth(result.getMonth() + 1, 7);
+  } else if (period === "Квартал") {
+    const quarterEndMonth = Math.floor(result.getMonth() / 3) * 3 + 2;
+    result.setTime(new Date(result.getFullYear(), quarterEndMonth + 1, 20).getTime());
+  } else if (period === "Рік") {
+    result.setFullYear(result.getFullYear() + 1, 1, 20);
+  } else if (period === "Щотижня") result.setDate(result.getDate() + (7 - result.getDay() || 7));
+  else if (period === "Щодня") result.setDate(result.getDate() + 1);
+  else if (period === "Щогодини") result.setHours(result.getHours() + 1, 0, 0, 0);
+  else result.setMonth(result.getMonth() + 1, 20);
+  return result.toISOString().slice(0, 10);
+}
+const servicePriceDefaultsKey = "nexaflow.accounting.servicePriceDefaults";
+const readServicePriceDefaults = () => {
+  try { return JSON.parse(window.localStorage.getItem(servicePriceDefaultsKey) || "{}"); } catch { return {}; }
+};
+export function downloadClientInvoice(client) {
+  const services = (client.services || []).filter((service) => service.name);
+  const total = services.reduce((sum, service) => sum + Number(service.price || 0), 0);
+  const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char]));
+  const invoiceNumber = `NF-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const invoiceDate = new Date().toLocaleDateString("uk-UA");
+  const rows = services.map((service, index) => `<tr><td style="text-align:center">${index + 1}</td><td>${escape(service.name)}</td><td style="text-align:center">1</td><td>${escape(service.period || "Місяць")}</td><td style="text-align:right">${Number(service.price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</td></tr>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Рахунок ${invoiceNumber}</title><style>body{font-family:Arial,sans-serif;color:#1f2b26;margin:36px;font-size:12px}h1{margin:0;color:#168968;font-size:24px}h2{margin:28px 0 6px;font-size:18px}p{margin:6px 0}.top{display:flex;justify-content:space-between;border-bottom:3px solid #168968;padding-bottom:18px}.muted{color:#718078}.meta{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:24px}.box{border:1px solid #d9e5de;border-radius:6px;padding:14px}.label{color:#718078;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}table{width:100%;border-collapse:collapse;margin-top:22px}th{background:#eaf6ef;color:#315d4b;text-align:left}th,td{border:1px solid #cbdad1;padding:10px}tfoot td{font-weight:bold;font-size:14px;background:#f5faf6}.note{margin-top:24px;padding:13px;background:#f5faf6;border-left:4px solid #168968}.footer{margin-top:40px;color:#718078;font-size:10px}</style></head><body><div class="top"><div><h1>NexaFlow</h1><p class="muted">Рахунок на оплату послуг</p></div><div style="text-align:right"><strong>Рахунок № ${invoiceNumber}</strong><p>від ${invoiceDate}</p></div></div><div class="meta"><div class="box"><div class="label">Постачальник</div><strong>NexaFlow</strong><p class="muted">Реквізити будуть додані пізніше</p></div><div class="box"><div class="label">Платник</div><strong>${escape(client.name || "Новий клієнт")}</strong><p>${escape(client.legal_form || "")}</p><p class="muted">Система: ${escape(client.tax_system || "Не вказано")}</p></div></div><h2>Перелік послуг</h2><table><thead><tr><th style="width:45px">№</th><th>Назва послуги</th><th style="width:70px">К-сть</th><th style="width:120px">Період</th><th style="width:150px">Сума</th></tr></thead><tbody>${rows || '<tr><td colspan="5">Послуги не додані</td></tr>'}</tbody><tfoot><tr><td colspan="4" style="text-align:right">Разом до сплати:</td><td style="text-align:right">${total.toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</td></tr></tfoot></table><div class="note"><strong>Оподаткування:</strong> ${client.has_vat ? "ПДВ включено" : "Без ПДВ"}</div><div class="footer">Документ сформовано в NexaFlow. Реквізити для оплати будуть додані після налаштування профілю компанії.</div></body></html>`;
+  const blob = new Blob([`\ufeff${html}`], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `rahunok-${String(client.name || "client").replace(/[^a-zа-яіїє0-9]+/gi, "-").replace(/^-|-$/g, "") || "client"}.xls`; link.click(); URL.revokeObjectURL(link.href);
+}
+export function serviceTaskPayload(client, service, clientId) {
+  const normalizeId = (value) => {
+    const id = String(value || "").trim();
+    return /^[a-f0-9]{32}$/i.test(id) ? id : "";
+  };
+  const normalizedClientId = normalizeId(clientId);
+  const rawDueDate = String(service.official_due_date || "").trim();
+  const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDueDate)
+    ? rawDueDate
+    : (/^(\d{2})\.(\d{2})\.(\d{4})$/.test(rawDueDate)
+      ? rawDueDate.replace(/^(\d{2})\.(\d{2})\.(\d{4})$/, "$3-$2-$1")
+      : null);
+  let reminderAt = null;
+  if (service.reminders_enabled !== false && dueDate) {
+    const reminderDate = new Date(`${dueDate}T12:00:00`);
+    reminderDate.setDate(reminderDate.getDate() - Number(service.internal_days_before ?? 5));
+    const date = reminderDate.toISOString().slice(0, 10);
+    reminderAt = `${date}T09:00`;
+  }
+  const taxes = (client.special_taxes || []).join(", ") || "немає";
+  const employeeText = client.has_employees ? `так, ${client.employee_count || "кількість не вказана"}` : "ні";
+  const recurrenceByPeriod = {
+    "Щогодини": "hourly",
+    "Щодня": "daily",
+    "Щотижня": "weekly",
+    "Місяць": "monthly",
+    "Квартал": "quarterly",
+    "Рік": "yearly",
+    "Разово": "none",
+  };
+  const recurrenceRule = recurrenceByPeriod[service.period || "Разово"] || "none";
+  return {
+    action: "create",
+    title: `${service.name} — ${client.name}`,
+    description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
+    client_ids: normalizedClientId ? [normalizedClientId] : [],
+    assignee_ids: normalizeId(service.accountant_id) ? [normalizeId(service.accountant_id)] : [],
+    project_ids: [],
+    status: "todo",
+    priority: "normal",
+    due_date: dueDate,
+    reminder_at: reminderAt,
+    creator_reminder: false,
+    recurrence_rule: recurrenceRule,
+  };
+}
+export const emptyForm = {
   name: "",
   legal_form: "ТОВ",
   tax_system: "Загальна система",
@@ -42,6 +187,7 @@ const emptyForm = {
   special_taxes: [],
   module: window.localStorage.getItem("nexaflow.client.module") || "accounting",
   module_data: {},
+  services: [],
 };
 const moduleNames = {
   accounting: "Бухгалтерія",
@@ -63,7 +209,73 @@ function Toggle({ label, value, onChange }) {
     </label>
   );
 }
-function ClientFormModal({ form, setForm, editing, onSave, onClose }) {
+function ServiceSelect({ value, onChange, legalForm }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const selectRef = useRef(null);
+  const legalFormOptions = serviceOptionsByLegalForm[legalForm] || serviceOptions;
+  const options = [...new Set(value && !legalFormOptions.includes(value) ? [value, ...legalFormOptions] : legalFormOptions)]
+    .filter((option) => option.toLocaleLowerCase("uk").includes(search.toLocaleLowerCase("uk")));
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!selectRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [open]);
+  return <div ref={selectRef} className="service-select">
+    <button type="button" className="service-select-trigger" onClick={() => setOpen((current) => !current)}><span>{value || "Оберіть послугу"}</span><Icon name="down" /></button>
+    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук послуги…" /></div><div className="service-select-options">{options.length ? options.map((option) => <button type="button" key={option} onClick={() => { onChange(option); setOpen(false); setSearch(""); }}>{option}{value === option && <Icon name="check" />}</button>) : <span>Послуг не знайдено</span>}</div></div>}
+  </div>;
+}
+function AccountantSelect({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const selectRef = useRef(null);
+  const selected = options.find((person) => person.id === value);
+  const filtered = options.filter((person) => `${person.name} ${person.email}`.toLocaleLowerCase("uk").includes(search.toLocaleLowerCase("uk")));
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event) => { if (!selectRef.current?.contains(event.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  return <div ref={selectRef} className="service-select accountant-select">
+    <button type="button" className="service-select-trigger" onClick={() => setOpen((current) => !current)}><span>{selected ? `${selected.name} — ${selected.email}` : "Оберіть виконавця"}</span><Icon name="down" /></button>
+    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук бухгалтера…" /></div><div className="service-select-options">{!options.length ? <span>Немає приєднаних клієнтів до бухгалтера</span> : filtered.length ? filtered.map((person) => <button type="button" key={person.id} onClick={() => { onChange(person.id); setOpen(false); setSearch(""); }}>{person.name}<small>{person.email}</small>{value === person.id && <Icon name="check" />}</button>) : <span>Бухгалтера не знайдено</span>}</div></div>}
+  </div>;
+}
+function FieldTip({ children }) {
+  const [open, setOpen] = useState(false);
+  const tipId = useRef(`field-tip-${Math.random().toString(36).slice(2)}`);
+  const tipRef = useRef(null);
+  useEffect(() => {
+    const closeOtherTips = (event) => {
+      if (event.detail !== tipId.current) setOpen(false);
+    };
+    const closeOnOutsideClick = (event) => {
+      if (tipRef.current && !tipRef.current.contains(event.target)) setOpen(false);
+    };
+    window.addEventListener("nexaflow:field-tip-open", closeOtherTips);
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => {
+      window.removeEventListener("nexaflow:field-tip-open", closeOtherTips);
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+    };
+  }, []);
+  const toggle = () => setOpen((current) => {
+    const next = !current;
+    if (next) window.dispatchEvent(new CustomEvent("nexaflow:field-tip-open", { detail: tipId.current }));
+    return next;
+  });
+  return <span ref={tipRef} className="client-field-tip">
+    <button type="button" aria-label="Показати підказку" aria-expanded={open} onClick={toggle}><Icon name="circle-question" /></button>
+    <span className={`client-field-tooltip${open ? " is-open" : ""}`} role="tooltip">{children}</span>
+  </span>;
+}
+export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "" }) {
+  const [savingServiceIndex, setSavingServiceIndex] = useState(null);
   const set = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
   const toggleTax = (value) =>
@@ -73,14 +285,49 @@ function ClientFormModal({ form, setForm, editing, onSave, onClose }) {
         ? form.special_taxes.filter((item) => item !== value)
         : [...form.special_taxes, value],
     );
-  return createPortal(
+  const updateService = (index, field, value) => set("services", (form.services || []).map((service, itemIndex) => {
+    if (itemIndex !== index) return service;
+    if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults()[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
+    if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
+    return { ...service, [field]: value };
+  }));
+  const addService = () => set("services", [{ name: "", price: 0, period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  const saveNewService = async (index) => {
+    const service = form.services?.[index];
+    if (!service?.name || !onAddService || savingServiceIndex !== null) return;
+    setSavingServiceIndex(index);
+    const services = (form.services || []).map((item, itemIndex) => {
+      const { _isNew, ...clean } = item;
+      return itemIndex === index ? clean : (_isNew ? clean : item);
+    });
+    rememberServicePrice(services[index]?.name, services[index]?.price);
+    const saved = await onAddService({ ...form, services }, services[index]);
+    if (saved) set("services", services);
+    setSavingServiceIndex(null);
+  };
+  const eligibleAccountants = clientId ? (availableUsersByClient[clientId] || []) : availableUsers;
+  const removeService = (index) => set("services", (form.services || []).filter((_, itemIndex) => itemIndex !== index));
+  const serviceTotal = (form.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0);
+  const rememberServicePrice = (name, price) => {
+    if (form.module !== "accounting" || !name) return;
+    const defaults = readServicePriceDefaults();
+    defaults[name] = price === "" ? 0 : price;
+    window.localStorage.setItem(servicePriceDefaultsKey, JSON.stringify(defaults));
+  };
+  const rememberServicePrices = () => {
+    if (form.module !== "accounting") return;
+    const defaults = readServicePriceDefaults();
+    (form.services || []).forEach((service) => { if (service.name && service.price !== "") defaults[service.name] = service.price; });
+    window.localStorage.setItem(servicePriceDefaultsKey, JSON.stringify(defaults));
+  };
+  const content = (
     <div
-      className="client-modal-backdrop"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      className={pageMode ? "client-page-form-shell" : "client-modal-backdrop"}
+      onMouseDown={(event) => !pageMode && event.target === event.currentTarget && onClose()}
     >
-      <section className="client-modal">
-        <button type="button" className="client-modal-close" onClick={onClose}>
-          ×
+      <section className={`client-modal ${pageMode ? "client-page-form" : ""}`}>
+        <button type="button" className="client-modal-close" onClick={onClose} aria-label="Закрити">
+          <Icon name="close" />
         </button>
         <div className="client-modal-scroll">
           <p className="eyebrow">КЛІЄНТ</p>
@@ -94,7 +341,7 @@ function ClientFormModal({ form, setForm, editing, onSave, onClose }) {
               {moduleNames[form.module] || moduleNames.accounting}
             </strong>
           </div>
-          <form className="client-form" onSubmit={onSave}>
+          <form className="client-form" onSubmit={(event) => { rememberServicePrices(); onSave(event); }}>
             {form.module !== "accounting" && (
               <div className="client-module-fields">
                 <h3>Дані модуля</h3>
@@ -285,20 +532,44 @@ function ClientFormModal({ form, setForm, editing, onSave, onClose }) {
                 ))}
               </div>
             </fieldset>
+            {form.module === "accounting" && <fieldset className="client-services-fieldset">
+              <legend>Необхідні бухгалтерські послуги</legend>
+              <p className="client-field-hint">Додайте послуги для цього клієнта та їхню вартість.</p>
+              <div className="client-services-add-box"><div><strong>Додати послугу</strong><small>Оберіть послугу — дата заповниться автоматично за відомим строком.</small></div><button type="button" className="primary-action" onClick={addService}><Icon name="plus" /> Додати</button></div>
+              <div className="client-services-list-label">Додані послуги <span>{(form.services || []).length}</span></div>
+              <div className="client-services-list">
+                {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}`} key={`${index}-${service.name}`}>
+                  <div className="client-service-row">
+                    <ServiceSelect value={service.name} legalForm={form.legal_form} onChange={(value) => updateService(index, "name", value)} />
+                    <span className="client-service-price"><input type="number" min="0" step="0.01" value={service.price} onChange={(event) => updateService(index, "price", event.target.value)} onBlur={(event) => rememberServicePrice(service.name, event.target.value)} placeholder="0" aria-label="Ціна послуги" /><b>грн</b></span>
+                    <select value={service.period || "Місяць"} onChange={(event) => updateService(index, "period", event.target.value)} aria-label="Періодичність"><option>Щогодини</option><option>Щодня</option><option>Щотижня</option><option>Місяць</option><option>Квартал</option><option>Рік</option><option>Разово</option></select>
+                    <button type="button" className="client-service-remove" onClick={() => removeService(index)} aria-label="Видалити послугу"><Icon name="close" /></button>
+                  </div>
+                  <div className="client-service-schedule">
+                    <label><span className="client-field-label">Офіційна дата<FieldTip>Дата взята з офіційних джерел і типових строків. За потреби ви можете змінити її вручну.</FieldTip></span><DateTimePicker value={service.official_due_date || (service.name ? officialDateForService(service.name, service.period) : "")} onChange={(value) => updateService(index, "official_due_date", value)} /></label>
+                    <label><span className="client-field-label">Відповідальний бухгалтер<FieldTip>Бухгалтер має бути доданий до глобальної групи на сторінці «Команда».</FieldTip></span><AccountantSelect value={service.accountant_id || ""} options={eligibleAccountants} onChange={(value) => updateService(index, "accountant_id", value)} /></label>
+                    <label><span className="client-field-label">Внутрішній дедлайн (днів до офіційного)<FieldTip>За скільки днів до офіційної дати нагадати виконавцю.</FieldTip></span><input type="number" min="0" max="90" value={service.internal_days_before ?? 5} onChange={(event) => updateService(index, "internal_days_before", event.target.value)} /></label>
+                    <div className="client-service-reminders"><label className="service-reminder-switch"><input type="checkbox" checked={service.reminders_enabled !== false} onChange={(event) => updateService(index, "reminders_enabled", event.target.checked)} /><span className="service-reminder-slider" />Нагадувати про цю послугу</label><label className="service-reminder-switch"><input type="checkbox" checked={Boolean(service.create_task)} onChange={(event) => updateService(index, "create_task", event.target.checked)} /><span className="service-reminder-slider" />Створити задачу для відповідального бухгалтера</label></div>
+                  </div>
+                  {service._isNew && onAddService && <button type="button" className="client-service-save" disabled={!service.name || savingServiceIndex !== null} onClick={() => saveNewService(index)}><Icon name="check" /> {savingServiceIndex === index ? "Додавання…" : "Додати послугу"}</button>}
+                </div>)}
+              </div>
+              <div className="client-services-total"><span>Разом за послуги</span><strong>{serviceTotal.toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</strong><button type="button" className="outline-btn" onClick={() => downloadClientInvoice({ ...form, name: form.name || "Новий клієнт" })}><Icon name="download" /> Згенерувати рахунок</button></div>
+            </fieldset>}
             <div className="client-form-actions">
               <button type="button" className="outline-btn" onClick={onClose}>
                 Скасувати
               </button>
-              <button className="primary-action">
+              <button className={`primary-action client-submit-action ${editing ? "is-save" : "is-create"}`}>
                 {editing ? "Зберегти зміни" : "Створити клієнта"}
               </button>
             </div>
           </form>
         </div>
       </section>
-    </div>,
-    document.body,
+    </div>
   );
+  return pageMode ? content : createPortal(content, document.body);
 }
 function Info({ label, value }) {
   return (
@@ -315,8 +586,8 @@ function ClientViewModal({ client, onClose }) {
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section className="client-modal client-view-modal">
-        <button type="button" className="client-modal-close" onClick={onClose}>
-          ×
+        <button type="button" className="client-modal-close" onClick={onClose} aria-label="Закрити">
+          <Icon name="close" />
         </button>
         <div className="client-modal-scroll">
           <p className="eyebrow">ПРОФІЛЬ КЛІЄНТА</p>
@@ -352,6 +623,7 @@ function ClientViewModal({ client, onClose }) {
               )}
             </div>
           </div>
+          {client.module === "accounting" && <><div className="client-view-services"><small>БУХГАЛТЕРСЬКІ ПОСЛУГИ</small>{client.services?.length ? client.services.map((service, index) => <div className="client-view-service" key={`${service.name}-${index}`}><strong>{service.name}<small>{service.official_due_date ? `Офіційний дедлайн: ${new Date(`${service.official_due_date}T12:00:00`).toLocaleDateString("uk-UA")}` : "Офіційний дедлайн не вказано"}</small></strong><span>{Number(service.price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн · {service.period}</span></div>) : <em>Послуги ще не додані.</em>}</div><div className="client-invoice-summary"><strong>Разом: {(client.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</strong><button type="button" className="primary-action" onClick={() => downloadClientInvoice(client)}><Icon name="download" /> Згенерувати рахунок</button></div></>}
           <button
             className="outline-btn client-view-close"
             type="button"
@@ -372,9 +644,10 @@ export default function Clients() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const [search, setSearch] = useState("");
-  const [legalFilter, setLegalFilter] = useState("all");
-  const [taxFilter, setTaxFilter] = useState("all");
+  const [search, setSearch] = useState(() => window.localStorage.getItem("nexaflow.clients.search") || "");
+  const [legalFilter, setLegalFilter] = useState(() => window.localStorage.getItem("nexaflow.clients.legal") || "all");
+  const [taxFilter, setTaxFilter] = useState(() => window.localStorage.getItem("nexaflow.clients.tax") || "all");
+  const [sort, setSort] = useState(() => window.localStorage.getItem("nexaflow.clients.sort") || "date_desc");
   const [page, setPage] = useState(1);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -390,34 +663,18 @@ export default function Clients() {
   }, []);
   useEffect(() => {
     setPage(1);
-  }, [search, legalFilter, taxFilter]);
+  }, [search, legalFilter, taxFilter, sort]);
+  useEffect(() => {
+    window.localStorage.setItem("nexaflow.clients.sort", sort);
+  }, [sort]);
+  useEffect(() => { window.localStorage.setItem("nexaflow.clients.search", search); }, [search]);
+  useEffect(() => { window.localStorage.setItem("nexaflow.clients.legal", legalFilter); }, [legalFilter]);
+  useEffect(() => { window.localStorage.setItem("nexaflow.clients.tax", taxFilter); }, [taxFilter]);
   function openCreate() {
-    setEditing(null);
-    setForm({
-      ...emptyForm,
-      module:
-        window.localStorage.getItem("nexaflow.client.module") || "accounting",
-      module_data: {},
-      special_taxes: [],
-    });
-    setModal(true);
+    navigate("/clients/new");
   }
   function openEdit(client) {
-    setEditing(client);
-    setForm({
-      ...client,
-      has_vat: Boolean(Number(client.has_vat)),
-      has_excise: Boolean(Number(client.has_excise)),
-      has_employees: Boolean(Number(client.has_employees)),
-      employee_count: client.employee_count || "",
-      special_taxes: client.special_taxes || [],
-      module:
-        client.module ||
-        window.localStorage.getItem("nexaflow.client.module") ||
-        "accounting",
-      module_data: client.module_data || {},
-    });
-    setModal(true);
+    navigate(`/clients/${client.id}/edit`);
   }
   async function save(event) {
     event.preventDefault();
@@ -454,9 +711,24 @@ export default function Clients() {
       (legalFilter === "all" || client.legal_form === legalFilter) &&
       (taxFilter === "all" || client.tax_system === taxFilter)
     );
+  }).sort((left, right) => {
+    if (sort === "name_asc" || sort === "name_desc") {
+      const comparison = String(left.name || "").localeCompare(String(right.name || ""), "uk");
+      return sort === "name_asc" ? comparison : -comparison;
+    }
+    const leftDate = new Date(left.created_at || 0).getTime();
+    const rightDate = new Date(right.created_at || 0).getTime();
+    return sort === "date_asc" ? leftDate - rightDate : rightDate - leftDate;
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const visible = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageItems = totalPages <= 5
+    ? Array.from({ length: totalPages }, (_, index) => index + 1)
+    : page <= 3
+      ? [1, 2, 3, "ellipsis", totalPages]
+      : page >= totalPages - 2
+        ? [1, "ellipsis", totalPages - 2, totalPages - 1, totalPages]
+        : [1, "ellipsis-left", page - 1, page, page + 1, "ellipsis-right", totalPages];
   return (
     <Layout page="Клієнти" user={data.user}>
       <div className="content clients-page">
@@ -471,11 +743,11 @@ export default function Clients() {
           </div>
           {data.permissions?.manage && (
             <button
-              className="primary-action"
+              className="primary-action client-create-action"
               type="button"
               onClick={openCreate}
             >
-              ＋ Новий клієнт
+              <Icon name="plus" /> Новий клієнт
             </button>
           )}
         </section>
@@ -493,8 +765,9 @@ export default function Clients() {
           </div>
           <div className="clients-toolbar">
             <label className="client-search">
-              ⌕
+              <Icon name="search" />
               <input
+                type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Пошук за назвою, формою або системою…"
@@ -518,6 +791,12 @@ export default function Clients() {
                 <option key={item}>{item}</option>
               ))}
             </select>
+            <select value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="date_desc">Нові спочатку</option>
+              <option value="date_asc">Старі спочатку</option>
+              <option value="name_asc">Назва: А — Я</option>
+              <option value="name_desc">Назва: Я — А</option>
+            </select>
           </div>
           {visible.length ? (
             <>
@@ -527,6 +806,7 @@ export default function Clients() {
                   <span>Форма</span>
                   <span>Оподаткування</span>
                   <span>Особливості</span>
+                  <span>Послуги</span>
                   <span>Дії</span>
                 </div>
                 {visible.map((client) => (
@@ -554,6 +834,9 @@ export default function Clients() {
                           )?.[1] || key}
                         </i>
                       ))}
+                    </span>
+                    <span className="client-tags client-service-tags">
+                      {client.services?.length ? client.services.map((service, index) => <i key={`${service.name}-${index}`} title={`${service.name} — ${service.period}`}>{service.name}</i>) : <em>Не додано</em>}
                     </span>
                     <div className="client-actions">
                       <button
@@ -589,28 +872,38 @@ export default function Clients() {
                 <small>
                   Показано {(page - 1) * pageSize + 1}–
                   {Math.min(page * pageSize, filtered.length)} з{" "}
-                  {filtered.length}
+                  {filtered.length} · Сторінка {page} з {totalPages}
                 </small>
-                <div>
+                <div className="clients-page-buttons">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage((value) => value - 1)}
-                  >
-                    ‹
+                   aria-label="Попередня сторінка">
+                    <Icon name="left" />
                   </button>
-                  <b>{page}</b>
+                  {pageItems.map((item, index) => item.toString().startsWith("ellipsis") ? (
+                    <span className="clients-page-ellipsis" key={`${item}-${index}`}>…</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={item === page ? "is-current" : ""}
+                      aria-current={item === page ? "page" : undefined}
+                      onClick={() => setPage(item)}
+                      key={item}
+                    >{item}</button>
+                  ))}
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage((value) => value + 1)}
-                  >
-                    ›
+                   aria-label="Наступна сторінка">
+                    <Icon name="right" />
                   </button>
                 </div>
               </div>
             </>
           ) : (
             <div className="clients-empty">
-              <span>◎</span>
+              <span><Icon name="user" /></span>
               <h3>Клієнтів не знайдено</h3>
               <p>Змініть фільтри або додайте нового клієнта.</p>
             </div>
@@ -622,6 +915,8 @@ export default function Clients() {
           form={form}
           setForm={setForm}
           editing={editing}
+          availableUsers={data?.available_users || []}
+          availableUsersByClient={data?.available_users_by_client || {}}
           onSave={save}
           onClose={() => setModal(false)}
         />

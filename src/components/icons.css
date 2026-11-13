@@ -1,0 +1,37 @@
+/* One aligned, decorative icon box. Accessible names stay on the controls. */
+.nf-icon.nf-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+  vertical-align: -0.125em;
+  font-size: inherit;
+  color: inherit;
+}
+.nf-icon.nf-icon > svg.svg-inline--fa {
+  display: block;
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  stroke: none;
+  stroke-width: 0;
+  overflow: visible;
+}
+.notification-button > .nf-icon { font-size: 18px; }
+.nav-item > span:has(> .nf-icon) { display: inline-flex; align-items: center; justify-content: center; }
+.status-menu-icon .nf-icon, .detail-status-icon .nf-icon { font-size: 10px; }
+.status-menu-chevron:has(.nf-icon)::before { content: none; }
+.status-menu-chevron:has(.nf-icon) { font-size: 10px; }
+.priority-dropdown-chevron:has(.nf-icon), .detail-status-chevron:has(.nf-icon) {
+  border: 0;
+  width: 1em;
+  height: 1em;
+  font-size: 11px;
+  transform: none;
+}
+.priority-dropdown-chevron:has(.nf-icon) { transform: translateY(-50%); }
+.priority-dropdown.is-open .priority-dropdown-chevron:has(.nf-icon) { transform: translateY(-50%) rotate(180deg); }
+.detail-status-dropdown.is-open .detail-status-chevron:has(.nf-icon) { transform: rotate(180deg); }
