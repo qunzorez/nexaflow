@@ -622,10 +622,10 @@ function Info({ label, value }) {
 }
 function ClientViewModal({ client, onClose, user }) {
   const isSimpleUser = user?.role === "user";
-  const serviceDisplayAmount = (service) => isSimpleUser
+  const servicePayoutAmount = (service) => service.is_package
     ? Number(service.package_responsible_amount ?? service.responsible_amount ?? 0)
-    : Number(service.price || 0);
-  const servicePayoutAmount = (service) => Number(service.package_responsible_amount ?? service.responsible_amount ?? 0);
+    : Number(service.responsible_amount ?? 0);
+  const serviceDisplayAmount = (service) => isSimpleUser ? servicePayoutAmount(service) : Number(service.price || 0);
   return createPortal(
     <div
       className="client-modal-backdrop"
