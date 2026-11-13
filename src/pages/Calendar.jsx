@@ -7,9 +7,11 @@ import "./calendar.css";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const VIEWS = [
+  { id: "month", label: "Місяць" },
   { id: "week", label: "Тиждень" },
   { id: "day", label: "День" },
 ];
+const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
 
 function nextDeadline(period, now = new Date()) {
   const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -25,6 +27,12 @@ function nextDeadline(period, now = new Date()) {
 function parseDate(value) {
   if (!value) return null;
   const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseDateTime(value) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(" ", "T"));
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -50,6 +58,7 @@ function addDays(date, count) {
 
 function viewTitle(date, view) {
   if (view === "day") return formatDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  if (view === "month") return formatDate(date, { month: "long", year: "numeric" }).replace(/^./, char => char.toUpperCase());
   const start = mondayOf(date);
   const end = addDays(start, 6);
   const sameMonth = start.getMonth() === end.getMonth();
@@ -66,11 +75,19 @@ function EventChip({ event, onOpen, compact = false }) {
   );
 }
 
+function TimeGrid({ days, eventsByDay, onOpen }) {
+  return <div className={`calendar-time-grid ${days.length === 1 ? "single-day" : ""}`}>
+    <div className="calendar-time-head"><span>Час</span>{days.map((date, index) => <strong key={dateKey(date)} className={dateKey(date) === dateKey(new Date()) ? "today" : ""}>{days.length > 1 ? `${WEEKDAYS[index]} · ` : ""}{date.getDate()} {date.toLocaleDateString("uk-UA", { month: "short" })}</strong>)}</div>
+    <div className="calendar-all-day-row"><span>Весь день</span>{days.map(date => <div key={dateKey(date)}>{(eventsByDay[dateKey(date)] || []).filter(event => !event.time).map(event => <EventChip key={event.id} event={event} onOpen={onOpen} />)}</div>)}</div>
+    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <div className="calendar-hour-slot" key={hour} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}`} style={{ top: `${Math.max(0, minutes)}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · {event.title}</strong><small>{event.subtitle}</small></button>; })}</div>)}</div></div>
+  </div>;
+}
+
 export default function Calendar() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [cursor, setCursor] = useState(() => new Date());
-  const [view, setView] = useState("week");
+  const [view, setView] = useState("month");
 
   useEffect(() => {
     Promise.all([api("/api/clients.php"), api("/api/tasks.php")]).then(([clientsResult, tasksResult]) => {
@@ -92,7 +109,11 @@ export default function Calendar() {
       }));
     const taskEvents = (data.tasks || [])
       .filter(task => task.due_date && !["archived", "cancelled"].includes(task.status))
-      .map(task => ({ id: `task-${task.id}`, kind: "task", title: task.title, subtitle: task.primary_project_name || "Без проєкту", date: parseDate(task.due_date), task }));
+      .map(task => {
+        const date = parseDate(task.due_date);
+        const reminder = parseDateTime(task.reminder_at);
+        return { id: `task-${task.id}`, kind: "task", title: task.title, subtitle: task.primary_project_name || "Без проєкту", date, time: reminder && date && dateKey(reminder) === dateKey(date) ? reminder : null, task };
+      });
     return [...serviceEvents, ...taskEvents].filter(item => item.date).sort((a, b) => a.date - b.date);
   }, [data]);
 
@@ -103,8 +124,14 @@ export default function Calendar() {
 
   const calendarDays = useMemo(() => {
     if (view === "day") return [new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())];
-    const start = mondayOf(cursor);
-    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+    if (view === "week") {
+      const start = mondayOf(cursor);
+      return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+    }
+    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const start = new Date(first);
+    start.setDate(1 - ((first.getDay() + 6) % 7));
+    return Array.from({ length: 42 }, (_, index) => addDays(start, index));
   }, [cursor, view]);
 
   const upcoming = useMemo(() => events
@@ -113,7 +140,8 @@ export default function Calendar() {
 
   const move = amount => setCursor(current => {
     const next = new Date(current);
-    next.setDate(next.getDate() + amount * (view === "week" ? 7 : 1));
+    if (view === "month") next.setMonth(next.getMonth() + amount);
+    else next.setDate(next.getDate() + amount * (view === "week" ? 7 : 1));
     return next;
   });
 
@@ -151,27 +179,11 @@ export default function Calendar() {
               <span className="calendar-legend-item"><i className="calendar-legend-dot service" />Бухгалтерські послуги</span>
             </div>
 
-            {view === "week" && <div className="calendar-week-scroll"><div className="calendar-week-grid">
-              {calendarDays.map((date, index) => {
-                const dayEvents = eventsByDay[dateKey(date)] || [];
-                return <section className={`calendar-week-column ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)}>
-                  <header><span>{WEEKDAYS[index]}</span><strong>{date.getDate()}</strong></header>
-                  <div className="calendar-week-events">{dayEvents.length ? dayEvents.map(event => <EventChip key={event.id} event={event} onOpen={openEvent} />) : <span className="calendar-no-events">Немає подій</span>}</div>
-                </section>;
-              })}
-            </div></div>}
+            {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)}><span className="calendar-day-number">{date.getDate()}</span><div className="calendar-day-events">{dayEvents.slice(0, 3).map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}{dayEvents.length > 3 && <small>+{dayEvents.length - 3} ще</small>}</div></div>; })}</div></>}
 
-            {view === "day" && <div className="calendar-day-agenda">
-              <div className="calendar-agenda-date"><span>{formatDate(cursor, { weekday: "short" }).replace(/\.$/, "")}</span><strong>{cursor.getDate()}</strong><small>{formatDate(cursor, { month: "long", year: "numeric" })}</small></div>
-              <div className="calendar-agenda-events">
-                {(eventsByDay[dateKey(cursor)] || []).length ? (eventsByDay[dateKey(cursor)] || []).map(event => <button type="button" className={`calendar-agenda-event ${event.kind}`} key={event.id} onClick={() => openEvent(event)}>
-                  <span className="calendar-agenda-icon"><Icon name={event.kind === "task" ? "check" : "calendar"} /></span>
-                  <span className="calendar-agenda-copy"><strong>{event.title}</strong><small>{event.subtitle}</small></span>
-                  <span className="calendar-agenda-kind">{event.kind === "task" ? "Задача" : "Послуга"}</span>
-                  <Icon name="chevron-right" />
-                </button>) : <div className="calendar-empty"><Icon name="calendar" /><p>На цей день подій немає.</p></div>}
-              </div>
-            </div>}
+            {view === "week" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} />}
+
+            {view === "day" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} />}
           </section>
 
           <section className="panel upcoming-deadlines-panel">
