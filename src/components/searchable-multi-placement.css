@@ -1,1 +1,2 @@
 .searchable-multi.drop-up .searchable-multi-menu{top:auto!important;bottom:calc(100% + 5px)!important}
+.searchable-multi-menu.is-portaled{position:fixed;right:auto;z-index:3000}
