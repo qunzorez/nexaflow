@@ -147,6 +147,16 @@ $services = array_values(array_filter(array_map(static function ($service): arra
         'task_id' => preg_match('/^[a-f0-9]{32}$/', (string)($service['task_id'] ?? '')) ? (string)$service['task_id'] : '',
     ];
 }, (array)($data['services'] ?? [])), static fn(array $service): bool => $service['name'] !== ''));
+$existingAccountantIds = [];
+if ($action === 'update' && $id !== '') {
+    $existingServicesQuery = $pdo->prepare('SELECT services FROM clients WHERE id = ? LIMIT 1');
+    $existingServicesQuery->execute([$id]);
+    $existingServices = json_decode((string)($existingServicesQuery->fetchColumn() ?: '[]'), true) ?: [];
+    foreach ($existingServices as $existingService) {
+        $existingAccountantId = trim((string)($existingService['accountant_id'] ?? ''));
+        if ($existingAccountantId !== '') $existingAccountantIds[$existingAccountantId] = true;
+    }
+}
 $requestedAccountantIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['accountant_id'] ?? ''), $services))));
 if ($requestedAccountantIds) {
     $accountingGroupIds = [];
@@ -173,7 +183,9 @@ if ($requestedAccountantIds) {
         $allowedAccountantIds = array_filter($allowedAccountantIds, static fn($_, $id): bool => isset($managerTeamIds[(string)$id]), ARRAY_FILTER_USE_BOTH);
     }
     foreach ($requestedAccountantIds as $accountantId) {
-        if (!isset($allowedAccountantIds[$accountantId])) jsonResponse(false, 'Відповідального бухгалтера не знайдено у вашій команді.', [], 422);
+        // Keep legacy assignments after a claim/team change, but never allow
+        // a new assignment to a person outside the current team.
+        if (!isset($allowedAccountantIds[$accountantId]) && !isset($existingAccountantIds[$accountantId])) jsonResponse(false, 'Відповідального бухгалтера не знайдено у вашій команді.', [], 422);
     }
 }
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
