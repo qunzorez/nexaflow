@@ -615,7 +615,12 @@ function Info({ label, value }) {
     </div>
   );
 }
-function ClientViewModal({ client, onClose }) {
+function ClientViewModal({ client, onClose, user }) {
+  const isSimpleUser = user?.role === "user";
+  const serviceDisplayAmount = (service) => isSimpleUser
+    ? Number(service.package_responsible_amount ?? service.responsible_amount ?? 0)
+    : Number(service.price || 0);
+  const servicePayoutAmount = (service) => Number(service.package_responsible_amount ?? service.responsible_amount ?? 0);
   return createPortal(
     <div
       className="client-modal-backdrop"
@@ -659,7 +664,7 @@ function ClientViewModal({ client, onClose }) {
               )}
             </div>
           </div>
-          {client.module === "accounting" && <><div className="client-view-services"><small>БУХГАЛТЕРСЬКІ ПОСЛУГИ</small>{client.services?.length ? client.services.map((service, index) => <div className="client-view-service" key={`${service.name}-${index}`}><strong>{service.name}<small>{service.official_due_date ? `Офіційний дедлайн: ${new Date(`${service.official_due_date}T12:00:00`).toLocaleDateString("uk-UA")}` : "Офіційний дедлайн не вказано"}</small></strong><span>{Number(service.price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн · {service.period}</span></div>) : <em>Послуги ще не додані.</em>}</div><div className="client-invoice-summary"><strong>Разом: {(client.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</strong><button type="button" className="primary-action" onClick={() => downloadClientInvoice(client)}><Icon name="download" /> Згенерувати рахунок</button></div></>}
+          {client.module === "accounting" && <><div className="client-view-services"><small>БУХГАЛТЕРСЬКІ ПОСЛУГИ</small>{client.services?.length ? client.services.map((service, index) => <div className="client-view-service" key={`${service.name}-${index}`}><strong>{service.name}<small>{service.official_due_date ? `Офіційний дедлайн: ${new Date(`${service.official_due_date}T12:00:00`).toLocaleDateString("uk-UA")}` : "Офіційний дедлайн не вказано"}</small></strong>{isSimpleUser ? <span><small>Ваша виплата</small>{serviceDisplayAmount(service).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн · {service.period}</span> : <span className="client-view-service-amounts"><small>Для клієнта: {Number(service.price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</small><small>Бухгалтеру: {servicePayoutAmount(service).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</small><em>{service.period}</em></span>}</div>) : <em>Послуги ще не додані.</em>}</div><div className="client-invoice-summary"><strong>{isSimpleUser ? "Разом до виплати: " : "Разом для клієнта: "}{(client.services || []).reduce((sum, service) => sum + (isSimpleUser ? serviceDisplayAmount(service) : Number(service.price || 0)), 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн{!isSimpleUser && <small>Бухгалтеру: {(client.services || []).reduce((sum, service) => sum + servicePayoutAmount(service), 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</small>}</strong>{!isSimpleUser && <button type="button" className="primary-action" onClick={() => downloadClientInvoice(client)}><Icon name="download" /> Згенерувати рахунок</button>}</div></>}
           <button
             className="outline-btn client-view-close"
             type="button"
@@ -958,7 +963,7 @@ export default function Clients() {
         />
       )}
       {viewing && (
-        <ClientViewModal client={viewing} onClose={() => setViewing(null)} />
+        <ClientViewModal client={viewing} user={data.user} onClose={() => setViewing(null)} />
       )}
     </Layout>
   );

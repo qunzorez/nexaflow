@@ -37,10 +37,22 @@ if ($method === 'GET') {
     $clients = claimRows($pdo, $userId, 'client', $clients);
     $serviceUsers = [];
     foreach ($pdo->query('SELECT id, name, email, role FROM users')->fetchAll() as $serviceUser) $serviceUsers[(string)$serviceUser['id']] = $serviceUser;
+    $catalogResponsibleAmounts = [];
+    try {
+        foreach ($pdo->query('SELECT name, responsible_amount FROM service_catalog WHERE active = 1')->fetchAll() as $catalogService) {
+            $catalogResponsibleAmounts[mb_strtolower(trim((string)$catalogService['name']))] = (float)$catalogService['responsible_amount'];
+        }
+    } catch (Throwable $exception) {
+        // The service catalog is optional for older installations.
+    }
     foreach ($clients as &$client) {
         $client['special_taxes'] = $client['special_taxes'] ? (json_decode($client['special_taxes'], true) ?: []) : [];
         $client['services'] = $client['services'] ? (json_decode($client['services'], true) ?: []) : [];
         foreach ($client['services'] as &$service) {
+            if (!array_key_exists('responsible_amount', $service)) {
+                $serviceNameKey = mb_strtolower(trim((string)($service['name'] ?? '')));
+                $service['responsible_amount'] = $catalogResponsibleAmounts[$serviceNameKey] ?? null;
+            }
             $person = $serviceUsers[(string)($service['accountant_id'] ?? '')] ?? null;
             if ($person) { $service['accountant_name'] = $person['name']; $service['accountant_email'] = $person['email']; }
         }
