@@ -42,12 +42,18 @@ export default function ClientEditPage() {
     event.preventDefault();
     setError("");
     setNotice("");
+    const previousForm = form;
     const result = await post("/api/clients.php", { ...form, action: "update", id });
     if (!result.ok) return setError(result.message);
     const services = [...(form.services || [])];
     let taskError = "";
     let tasksChanged = false;
     let tasksCreated = 0;
+    const createdTaskIds = [];
+    const rollback = async () => {
+      await Promise.all(createdTaskIds.map((taskId) => post("/api/tasks.php", { action: "delete", id: taskId })));
+      await post("/api/clients.php", { ...previousForm, action: "update", id });
+    };
     for (let index = 0; index < services.length; index += 1) {
       const service = services[index];
       if (!service.create_task || !service.name || service.task_id) continue;
@@ -56,17 +62,22 @@ export default function ClientEditPage() {
         taskError = taskResult.message;
         continue;
       }
+      if (taskResult.task_id) createdTaskIds.push(taskResult.task_id);
       services[index] = { ...service, task_id: taskResult.task_id || "" };
       tasksChanged = true;
       tasksCreated += 1;
     }
     if (tasksChanged) {
       const taskSave = await post("/api/clients.php", { ...form, services, action: "update", id });
-      if (!taskSave.ok) return setError(`Задачі створено, але послуги не оновлено: ${taskSave.message}`);
+      if (!taskSave.ok) {
+        await rollback();
+        return setError(`Не вдалося завершити збереження клієнта: ${taskSave.message}`);
+      }
       setForm((current) => ({ ...current, services }));
     }
     if (taskError) {
-      setError(`Клієнта збережено, але задачу не створено: ${taskError}`);
+      await rollback();
+      setError(`Зміни скасовано, оскільки задачу не створено: ${taskError}`);
       return;
     }
     setNotice(tasksCreated > 0 ? `Зміни збережено. Створено задач: ${tasksCreated}.` : result.message);
@@ -75,6 +86,7 @@ export default function ClientEditPage() {
   async function addService(nextForm, service) {
     setError("");
     setNotice("");
+    const previousForm = form;
     const result = await post("/api/clients.php", { ...nextForm, action: "update", id });
     if (!result.ok) {
       setError(result.message);
@@ -82,11 +94,18 @@ export default function ClientEditPage() {
     }
     if (service?.create_task && !service.task_id) {
       const taskResult = await post("/api/tasks.php", serviceTaskPayload(nextForm, service, id));
-      if (!taskResult.ok) setError(`Послугу збережено, але задачу не створено: ${taskResult.message}`);
+      if (!taskResult.ok) {
+        await post("/api/clients.php", { ...previousForm, action: "update", id });
+        setError(`Зміни скасовано, оскільки задачу не створено: ${taskResult.message}`);
+      }
       else {
         const servicesWithTask = nextForm.services.map((item, itemIndex) => itemIndex === nextForm.services.indexOf(service) ? { ...item, task_id: taskResult.task_id || "" } : item);
         const taskSave = await post("/api/clients.php", { ...nextForm, services: servicesWithTask, action: "update", id });
-        if (!taskSave.ok) setError(`Задачу створено, але послугу не оновлено: ${taskSave.message}`);
+        if (!taskSave.ok) {
+          await post("/api/tasks.php", { action: "delete", id: taskResult.task_id });
+          await post("/api/clients.php", { ...previousForm, action: "update", id });
+          setError(`Зміни скасовано: ${taskSave.message}`);
+        }
         else {
           setForm((current) => ({ ...current, services: servicesWithTask }));
           setNotice(`Послугу збережено. Створено задачу: «${service.name}».`);

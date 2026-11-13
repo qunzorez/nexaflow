@@ -40,15 +40,28 @@ export default function ClientCreatePage() {
     if (!result.ok) return setError(result.message);
     const clientId = result.id || result.data?.id;
     const services = [...(form.services || [])];
+    const createdTaskIds = [];
+    const rollback = async () => {
+      await Promise.all(createdTaskIds.map((taskId) => post("/api/tasks.php", { action: "delete", id: taskId })));
+      await post("/api/clients.php", { action: "delete", id: clientId });
+    };
     for (let index = 0; index < services.length; index += 1) {
       const service = services[index];
       if (!service.create_task || !service.name) continue;
       const taskResult = await post("/api/tasks.php", serviceTaskPayload(form, service, clientId));
-      if (!taskResult.ok) return setError(`Клієнта створено, але одну із задач не створено: ${taskResult.message}`);
+      if (!taskResult.ok) {
+        await rollback();
+        return setError(`Не вдалося зберегти клієнта і пов’язані задачі: ${taskResult.message}`);
+      }
+      if (taskResult.task_id) createdTaskIds.push(taskResult.task_id);
       services[index] = { ...service, task_id: taskResult.task_id || "" };
     }
     if (services.some((service, index) => service.task_id !== (form.services || [])[index]?.task_id)) {
-      await post("/api/clients.php", { ...form, services, action: "update", id: clientId });
+      const updateResult = await post("/api/clients.php", { ...form, services, action: "update", id: clientId });
+      if (!updateResult.ok) {
+        await rollback();
+        return setError(`Не вдалося завершити збереження клієнта: ${updateResult.message}`);
+      }
     }
     navigate("/clients", { state: { notice: result.message } });
   }
