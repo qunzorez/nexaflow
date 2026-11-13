@@ -14,8 +14,9 @@ export default function Sidebar({ user, open }) {
       return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0 };
     }
   });
-  const canManage = ["admin", "owner", "manager"].includes(user?.role);
-  const isAdmin = ["admin", "owner"].includes(user?.role);
+  const userRole = String(user?.role || "").toLowerCase();
+  const canManage = ["admin", "owner", "manager"].includes(userRole);
+  const isAdmin = ["admin", "owner"].includes(userRole);
   useEffect(() => {
     let active = true;
     const loadCounts = async () => {
