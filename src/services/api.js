@@ -2,7 +2,7 @@ import { apiUrl, runtimeConfig } from '../config';
 
 export async function api(path, options = {}) {
   try {
-    const response = await fetch(apiUrl(path), { credentials: runtimeConfig.apiBaseUrl ? 'include' : 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, ...options });
+    const response = await fetch(apiUrl(path), { cache: 'no-store', credentials: runtimeConfig.apiBaseUrl ? 'include' : 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, ...options });
     const raw = await response.text();
     let result;
     try {
