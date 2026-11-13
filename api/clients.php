@@ -119,7 +119,8 @@ if ($name === '' || !in_array($legalForm, $allowedForms, true) || !in_array($tax
 $hasVat = !empty($data['has_vat']) ? 1 : 0; $hasExcise = !empty($data['has_excise']) ? 1 : 0; $hasEmployees = !empty($data['has_employees']) ? 1 : 0;
 $employeeCount = $hasEmployees ? max(1, (int)($data['employee_count'] ?? 0)) : null;
 $specialTaxes = array_values(array_intersect((array)($data['special_taxes'] ?? []), ['tourist', 'land', 'property', 'rent', 'environmental', 'transport', 'retail_excise', 'other']));
-$module = in_array((string)($data['module'] ?? 'accounting'), ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? (string)$data['module'] : 'accounting';
+$requestedModule = (string)($data['module'] ?? 'accounting');
+$module = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : 'accounting';
 $moduleData = json_encode((array)($data['module_data'] ?? []), JSON_UNESCAPED_UNICODE);
 $services = array_values(array_filter(array_map(static function ($service): array {
     if (!is_array($service)) return [];
