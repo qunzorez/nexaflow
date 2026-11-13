@@ -5,3 +5,4 @@
 .service-packages{max-height:none;overflow:visible;padding:4px 2px 12px}
 .service-package:hover{box-shadow:none}
 .service-packages{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:1100px){.service-packages{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.service-packages{grid-template-columns:1fr}}
+.service-package{display:flex;flex-direction:column}.service-package-summary{margin-top:auto}.service-add-button{flex:none}
