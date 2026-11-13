@@ -50,7 +50,7 @@ if ($method === 'GET') {
     unset($client);
     // Only members of a global accounting group can be assigned to a client service.
     // Legacy group names are normalized in db.php before this query runs.
-    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (HEX(pg.name) LIKE 'D0B1D183D185D0B3D0B0D0BB%' OR HEX(pg.name) LIKE 'D091D183D185D0B3D0B0D0BB%' OR HEX(pg.name) LIKE 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB%' OR HEX(pg.name) LIKE '%6163636F756E74%') ORDER BY u.name, u.email")->fetchAll() : [];
+    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (HEX(pg.name) LIKE 'D0B1D183D185D0B3D0B0D0BB%' OR HEX(pg.name) LIKE 'D091D183D185D0B3D0B0D0BB%' OR HEX(pg.name) LIKE 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB%' OR HEX(pg.name) LIKE 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB%' OR HEX(pg.name) LIKE '%6163636F756E74%') ORDER BY u.name, u.email")->fetchAll() : [];
     $availableByClient = [];
     if ($canManage && $clients) {
         // A service accountant is selected from the manager's eligible accounting
