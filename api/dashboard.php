@@ -106,7 +106,7 @@ try {
         if (!$isAdmin) $recentQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
         $managerDashboard = ['attention' => $attention, 'upcoming_deadlines' => array_slice($upcomingDeadlines, 0, 6), 'project_progress' => $projectProgress, 'team_workload' => $workloadQuery->fetchAll(), 'recent_activity' => $recentQuery->fetchAll()];
     }
-    jsonResponse(true, 'Dashboard завантажено.', ['user' => $user, 'users' => $users, 'projects' => $projects, 'tasks' => $tasks, 'reminders' => $reminders, 'time_by_user' => $teamTime, 'manager_dashboard' => $managerDashboard, 'metrics' => ['projects' => count($projects), 'clients' => 0, 'tasks' => $taskCount, 'hours' => round($myMinutes / 60, 2), ...$userMetrics], 'permissions' => ['manage' => $canManage, 'can_create_project' => $canManage]]);
+    jsonResponse(true, 'Dashboard завантажено.', ['user' => $user, 'users' => $users, 'projects' => $projects, 'tasks' => $tasks, 'reminders' => $reminders, 'time_by_user' => $teamTime, 'manager_dashboard' => $managerDashboard, 'metrics' => array_merge(['projects' => count($projects), 'clients' => 0, 'tasks' => $taskCount, 'hours' => round($myMinutes / 60, 2)], $userMetrics), 'permissions' => ['manage' => $canManage, 'can_create_project' => $canManage]]);
 } catch (Throwable $error) {
     error_log($error->getMessage());
     jsonResponse(false, 'Не вдалося завантажити Dashboard.', [], 500);
