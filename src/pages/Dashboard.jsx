@@ -46,7 +46,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [reminderTask, setReminderTask] = useState(null);
   const [notice, setNotice] = useState("");
-  const [reviewPanelOpen, setReviewPanelOpen] = useState(true);
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(() => window.localStorage.getItem("nexaflow.dashboard.reviewPanelOpen") !== "false");
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");
   const [teamSearch, setTeamSearch] = useState("");
@@ -71,7 +71,8 @@ export default function Dashboard() {
   useEffect(() => {
     window.localStorage.setItem("nexaflow.dashboard.projectSearch", projectSearch);
     window.localStorage.setItem("nexaflow.dashboard.projectProgressFilter", projectProgressFilter);
-  }, [projectSearch, projectProgressFilter]);
+    window.localStorage.setItem("nexaflow.dashboard.reviewPanelOpen", String(reviewPanelOpen));
+  }, [projectSearch, projectProgressFilter, reviewPanelOpen]);
   if (!data)
     return <div className="loading-screen">Завантаження NexaFlow…</div>;
   const canManage = data.permissions.manage;
