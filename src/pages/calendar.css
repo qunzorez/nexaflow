@@ -126,5 +126,10 @@
 .calendar-time-grid.single-day .calendar-time-body{grid-template-columns:64px minmax(0,1fr);min-width:0}
 .calendar-time-columns{width:100%;grid-template-columns:repeat(7,minmax(0,1fr))}
 .calendar-time-grid.single-day .calendar-time-columns{grid-template-columns:1fr}
+.calendar-toolbar-month{grid-template-columns:36px minmax(0,1fr) 36px auto auto!important;min-height:46px}
+.calendar-toolbar-month .calendar-period-title{padding-left:8px}
+.calendar-toolbar-month .calendar-period-title h2{font-size:21px;letter-spacing:-.02em}
+.calendar-toolbar-month .calendar-view-switch{min-width:238px}
+.calendar-toolbar-month .calendar-view-switch button{min-width:0;flex:1}
 @media(max-width:900px){.calendar-page .calendar-toolbar{grid-template-columns:36px minmax(0,1fr) 36px auto}.calendar-page .calendar-view-switch{grid-column:1/-1;justify-self:stretch}.calendar-page .calendar-view-switch button{flex:1}}
 @media(max-width:600px){.calendar-page .calendar-toolbar{grid-template-columns:32px minmax(0,1fr) 32px}.calendar-page .calendar-nav-button{width:32px;height:32px}.calendar-page .calendar-period-title h2{font-size:16px}.calendar-page .calendar-today-button{grid-column:1/-1;width:100%}.calendar-page .calendar-view-switch{grid-column:1/-1}.calendar-time-grid{border-radius:11px}.calendar-time-body{min-height:702px}.calendar-hour-slot{height:54px}.calendar-time-labels{grid-template-rows:repeat(13,54px)}}

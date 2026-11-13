@@ -168,7 +168,7 @@ export default function Calendar() {
 
         <div className="calendar-layout">
           <section className="panel big-calendar-panel">
-            <div className="calendar-toolbar">
+            <div className={`calendar-toolbar calendar-toolbar-${view}`}>
               <button className="calendar-nav-button" type="button" aria-label="Попередній період" onClick={() => move(-1)}><Icon name="chevron-left" /></button>
               <div className="calendar-period-title">
                 <h2>{viewTitle(cursor, view)}</h2>
