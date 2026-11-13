@@ -3,23 +3,18 @@
 @media(max-width:600px){.calendar-hero{margin-bottom:14px}.calendar-toolbar{gap:7px}.calendar-period-title h2{font-size:15px}.calendar-today-button{height:32px;padding:0 9px}.calendar-view-switch{width:100%;order:2}.calendar-view-switch button{flex:1}.calendar-legend{flex-wrap:wrap;gap:9px 15px}.calendar-day{min-height:82px;padding:5px}.calendar-day-number{margin-bottom:5px;font-size:10px}.calendar-event-chip.compact{justify-content:center;min-height:8px;height:8px;padding:0;border-radius:4px}.calendar-event-chip.compact svg,.calendar-event-chip.compact span{display:none}.calendar-day-events{gap:3px}.calendar-day-events small{font-size:8px}.calendar-week-grid{min-width:770px}.calendar-week-column{min-height:220px}.calendar-day-agenda{grid-template-columns:74px minmax(0,1fr);gap:10px;padding-top:14px}.calendar-agenda-date{min-height:120px;padding:12px 5px}.calendar-agenda-date strong{font-size:32px}.calendar-agenda-event{gap:8px;padding:9px}.calendar-agenda-kind{display:none}.upcoming-deadlines{max-height:420px}}
 @media(prefers-reduced-motion:reduce){.calendar-page *{scroll-behavior:auto!important;transition:none!important}}
 
-/* Keep month-view event labels inside their colored chips. */
-.month-grid .calendar-day-events{min-width:0;overflow:hidden}
-.month-grid .calendar-event-chip.compact{display:flex!important;flex-flow:row nowrap!important;align-items:center!important;gap:5px;box-sizing:border-box;max-width:100%;height:25px;overflow:hidden;white-space:nowrap}
-.month-grid .calendar-event-chip.compact>svg{display:block!important;flex:0 0 11px;min-width:11px}
-.month-grid .calendar-event-chip.compact>span{display:block!important;flex:1 1 auto;min-width:0;width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
-@media(max-width:600px){.month-grid .calendar-event-chip.compact{height:8px;min-height:8px}.month-grid .calendar-event-chip.compact>svg,.month-grid .calendar-event-chip.compact>span{display:none!important}}
-
-/* Month events use a compact two-line label instead of clipping the title. */
-.month-grid .calendar-event-chip.compact{height:auto;min-height:30px;max-height:36px;padding:4px 5px;align-items:flex-start;gap:4px}
-.month-grid .calendar-event-chip.compact>svg{margin-top:2px}
-.month-grid .calendar-event-chip.compact>span{display:-webkit-box!important;flex:1 1 auto;width:auto;white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:anywhere;line-height:1.2;-webkit-box-orient:vertical;-webkit-line-clamp:2}
-@media(max-width:600px){.month-grid .calendar-event-chip.compact{height:auto;min-height:30px;max-height:36px}.month-grid .calendar-event-chip.compact>svg{display:block!important}.month-grid .calendar-event-chip.compact>span{display:-webkit-box!important}}
-.month-grid .calendar-event-chip.compact{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important}
-.month-grid .calendar-event-chip.compact>svg{order:0;flex:0 0 11px;margin:0}
-.month-grid .calendar-event-chip.compact>span{order:1;flex:1 1 0;min-width:0;text-align:left}
-/* Icon is wrapped by Icon.jsx in .nf-icon; style it separately from the title span. */
-.month-grid .calendar-event-chip.compact>.nf-icon{display:grid!important;place-items:center;order:0;position:static;flex:0 0 14px;width:14px;height:14px;margin:0;padding:0;overflow:visible;background:transparent;color:inherit;line-height:1}
-.month-grid .calendar-event-chip.compact>.nf-icon svg{display:block!important;width:10px;height:10px;max-width:10px;max-height:10px;margin:0}
-.month-grid .calendar-event-chip.compact>span:not(.nf-icon){display:-webkit-box!important;order:1;flex:1 1 0;width:auto;min-width:0;margin:0;overflow:hidden;text-align:left;text-overflow:clip;white-space:normal;overflow-wrap:anywhere;line-height:1.2;-webkit-box-orient:vertical;-webkit-line-clamp:2}
-@media(max-width:600px){.month-grid .calendar-event-chip.compact>.nf-icon,.month-grid .calendar-event-chip.compact>span:not(.nf-icon){display:flex!important}.month-grid .calendar-event-chip.compact>span:not(.nf-icon){display:-webkit-box!important}}
+.calendar-page .big-calendar-panel{border:1px solid #dce9e2;background:linear-gradient(145deg,#fff 0%,#fbfefc 100%);box-shadow:0 18px 45px rgba(30,79,56,.08)}
+.calendar-page .calendar-toolbar{padding:6px 4px 18px;border-bottom:1px solid #e6eee9}
+.calendar-view-switch{padding:4px;border-color:#d6e6dd;background:#edf6f1;box-shadow:inset 0 1px 2px rgba(30,79,56,.04)}
+.calendar-view-switch button{min-width:82px;height:32px;font-size:10px}
+.calendar-view-switch button.active{background:var(--cal-green);color:#fff;box-shadow:0 5px 12px rgba(22,135,101,.22)}
+.calendar-week-column{border-color:#dce9e2;box-shadow:0 4px 14px rgba(30,79,56,.04)}
+.calendar-week-column:hover{border-color:#a8d2bc;box-shadow:0 10px 22px rgba(30,79,56,.09);transform:translateY(-2px)}
+.calendar-week-column header{background:linear-gradient(135deg,#f6fbf8,#eef8f3);padding:14px}
+.calendar-week-column.today{border-color:#54ae83;box-shadow:0 0 0 3px #e4f5eb,0 10px 24px rgba(30,79,56,.1)}
+.calendar-week-column.today header{background:linear-gradient(135deg,#e6f7ed,#d8f0e3)}
+.calendar-day-agenda{padding-top:24px}
+.calendar-agenda-date{background:linear-gradient(145deg,#eaf8f0,#fff);border-color:#cfe5d8;box-shadow:0 8px 20px rgba(30,79,56,.06)}
+.calendar-agenda-event{border-color:#dce9e2;box-shadow:0 4px 14px rgba(30,79,56,.04)}
+.calendar-agenda-event:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(30,79,56,.1)}
+@media(max-width:600px){.calendar-view-switch button{min-width:0}.calendar-page .calendar-toolbar{padding-bottom:14px}.calendar-week-column:hover{transform:none}}

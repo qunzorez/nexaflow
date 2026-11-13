@@ -7,7 +7,6 @@ import "./calendar.css";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const VIEWS = [
-  { id: "month", label: "Місяць" },
   { id: "week", label: "Тиждень" },
   { id: "day", label: "День" },
 ];
@@ -51,14 +50,11 @@ function addDays(date, count) {
 
 function viewTitle(date, view) {
   if (view === "day") return formatDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  if (view === "week") {
-    const start = mondayOf(date);
-    const end = addDays(start, 6);
-    const sameMonth = start.getMonth() === end.getMonth();
-    if (sameMonth) return `${start.getDate()}–${formatDate(end, { day: "numeric", month: "long", year: "numeric" })}`;
-    return `${formatDate(start, { day: "numeric", month: "short" })} – ${formatDate(end, { day: "numeric", month: "short", year: "numeric" })}`;
-  }
-  return formatDate(date, { month: "long", year: "numeric" }).replace(/^./, char => char.toUpperCase());
+  const start = mondayOf(date);
+  const end = addDays(start, 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  if (sameMonth) return `${start.getDate()}–${formatDate(end, { day: "numeric", month: "long", year: "numeric" })}`;
+  return `${formatDate(start, { day: "numeric", month: "short" })} – ${formatDate(end, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
 function EventChip({ event, onOpen, compact = false }) {
@@ -74,7 +70,7 @@ export default function Calendar() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [cursor, setCursor] = useState(() => new Date());
-  const [view, setView] = useState("month");
+  const [view, setView] = useState("week");
 
   useEffect(() => {
     Promise.all([api("/api/clients.php"), api("/api/tasks.php")]).then(([clientsResult, tasksResult]) => {
@@ -107,14 +103,8 @@ export default function Calendar() {
 
   const calendarDays = useMemo(() => {
     if (view === "day") return [new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())];
-    if (view === "week") {
-      const start = mondayOf(cursor);
-      return Array.from({ length: 7 }, (_, index) => addDays(start, index));
-    }
-    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-    const start = new Date(first);
-    start.setDate(1 - ((first.getDay() + 6) % 7));
-    return Array.from({ length: 42 }, (_, index) => addDays(start, index));
+    const start = mondayOf(cursor);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }, [cursor, view]);
 
   const upcoming = useMemo(() => events
@@ -123,8 +113,7 @@ export default function Calendar() {
 
   const move = amount => setCursor(current => {
     const next = new Date(current);
-    if (view === "month") next.setMonth(next.getMonth() + amount);
-    else next.setDate(next.getDate() + amount * (view === "week" ? 7 : 1));
+    next.setDate(next.getDate() + amount * (view === "week" ? 7 : 1));
     return next;
   });
 
@@ -161,23 +150,6 @@ export default function Calendar() {
               <span className="calendar-legend-item"><i className="calendar-legend-dot task" />Задачі</span>
               <span className="calendar-legend-item"><i className="calendar-legend-dot service" />Бухгалтерські послуги</span>
             </div>
-
-            {view === "month" && <>
-              <div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div>
-              <div className="calendar-grid month-grid">
-                {calendarDays.map(date => {
-                  const dayEvents = eventsByDay[dateKey(date)] || [];
-                  const inMonth = date.getMonth() === cursor.getMonth();
-                  return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)}>
-                    <span className="calendar-day-number">{date.getDate()}</span>
-                    <div className="calendar-day-events">
-                      {dayEvents.slice(0, 3).map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}
-                      {dayEvents.length > 3 && <small>+{dayEvents.length - 3} ще</small>}
-                    </div>
-                  </div>;
-                })}
-              </div>
-            </>}
 
             {view === "week" && <div className="calendar-week-scroll"><div className="calendar-week-grid">
               {calendarDays.map((date, index) => {
