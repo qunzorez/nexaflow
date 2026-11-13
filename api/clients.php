@@ -52,7 +52,7 @@ if ($method === 'GET') {
     // Some older live records contain a double-encoded Ukrainian group name, so match
     // both the normal UTF-8 prefix and its legacy representation.
     $accountingGroupPrefix = 'c390c2b1c391c283c391c285c390c2b3c390c2b0c390c2bb';
-    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (LOWER(pg.name) LIKE '%бухгал%' OR LOWER(pg.name) LIKE '%account%' OR pg.name LIKE CONCAT('%', CONVERT(UNHEX('{$accountingGroupPrefix}') USING utf8mb4), '%')) ORDER BY u.name, u.email")->fetchAll() : [];
+    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (LOWER(pg.name) LIKE '%бухгал%' OR LOWER(pg.name) LIKE '%account%' OR HEX(pg.name) LIKE '{$accountingGroupPrefix}%') ORDER BY u.name, u.email")->fetchAll() : [];
     $availableByClient = [];
     if ($canManage && $clients) {
         // A service accountant is selected from the manager's eligible accounting
