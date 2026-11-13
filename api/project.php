@@ -94,8 +94,8 @@ if ($method === 'POST' && in_array($action, ['add_member', 'remove_member', 'cre
 
 
 if ($method === 'GET') {
-    $membersQuery = $pdo->prepare("SELECT pm.user_id, pm.role, u.name, u.email, u.avatar_url, GROUP_CONCAT(DISTINCT pg.id) AS group_ids, GROUP_CONCAT(DISTINCT pg.name SEPARATOR ', ') AS group_names FROM project_members pm JOIN users u ON u.id = pm.user_id LEFT JOIN project_group_members pgm ON pgm.user_id = pm.user_id LEFT JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE pm.project_id = ? AND pm.user_id <> ? GROUP BY pm.user_id, pm.role, u.name, u.email, u.avatar_url ORDER BY u.name");
-    $membersQuery->execute([$projectId, $project['owner_id']]);
+    $membersQuery = $pdo->prepare("SELECT pm.user_id, pm.role, u.name, u.email, u.avatar_url, GROUP_CONCAT(DISTINCT pg.id) AS group_ids, GROUP_CONCAT(DISTINCT pg.name SEPARATOR ', ') AS group_names FROM project_members pm JOIN users u ON u.id = pm.user_id LEFT JOIN project_group_members pgm ON pgm.user_id = pm.user_id LEFT JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL AND (? = 1 OR JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?) WHERE pm.project_id = ? AND pm.user_id <> ? GROUP BY pm.user_id, pm.role, u.name, u.email, u.avatar_url ORDER BY u.name");
+    $membersQuery->execute([$actorAdmin ? 1 : 0, $userId, $projectId, $project['owner_id']]);
     $groupsQuery = $pdo->prepare('SELECT id, name, role_name, permissions FROM project_groups WHERE project_id = ? OR project_id IS NULL ORDER BY name');
     $groupsQuery->execute([$projectId]);
     $groups = $groupsQuery->fetchAll();
