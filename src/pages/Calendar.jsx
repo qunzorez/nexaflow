@@ -70,7 +70,7 @@ function EventChip({ event, onOpen, compact = false }) {
   return (
     <button type="button" className={`calendar-event-chip ${event.kind}${compact ? " compact" : ""}`} onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event); }} title={`${event.title} · ${event.subtitle}`}>
       {!compact && <Icon name={event.kind === "task" ? "check" : "calendar"} />}
-      <span>{event.title}</span>
+      {compact ? <strong>{event.title}</strong> : <span>{event.title}</span>}
     </button>
   );
 }

@@ -74,5 +74,5 @@
 .month-grid .calendar-event-chip.compact:hover{filter:brightness(.97);transform:none;box-shadow:none}
 .month-grid .calendar-event-chip.compact.task{border-left-color:var(--cal-blue)!important;background:#dcecff;color:#174f97}
 .month-grid .calendar-event-chip.compact.service{border-left-color:#1a9b6d!important;background:#dff3e7;color:#126d4d}
-.month-grid .calendar-event-chip.compact>span{display:block!important;min-width:0;width:auto;margin:0;overflow:hidden;text-align:left!important;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
-@media(max-width:600px){.month-grid .calendar-event-chip.compact{display:block!important;min-height:26px;height:26px;max-height:26px;padding:5px 6px!important}.month-grid .calendar-event-chip.compact>span{display:block!important}}
+.month-grid .calendar-event-chip.compact>strong{display:block!important;min-width:0;width:auto;margin:0;overflow:hidden;text-align:left!important;text-overflow:ellipsis;white-space:nowrap;font:inherit;line-height:1.2}
+@media(max-width:600px){.month-grid .calendar-event-chip.compact{display:block!important;min-height:26px;height:26px;max-height:26px;padding:5px 6px!important}.month-grid .calendar-event-chip.compact>strong{display:block!important}}
