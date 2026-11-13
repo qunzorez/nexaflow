@@ -255,7 +255,7 @@ export default function Tasks() {
     if (!result.ok) return setError(result.message);
     setNotice(result.message);
     load();
-    if (status === "done") setArchivePrompt(task);
+    if (status === "done" && ["admin", "owner", "manager"].includes(data?.user?.role)) setArchivePrompt(task);
   }
   async function archiveCompletedTask() {
     if (!archivePrompt) return;
