@@ -17,6 +17,7 @@ import "./tasks-dropdown-fix.css";
 import "./tasks-status-centering.css";
 import "./task-actions.css";
 import "../modules/tasks/task-modal.css";
+import "./task-completion-prompt.css";
 
 const statusOptions = {
   todo: { label: "До виконання", icon: <Icon name="todo" /> },
@@ -168,6 +169,7 @@ export default function Tasks() {
   const [projectIds, setProjectIds] = useState([]);
   const [assigneeIds, setAssigneeIds] = useState([]);
   const [clientIds, setClientIds] = useState([]);
+  const [archivePrompt, setArchivePrompt] = useState(null);
   const navigate = useNavigate();
   const openedFromQuery = useRef(false);
   async function load() {
@@ -252,6 +254,15 @@ export default function Tasks() {
     });
     if (!result.ok) return setError(result.message);
     setNotice(result.message);
+    load();
+    if (status === "done") setArchivePrompt(task);
+  }
+  async function archiveCompletedTask() {
+    if (!archivePrompt) return;
+    const result = await post("/api/tasks.php", { action: "set_status", id: archivePrompt.id, status: "archived" });
+    if (!result.ok) return setError(result.message);
+    setArchivePrompt(null);
+    setNotice("Задачу переміщено до архіву.");
     load();
   }
   async function archive(task) {
@@ -519,6 +530,21 @@ export default function Tasks() {
             onSubmit={save}
             onClose={closeModal}
           />
+        )}
+        {archivePrompt && (
+          <div className="completion-prompt-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setArchivePrompt(null); }}>
+            <section className="completion-prompt" role="dialog" aria-modal="true" aria-labelledby="tasks-completion-prompt-title">
+              <button className="completion-prompt-close" type="button" onClick={() => setArchivePrompt(null)} aria-label="Закрити"><Icon name="close" /></button>
+              <div className="completion-prompt-icon"><Icon name="check" /></div>
+              <p className="eyebrow">ЗАДАЧУ ЗАВЕРШЕНО</p>
+              <h2 id="tasks-completion-prompt-title">Перенести задачу в архів?</h2>
+              <p>Завершена задача більше не відображатиметься серед активних. Її можна буде знайти в архіві.</p>
+              <div className="completion-prompt-actions">
+                <button className="outline-btn" type="button" onClick={() => setArchivePrompt(null)}>Залишити завершеною</button>
+                <button className="primary-action" type="button" onClick={archiveCompletedTask}>Перенести в архів <Icon name="archive" /></button>
+              </div>
+            </section>
+          </div>
         )}
       </div>
     </Layout>
