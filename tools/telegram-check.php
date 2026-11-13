@@ -36,8 +36,8 @@ echo "NexaFlow Telegram diagnostic\n============================\n";
 if ($email === '') { echo "Використання: php tools/telegram-check.php user@example.com [--send]\n"; exit(1); }
 
 try {
-    $localConfig = __DIR__ . '/../api/config.local.php';
-    $config = require file_exists($localConfig) ? $localConfig : (__DIR__ . '/../api/config.php');
+    require_once __DIR__ . '/../api/runtime-config.php';
+    $config = appConfig();
     $token = trim((string)($config['telegram_bot_token'] ?? ''));
     line('Email', $email);
     line('Token', $token !== '' ? 'налаштований' : 'ВІДСУТНІЙ');

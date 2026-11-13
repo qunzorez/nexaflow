@@ -102,10 +102,10 @@ foreach ($tasks as $task) {
             $safeTitle = htmlspecialchars((string)$task['title'], ENT_QUOTES, 'UTF-8');
             $safeProject = htmlspecialchars(trim((string)($task['project_name'] ?? '')) ?: 'Без проєкту', ENT_QUOTES, 'UTF-8');
             $safeDue = htmlspecialchars(trim((string)($task['due_date'] ?? '')) ?: 'Не встановлено', ENT_QUOTES, 'UTF-8');
-            $taskUrl = 'https://nexaflow.top/tasks/' . rawurlencode((string)$task['id']);
+            $taskUrl = appUrl('/tasks/') . rawurlencode((string)$task['id']);
             $message = 'Нагадування: задача «' . (string)$task['title'] . '» потребує вашої уваги.' . "\n\n" . 'Відкрийте задачу: ' . $taskUrl;
             $html = '<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#17312b">'
-                . '<div style="background:#0f1720;padding:24px;text-align:center"><img src="https://nexaflow.top/assets/logo-telegram.png" alt="NexaFlow" style="max-width:220px;max-height:90px"></div>'
+                . '<div style="background:#0f1720;padding:24px;text-align:center"><img src="' . htmlspecialchars(appUrl('/assets/logo-telegram.png'), ENT_QUOTES, 'UTF-8') . '" alt="NexaFlow" style="max-width:220px;max-height:90px"></div>'
                 . '<div style="padding:30px;background:#ffffff"><p style="color:#168b70;font-weight:700;letter-spacing:1px">NEXAFLOW • НАГАДУВАННЯ</p>'
                 . '<h1 style="font-size:26px">Час повернутися до задачі</h1><p>Задача <strong>«' . $safeTitle . '»</strong> очікує вашої уваги.</p>'
                 . '<p style="background:#eef8f3;padding:16px;border-radius:10px">Проєкт: <strong>' . $safeProject . '</strong><br>Дедлайн: <strong>' . $safeDue . '</strong></p>'

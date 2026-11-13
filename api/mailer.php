@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/runtime-config.php';
 
 function sendProjectEmail(string $to, string $subject, string $message, string $html = ''): bool
 {
     $from = 'no-reply@nexaflow.top';
-    $configFile = __DIR__ . '/config.local.php';
-    $config = require file_exists($configFile) ? $configFile : (__DIR__ . '/config.php');
+    $config = appConfig();
     $mailTransport = (string)($config['mail_transport'] ?? 'mail');
     if ($mailTransport === 'mailpit') {
-        $socket = @fsockopen('127.0.0.1', 1025, $errorCode, $errorMessage, 3);
+        $socket = @fsockopen($config['mail_host'] ?? '127.0.0.1', (int)($config['mail_port'] ?? 1025), $errorCode, $errorMessage, 3);
         if (!$socket) return false;
         $read = static function () use ($socket): string { return (string)fgets($socket, 2048); };
         $write = static function (string $command) use ($socket): void { fwrite($socket, $command . "\r\n"); };

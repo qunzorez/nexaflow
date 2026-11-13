@@ -1,4 +1,5 @@
-const rawApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim();
+// Builds always call the API of the installation serving the page.
+const rawApiBaseUrl = '';
 
 export const runtimeConfig = {
   environment: import.meta.env.VITE_APP_ENV || 'local',

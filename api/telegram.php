@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/runtime-config.php';
 
 function sendTelegramMessage(string $chatId, string $message, string $buttonUrl = ''): bool
 {
     if ($chatId === '') return false;
-    $localConfig = __DIR__ . '/config.local.php';
-    $config = require file_exists($localConfig) ? $localConfig : (__DIR__ . '/config.php');
+    $config = appConfig();
     $token = trim((string)($config['telegram_bot_token'] ?? ''));
     if ($token === '' || !function_exists('curl_init')) return false;
     $curl = curl_init('https://api.telegram.org/bot' . rawurlencode($token) . '/sendMessage');
@@ -19,8 +19,7 @@ function sendTelegramMessage(string $chatId, string $message, string $buttonUrl 
 function sendTelegramPhoto(string $chatId, string $photoUrl, string $caption, string $buttonUrl = ''): bool
 {
     if ($chatId === '' || $photoUrl === '') return false;
-    $localConfig = __DIR__ . '/config.local.php';
-    $config = require file_exists($localConfig) ? $localConfig : (__DIR__ . '/config.php');
+    $config = appConfig();
     $token = trim((string)($config['telegram_bot_token'] ?? ''));
     if ($token === '' || !function_exists('curl_init')) return false;
     $mime = function_exists('mime_content_type') ? (string)(mime_content_type($photoUrl) ?: 'image/png') : 'image/png';
@@ -54,7 +53,7 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
         $caption = "<b>NexaFlow • Нове сповіщення</b>\n\n🔔 <b>Важлива інформація</b>\n\n{$safeMessage}\n\nПерейдіть у NexaFlow, щоб переглянути деталі.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
-        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : appUrl('/assets/logo-telegram.png');
         if (!sendTelegramPhoto($chatId, $logo, $caption)) sendTelegramMessage($chatId, "NexaFlow\n\n{$message}");
     } catch (Throwable $error) {
         error_log('Telegram notification error: ' . $error->getMessage());
@@ -72,7 +71,7 @@ function sendTelegramTaskAssignment(PDO $pdo, string $userId, string $title, str
         $caption = "<b>NexaFlow • Нова задача</b>\n\n👤 <b>Вам призначили задачу</b>\n\n📌 <b>{$safeTitle}</b>\n\nВідкрийте задачу, щоб переглянути опис, дедлайн і почати роботу.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
-        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : appUrl('/assets/logo-telegram.png');
         if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
             sendTelegramMessage((string)$user['telegram_chat_id'], "NexaFlow • Нова задача\n\n👤 Вам призначили задачу\n\n📌 {$title}\n\nВідкрити задачу: {$taskUrl}", $taskUrl);
         }
@@ -100,7 +99,7 @@ function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string 
         $caption = "<b>NexaFlow • Оновлення задачі</b>\n\n<b>{$heading}</b>\n\n📌 <b>{$safeTitle}</b>\n\n{$safeMessage}\n\nПерегляньте актуальний статус і деталі задачі.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
-        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : appUrl('/assets/logo-telegram.png');
         if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
             sendTelegramMessage((string)$user['telegram_chat_id'], "NexaFlow • Оновлення задачі\n\n{$heading}\n\n📌 {$title}\n\n{$message}\n\nВідкрити задачу: {$taskUrl}", $taskUrl);
         }
@@ -120,7 +119,7 @@ function sendTelegramTaskReview(PDO $pdo, string $userId, string $title, string 
         $caption = "<b>NexaFlow • Потрібна перевірка</b>\n\n🔎 <b>Задача очікує вашої перевірки</b>\n\n📌 <b>{$safeTitle}</b>\n\nПерегляньте результат, підтвердьте виконання або поверніть задачу на доопрацювання.";
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
-        $logo = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        $logo = is_file($localLogo) ? $localLogo : appUrl('/assets/logo-telegram.png');
         if (!sendTelegramPhoto((string)$user['telegram_chat_id'], $logo, $caption, $taskUrl)) {
             sendTelegramMessage((string)$user['telegram_chat_id'], strip_tags(str_replace(['<b>', '</b>'], '', $caption)), $taskUrl);
         }
@@ -143,10 +142,10 @@ function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): 
         $due = htmlspecialchars($due, ENT_QUOTES, 'UTF-8');
         $caption = "<b>NexaFlow • Нагадування</b>\n\n🔔 Час повернутися до задачі\n\n<b>{$title}</b>\n\n📁 Проєкт: {$project}\n📅 Дедлайн: {$due}\n\nЗадача все ще очікує вашої уваги. Відкрийте її, щоб переглянути деталі та продовжити роботу.";
         $chatId = (string)$user['telegram_chat_id'];
-        $taskUrl = 'https://nexaflow.top/tasks/' . rawurlencode((string)$reminder['id']);
+        $taskUrl = appUrl('/tasks/') . rawurlencode((string)$reminder['id']);
         $localLogo = __DIR__ . '/../assets/logo-telegram.png';
         if (!is_file($localLogo)) $localLogo = __DIR__ . '/../public/assets/logo-telegram.png';
-        $logoSource = is_file($localLogo) ? $localLogo : 'https://nexaflow.top/assets/logo-telegram.png';
+        $logoSource = is_file($localLogo) ? $localLogo : appUrl('/assets/logo-telegram.png');
         $sent = sendTelegramPhoto($chatId, $logoSource, $caption, $taskUrl);
         if (!$sent) $sent = sendTelegramMessage($chatId, strip_tags(str_replace(['<b>', '</b>'], '', $caption)), $taskUrl);
         return $sent;

@@ -15,7 +15,7 @@ function invitationUrl(string $token): string
 {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'nexaflow.top';
-    return $scheme . '://' . $host . '/accept-invite?token=' . urlencode($token);
+    return appUrl('/accept-invite?token=') . urlencode($token);
 }
 
 if ($action === 'details' && $method === 'GET') {

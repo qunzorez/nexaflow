@@ -4,4 +4,6 @@ deployment:
     - export DEPLOYPATH=/home3/nexaflow/public_html/
     - /bin/cp -R dist/. $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/api
-    - /bin/cp api/*.php $DEPLOYPATH/api/
+    - /bin/cp appsettings.json $DEPLOYPATH/appsettings.json
+    - /usr/local/bin/php tools/set-web-environment.php $DEPLOYPATH
+    - /usr/bin/find api -maxdepth 1 -name '*.php' ! -name 'config.local.php' ! -name 'config.web.php' -exec /bin/cp {} $DEPLOYPATH/api/ \;

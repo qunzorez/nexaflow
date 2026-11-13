@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/runtime-config.php';
 
 function db(): PDO
 {
     static $pdo;
     if ($pdo instanceof PDO) return $pdo;
 
-    $localConfig = __DIR__ . '/config.local.php';
-    $config = require file_exists($localConfig) ? $localConfig : (__DIR__ . '/config.php');
+    $config = appConfig();
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $config['host'], $config['port'], $config['database'], $config['charset']);
     $pdo = new PDO($dsn, $config['username'], $config['password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
