@@ -246,7 +246,13 @@ export default function Tasks() {
     const result = await post("/api/tasks.php", payload);
     if (!result.ok) return setModalError(result.message || "Не вдалося зберегти задачу.");
     setNotice(result.message);
+    const returnView = params.get("return_view");
+    const returnDate = params.get("return_date") || String(payload.due_date || "").slice(0, 10);
     closeModal();
+    if (returnView && ["month", "week", "day"].includes(returnView)) {
+      navigate(`/calendar?view=${returnView}&date=${encodeURIComponent(returnDate)}`, { replace: true });
+      return;
+    }
     load();
   }
   async function changeStatus(task, status) {

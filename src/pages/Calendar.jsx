@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import Icon from "../components/Icon.jsx";
 import { api } from "../services/api.js";
@@ -90,9 +90,14 @@ function TimeGrid({ days, eventsByDay, onOpen, onCreate }) {
 
 export default function Calendar() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [data, setData] = useState(null);
-  const [cursor, setCursor] = useState(() => new Date());
-  const [view, setView] = useState("month");
+  const [cursor, setCursor] = useState(() => {
+    const raw = searchParams.get("date");
+    const date = raw ? new Date(`${raw}T12:00:00`) : new Date();
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+  });
+  const [view, setView] = useState(() => VIEWS.some(option => option.id === searchParams.get("view")) ? searchParams.get("view") : "month");
 
   useEffect(() => {
     Promise.all([api("/api/clients.php"), api("/api/tasks.php")]).then(([clientsResult, tasksResult]) => {
@@ -153,6 +158,7 @@ export default function Calendar() {
   });
 
   const openEvent = event => navigate(event.kind === "task" ? `/tasks/${event.task.id}` : `/clients/${event.client.id}/edit`);
+  const createTaskUrl = (date, hour = null) => `/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}&return_view=${view}&return_date=${dateKey(date)}`;
   if (!data) return <div className="loading-screen">Завантаження календаря…</div>;
 
   return (
@@ -186,11 +192,11 @@ export default function Calendar() {
               <span className="calendar-legend-item"><i className="calendar-legend-dot service" />Бухгалтерські послуги</span>
             </div>
 
-            {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)} onClick={() => navigate(`/tasks?create=1&due_date=${dateKey(date)}`)} role="button" tabIndex="0" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") navigate(`/tasks?create=1&due_date=${dateKey(date)}`); }}><span className="calendar-day-number"><span>{date.getDate()}</span><button type="button" className="calendar-day-add" onClick={event => { event.stopPropagation(); navigate(`/tasks?create=1&due_date=${dateKey(date)}`); }} aria-label={`Створити задачу на ${dateKey(date)}`}><Icon name="plus" /></button></span><div className="calendar-day-events">{dayEvents.map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}</div></div>; })}</div></>}
+            {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)} onClick={() => navigate(createTaskUrl(date))} role="button" tabIndex="0" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") navigate(createTaskUrl(date)); }}><span className="calendar-day-number"><span>{date.getDate()}</span><button type="button" className="calendar-day-add" onClick={event => { event.stopPropagation(); navigate(createTaskUrl(date)); }} aria-label={`Створити задачу на ${dateKey(date)}`}><Icon name="plus" /></button></span><div className="calendar-day-events">{dayEvents.map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}</div></div>; })}</div></>}
 
-            {view === "week" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={(date, hour = null) => navigate(`/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}`)} />}
+            {view === "week" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={(date, hour = null) => navigate(createTaskUrl(date, hour))} />}
 
-            {view === "day" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={(date, hour = null) => navigate(`/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}`)} />}
+            {view === "day" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={(date, hour = null) => navigate(createTaskUrl(date, hour))} />}
           </section>
 
           <section className="panel upcoming-deadlines-panel">
