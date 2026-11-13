@@ -93,13 +93,13 @@ export default function Dashboard() {
       : {
           value:
             data.tasks?.filter(
-              (task) => task.status !== "archived" && task.due_date,
+              (task) => ["todo", "in_progress", "review"].includes(task.status) && task.due_date,
             ).length || 0,
           title: "Мої дедлайни",
         };
   const dashboardTasks =
     data.tasks
-      ?.filter((task) => task.status !== "archived")
+      ?.filter((task) => ["todo", "in_progress", "review"].includes(task.status))
       .filter((task) => taskFilter === "all" || task.status === taskFilter)
       .filter((task) =>
         `${task.title} ${task.project_name || ""} ${task.client_name || ""}`

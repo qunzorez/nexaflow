@@ -53,9 +53,9 @@ try {
     $remindersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $reminders = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $remindersQuery->fetchAll());
     foreach ($reminders as $reminder) deliverDueReminder($pdo, (string)$_SESSION['user_id'], $reminder);
-    $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status <> 'archived'") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status <> 'archived' AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
+    $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress', 'review')") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress', 'review') AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
-    $taskCountQuery->fetchColumn(); $taskCount = count(array_filter($tasks, static function ($task): bool { return $task['status'] !== 'archived'; }));
+    $taskCountQuery->fetchColumn(); $taskCount = count(array_filter($tasks, static function ($task): bool { return in_array($task['status'], ['todo', 'in_progress', 'review'], true); }));
     $timeQuery = $pdo->prepare('SELECT COALESCE(SUM(minutes), 0) FROM time_entries WHERE user_id = ?'); $timeQuery->execute([$_SESSION['user_id']]); $myMinutes = (int)$timeQuery->fetchColumn(); $teamTime = [];
     if ($canManage) {
         if ($isAdmin) {
