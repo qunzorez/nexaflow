@@ -16,6 +16,7 @@ import Clients from "./pages/Clients.jsx";
 import ClientCreatePage from "./pages/ClientCreatePage.jsx";
 import ClientEditPage from "./pages/ClientEditPage.jsx";
 import Calendar from "./pages/Calendar.jsx";
+import Services from "./pages/Services.jsx";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/calendar" element={<Calendar />} />
+      <Route path="/services" element={<Services />} />
       <Route path="/projects" element={<Projects />} />
       <Route path="/projects/new" element={<ProjectCreatePage />} />
       <Route path="/projects/:id" element={<ProjectEditPage />} />
