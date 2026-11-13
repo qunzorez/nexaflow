@@ -81,6 +81,14 @@
   transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
 }
 
+.project-management .management-section {
+  overflow: visible;
+}
+
+.project-management .management-section:has(.searchable-user-trigger.is-open) {
+  z-index: 2;
+}
+
 .project-edit-form::before,
 .project-info-card::before,
 .project-next-card::before,

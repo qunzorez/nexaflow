@@ -1,5 +1,4 @@
 .clients-page .clients-hero { align-items: center; }
-.clients-page .client-create-action,
 .client-submit-action.is-create,
 .client-submit-action.is-save {
   background: #4267a8;
@@ -7,7 +6,6 @@
   color: #fff;
   box-shadow: 0 8px 16px rgba(66, 103, 168, .2);
 }
-.clients-page .client-create-action:hover,
 .client-submit-action.is-create:hover,
 .client-submit-action.is-save:hover {
   background: #34558e;
