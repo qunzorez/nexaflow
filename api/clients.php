@@ -36,7 +36,7 @@ if ($method === 'GET') {
     $clients = $clientQuery->fetchAll();
     $clients = claimRows($pdo, $userId, 'client', $clients);
     $serviceUsers = [];
-    foreach ($pdo->query('SELECT id, name, email FROM users')->fetchAll() as $serviceUser) $serviceUsers[(string)$serviceUser['id']] = $serviceUser;
+    foreach ($pdo->query('SELECT id, name, email, role FROM users')->fetchAll() as $serviceUser) $serviceUsers[(string)$serviceUser['id']] = $serviceUser;
     foreach ($clients as &$client) {
         $client['special_taxes'] = $client['special_taxes'] ? (json_decode($client['special_taxes'], true) ?: []) : [];
         $client['services'] = $client['services'] ? (json_decode($client['services'], true) ?: []) : [];
@@ -48,9 +48,36 @@ if ($method === 'GET') {
         $client['module_data'] = $client['module_data'] ? (json_decode($client['module_data'], true) ?: []) : [];
     }
     unset($client);
-    // Only members of a global accounting group can be assigned to a client service.
-    // Legacy group names are normalized in db.php before this query runs.
-    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (HEX(pg.name) LIKE 'D0B1D183D185D0B3D0B0D0BB%' OR HEX(pg.name) LIKE 'D091D183D185D0B3D0B0D0BB%' OR HEX(pg.name) LIKE 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB%' OR HEX(pg.name) LIKE 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB%' OR HEX(pg.name) LIKE '%6163636F756E74%') ORDER BY u.name, u.email")->fetchAll() : [];
+    // Match accounting groups in PHP: older production tables can use different
+    // collations for group names and user IDs, making the joined SQL query fail.
+    $availableUsers = [];
+    if ($canManage) {
+        $accountingGroupIds = [];
+        foreach ($pdo->query('SELECT id, name FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+            $name = (string)$group['name'];
+            $nameHex = strtoupper(bin2hex($name));
+            if (preg_match('/(?:бухгалт|бугалт|account)/iu', $name)
+                || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0
+                || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) {
+                $accountingGroupIds[(string)$group['id']] = true;
+            }
+        }
+        if ($accountingGroupIds) {
+            $placeholders = implode(',', array_fill(0, count($accountingGroupIds), '?'));
+            $membershipQuery = $pdo->prepare("SELECT user_id FROM project_group_members WHERE group_id IN ($placeholders)");
+            $membershipQuery->execute(array_keys($accountingGroupIds));
+            foreach ($membershipQuery->fetchAll() as $membership) {
+                $person = $serviceUsers[(string)$membership['user_id']] ?? null;
+                if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true)) {
+                    $availableUsers[(string)$person['id']] = $person;
+                }
+            }
+            $availableUsers = array_values($availableUsers);
+            usort($availableUsers, static function (array $left, array $right): int {
+                return strcmp($left['name'], $right['name']) ?: strcmp($left['email'], $right['email']);
+            });
+        }
+    }
     $availableByClient = [];
     if ($canManage && $clients) {
         // A service accountant is selected from the manager's eligible accounting

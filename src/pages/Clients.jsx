@@ -243,7 +243,7 @@ function AccountantSelect({ value, onChange, options }) {
   }, [open]);
   return <div ref={selectRef} className="service-select accountant-select">
     <button type="button" className="service-select-trigger" onClick={() => setOpen((current) => !current)}><span>{selected ? `${selected.name} — ${selected.email}` : "Оберіть виконавця"}</span><Icon name="down" /></button>
-    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук бухгалтера…" /></div><div className="service-select-options">{!options.length ? <span>Немає приєднаних клієнтів до бухгалтера</span> : filtered.length ? filtered.map((person) => <button type="button" key={person.id} onClick={() => { onChange(person.id); setOpen(false); setSearch(""); }}>{person.name}<small>{person.email}</small>{value === person.id && <Icon name="check" />}</button>) : <span>Бухгалтера не знайдено</span>}</div></div>}
+    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук бухгалтера…" /></div><div className="service-select-options">{!options.length ? <span>Немає учасників глобальної групи «Бухгалтер»</span> : filtered.length ? filtered.map((person) => <button type="button" key={person.id} onClick={() => { onChange(person.id); setOpen(false); setSearch(""); }}>{person.name}<small>{person.email}</small>{value === person.id && <Icon name="check" />}</button>) : <span>Бухгалтера не знайдено</span>}</div></div>}
   </div>;
 }
 function FieldTip({ children }) {
