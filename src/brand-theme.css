@@ -35,31 +35,6 @@ body { background: var(--bg); color: var(--ink); }
 .review-notification-action:hover { border-color: #333; background: #333; color: #fff; }
 .review-notification-row { border-color: #e5e5e5; }
 
-/* Legacy page-level colors kept outside the design tokens. */
-input:focus, textarea:focus, select:focus,
-.task-search:focus-within, .dashboard-task-tools label:focus-within,
-.team-time-tools label:focus-within { border-color: #111 !important; box-shadow: 0 0 0 3px #1112 !important; }
-.date-time-trigger:hover, .date-time-picker.is-open .date-time-trigger { border-color: #111; box-shadow: 0 0 0 4px #1112; }
-.date-time-icon, .date-time-head button, .settings-section-icon,
-.subscription-module-label > span { background: #f1f1f1; color: #111; }
-.date-time-chevron, .date-time-today, .date-time-done,
-.subscription-module-control > span { color: #111; }
-.date-time-done, .calendar-grid button.selected { background: #111; color: #fff; box-shadow: 0 5px 12px #1113; }
-.status-menu-done .status-menu-trigger, .status-menu-done .status-menu-icon,
-.status-done, .status-done .detail-status-icon { background: #f1f1f1; color: #111; }
-.status-menu-options button:hover, .status-menu-options button.active,
-.detail-status-menu button:hover, .detail-status-menu button.active { background: #f1f1f1; color: #111; }
-.project-status.active { background: #f1f1f1; color: #111; box-shadow: inset 0 0 0 1px #cfcfcf; }
-.progress-track i, .project-progress-line .progress-track i.progress-done { background: #111; }
-.task-card { border-left-color: #bdbdbd; }
-.task-card.status-done, .task-card.status-in_progress { border-left-color: #111; }
-.settings-avatar { background: #f1f1f1; color: #111; }
-.subscription-module-control select { border-color: #bdbdbd; background: #fff; }
-.project-create-form input:focus, .project-create-form textarea:focus,
-.project-edit-form input:focus, .project-edit-form textarea:focus { outline-color: #111; }
-.status-menu-done .status-menu-trigger { background: #f1f1f1; color: #111; }
-.hero-create, .notification-count { background-color: #111; }
-
 @media (prefers-color-scheme: dark) {
   /* Keep the product intentionally light; the brand palette is white and graphite. */
   body { color-scheme: light; }
