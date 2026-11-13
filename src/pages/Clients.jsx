@@ -229,7 +229,7 @@ function ServiceSelect({ value, onChange, legalForm }) {
     {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук послуги…" /></div><div className="service-select-options">{options.length ? options.map((option) => <button type="button" key={option} onClick={() => { onChange(option); setOpen(false); setSearch(""); }}>{option}{value === option && <Icon name="check" />}</button>) : <span>Послуг не знайдено</span>}</div></div>}
   </div>;
 }
-function AccountantSelect({ value, onChange, options }) {
+function AccountantSelect({ value, onChange, options, emptyMessage }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selectRef = useRef(null);
@@ -243,7 +243,7 @@ function AccountantSelect({ value, onChange, options }) {
   }, [open]);
   return <div ref={selectRef} className="service-select accountant-select">
     <button type="button" className="service-select-trigger" onClick={() => setOpen((current) => !current)}><span>{selected ? `${selected.name} — ${selected.email}` : "Оберіть виконавця"}</span><Icon name="down" /></button>
-    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук бухгалтера…" /></div><div className="service-select-options">{!options.length ? <span>Немає учасників глобальної групи «Бухгалтер»</span> : filtered.length ? filtered.map((person) => <button type="button" key={person.id} onClick={() => { onChange(person.id); setOpen(false); setSearch(""); }}>{person.name}<small>{person.email}</small>{value === person.id && <Icon name="check" />}</button>) : <span>Бухгалтера не знайдено</span>}</div></div>}
+    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук бухгалтера…" /></div><div className="service-select-options">{!options.length ? <span>{emptyMessage}</span> : filtered.length ? filtered.map((person) => <button type="button" key={person.id} onClick={() => { onChange(person.id); setOpen(false); setSearch(""); }}>{person.name}<small>{person.email}</small>{value === person.id && <Icon name="check" />}</button>) : <span>Бухгалтера не знайдено</span>}</div></div>}
   </div>;
 }
 function FieldTip({ children }) {
@@ -305,8 +305,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     if (saved) set("services", services);
     setSavingServiceIndex(null);
   };
-  const clientAccountants = clientId ? (availableUsersByClient[clientId] || []) : [];
-  const eligibleAccountants = clientAccountants.length ? clientAccountants : availableUsers;
+  const eligibleAccountants = clientId ? (availableUsersByClient[clientId] || []) : availableUsers;
   const removeService = (index) => set("services", (form.services || []).filter((_, itemIndex) => itemIndex !== index));
   const serviceTotal = (form.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0);
   const rememberServicePrice = (name, price) => {
@@ -548,7 +547,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                   </div>
                   <div className="client-service-schedule">
                     <label><span className="client-field-label">Офіційна дата<FieldTip>Дата взята з офіційних джерел і типових строків. За потреби ви можете змінити її вручну.</FieldTip></span><DateTimePicker value={service.official_due_date || (service.name ? officialDateForService(service.name, service.period) : "")} onChange={(value) => updateService(index, "official_due_date", value)} /></label>
-                    <label><span className="client-field-label">Відповідальний бухгалтер<FieldTip>Бухгалтер має бути доданий до глобальної групи на сторінці «Команда».</FieldTip></span><AccountantSelect value={service.accountant_id || ""} options={eligibleAccountants} onChange={(value) => updateService(index, "accountant_id", value)} /></label>
+                    <label><span className="client-field-label">Відповідальний бухгалтер<FieldTip>Для існуючого клієнта тут відображаються користувачі, яким надано доступ до нього на сторінці «Команда».</FieldTip></span><AccountantSelect value={service.accountant_id || ""} options={eligibleAccountants} emptyMessage={clientId ? "Надайте бухгалтеру доступ до цього клієнта на сторінці «Команда»." : "Немає учасників глобальної групи «Бухгалтер»."} onChange={(value) => updateService(index, "accountant_id", value)} /></label>
                     <label><span className="client-field-label">Внутрішній дедлайн (днів до офіційного)<FieldTip>За скільки днів до офіційної дати нагадати виконавцю.</FieldTip></span><input type="number" min="0" max="90" value={service.internal_days_before ?? 5} onChange={(event) => updateService(index, "internal_days_before", event.target.value)} /></label>
                     <div className="client-service-reminders"><label className="service-reminder-switch"><input type="checkbox" checked={service.reminders_enabled !== false} onChange={(event) => updateService(index, "reminders_enabled", event.target.checked)} /><span className="service-reminder-slider" />Нагадувати про цю послугу</label><label className="service-reminder-switch"><input type="checkbox" checked={Boolean(service.create_task)} onChange={(event) => updateService(index, "create_task", event.target.checked)} /><span className="service-reminder-slider" />Створити задачу для відповідального бухгалтера</label></div>
                   </div>

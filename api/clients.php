@@ -80,11 +80,25 @@ if ($method === 'GET') {
     }
     $availableByClient = [];
     if ($canManage && $clients) {
-        // A service accountant is selected from the manager's eligible accounting
-        // team; the accountant does not need to be a client_member first.
         foreach ($clients as $clientRow) {
-            $availableByClient[(string)$clientRow['id']] = $availableUsers;
+            $availableByClient[(string)$clientRow['id']] = [];
         }
+        $clientIds = array_keys($availableByClient);
+        $placeholders = implode(',', array_fill(0, count($clientIds), '?'));
+        $clientMembersQuery = $pdo->prepare("SELECT client_id, user_id FROM client_members WHERE client_id IN ($placeholders)");
+        $clientMembersQuery->execute($clientIds);
+        foreach ($clientMembersQuery->fetchAll() as $membership) {
+            $person = $serviceUsers[(string)$membership['user_id']] ?? null;
+            if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true)) {
+                $availableByClient[(string)$membership['client_id']][] = $person;
+            }
+        }
+        foreach ($availableByClient as &$clientAccountants) {
+            usort($clientAccountants, static function (array $left, array $right): int {
+                return strcmp($left['name'], $right['name']) ?: strcmp($left['email'], $right['email']);
+            });
+        }
+        unset($clientAccountants);
     }
     jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'permissions' => ['manage' => $canManage]]);
 }
