@@ -82,3 +82,11 @@
 .month-grid .calendar-day-events{overflow:visible}
 .month-grid .calendar-event-chip.compact{height:29px;max-height:29px}
 @media(max-width:600px){.month-grid .calendar-day{min-height:150px}.month-grid .calendar-event-chip.compact{height:25px;max-height:25px}}
+
+/* Keep the day number and the create button aligned independently. */
+.month-grid .calendar-day-number{display:flex!important;align-items:center;justify-content:flex-start;gap:6px;min-height:24px;margin-bottom:9px}
+.month-grid .calendar-day-number>span:first-child{display:grid;place-items:center;flex:none;min-width:24px;height:24px}
+.month-grid .calendar-day.today .calendar-day-number>span:first-child{border-radius:50%;background:var(--cal-green);color:#fff}
+.month-grid .calendar-day-add{position:static!important;display:grid;place-items:center;flex:none;width:20px;height:20px;margin:0;opacity:0}
+.month-grid .calendar-day:hover .calendar-day-add,.month-grid .calendar-day:focus-within .calendar-day-add{opacity:1}
+.month-grid .calendar-day-events{margin-top:2px}
