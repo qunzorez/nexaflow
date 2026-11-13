@@ -120,6 +120,7 @@ const servicePriceDefaultsKey = "nexaflow.accounting.servicePriceDefaults";
 const readServicePriceDefaults = () => {
   try { return JSON.parse(window.localStorage.getItem(servicePriceDefaultsKey) || "{}"); } catch { return {}; }
 };
+const responsibleAmountFor = (price, percent) => Math.max(0, Math.round(Number(price || 0) * Number(percent || 0) / 100 * 100) / 100);
 export function downloadClientInvoice(client) {
   const services = (client.services || []).filter((service) => service.name);
   const total = services.reduce((sum, service) => sum + Number(service.price || 0), 0);
@@ -299,14 +300,17 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     if (itemIndex !== index) return service;
     if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults()[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
     if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
+    if (field === "price" && service.responsible_mode === "percent") return { ...service, price: value, responsible_amount: responsibleAmountFor(value, service.responsible_percent) };
+    if (field === "responsible_mode") return { ...service, responsible_mode: value, responsible_amount: value === "percent" ? responsibleAmountFor(service.price, service.responsible_percent) : service.responsible_amount };
+    if (field === "responsible_percent") return { ...service, responsible_percent: value, responsible_amount: responsibleAmountFor(service.price, value) };
     return { ...service, [field]: value };
   }));
-  const addService = () => set("services", [{ name: "", price: 0, period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  const addService = () => set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
   const addPackage = () => {
     const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
     if (!packageItem) return;
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
-    set("services", [{ name: packageItem.name, price: Number(packageItem.client_price || 0), period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+    set("services", [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
     setSelectedPackageId("");
   };
   const saveNewService = async (index) => {
@@ -581,6 +585,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                     <select value={service.period || "Місяць"} onChange={(event) => updateService(index, "period", event.target.value)} aria-label="Періодичність"><option>Щогодини</option><option>Щодня</option><option>Щотижня</option><option>Місяць</option><option>Квартал</option><option>Рік</option><option>Разово</option></select>
                     <button type="button" className="client-service-remove" onClick={() => removeService(index)} aria-label="Видалити послугу"><Icon name="close" /></button>
                   </div>
+                  <div className="client-service-payout"><label><span className="client-field-label">Виплата виконавцю<FieldTip>Вкажіть суму вручну або відсоток від ціни для клієнта.</FieldTip></span><div className="client-service-payout-control"><input type="number" min="0" max={service.responsible_mode === "percent" ? 100 : undefined} step="0.01" value={service.responsible_mode === "percent" ? (service.responsible_percent ?? "") : (service.responsible_amount ?? 0)} readOnly={Boolean(service.is_package)} onChange={(event) => updateService(index, service.responsible_mode === "percent" ? "responsible_percent" : "responsible_amount", event.target.value)} placeholder="0" aria-label="Виплата виконавцю" /><select value={service.responsible_mode || "amount"} disabled={Boolean(service.is_package)} onChange={(event) => updateService(index, "responsible_mode", event.target.value)} aria-label="Тип виплати"><option value="amount">грн</option><option value="percent">% від ціни</option></select></div>{service.responsible_mode === "percent" && <small className="client-service-payout-calculated">До виплати: {responsibleAmountFor(service.price, service.responsible_percent).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</small>}</label></div>
                   <div className="client-service-schedule">
                     <label><span className="client-field-label">Офіційна дата<FieldTip>Дата взята з офіційних джерел і типових строків. За потреби ви можете змінити її вручну.</FieldTip></span><DateTimePicker value={service.official_due_date || (service.name ? officialDateForService(service.name, service.period) : "")} onChange={(value) => updateService(index, "official_due_date", value)} /></label>
                     <label><span className="client-field-label">Відповідальний бухгалтер<FieldTip>Тут показуються лише учасники вашої команди.</FieldTip></span><AccountantSelect value={service.accountant_id || ""} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={(value) => updateService(index, "accountant_id", value)} /></label>

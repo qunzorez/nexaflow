@@ -149,6 +149,9 @@ $services = array_values(array_filter(array_map(static function ($service): arra
     return [
         'name' => trim((string)($service['name'] ?? '')),
         'price' => max(0, (float)($service['price'] ?? 0)),
+        'responsible_amount' => max(0, (float)(($service['responsible_mode'] ?? 'amount') === 'percent' ? ((float)($service['price'] ?? 0) * min(100, max(0, (float)($service['responsible_percent'] ?? 0))) / 100) : ($service['responsible_amount'] ?? 0))),
+        'responsible_mode' => in_array((string)($service['responsible_mode'] ?? 'amount'), ['amount', 'percent'], true) ? (string)$service['responsible_mode'] : 'amount',
+        'responsible_percent' => min(100, max(0, (float)($service['responsible_percent'] ?? 0))),
         'period' => in_array((string)($service['period'] ?? 'Місяць'), $allowedPeriods, true) ? (string)$service['period'] : 'Місяць',
         'official_due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($service['official_due_date'] ?? '')) ? (string)$service['official_due_date'] : '',
         'accountant_id' => trim((string)($service['accountant_id'] ?? '')),
