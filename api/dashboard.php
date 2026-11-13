@@ -57,7 +57,15 @@ try {
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $taskCountQuery->fetchColumn(); $taskCount = count(array_filter($tasks, static function ($task): bool { return $task['status'] !== 'archived'; }));
     $timeQuery = $pdo->prepare('SELECT COALESCE(SUM(minutes), 0) FROM time_entries WHERE user_id = ?'); $timeQuery->execute([$_SESSION['user_id']]); $myMinutes = (int)$timeQuery->fetchColumn(); $teamTime = [];
-    if ($canManage) { $teamTimeQuery = $pdo->query('SELECT u.id, u.name, u.email, COALESCE(SUM(te.minutes), 0) AS minutes FROM users u LEFT JOIN time_entries te ON te.user_id = u.id GROUP BY u.id, u.name, u.email ORDER BY minutes DESC, u.name'); $teamTime = $teamTimeQuery->fetchAll(); }
+    if ($canManage) {
+        if ($isAdmin) {
+            $teamTimeQuery = $pdo->query('SELECT u.id, u.name, u.email, COALESCE(SUM(te.minutes), 0) AS minutes FROM users u LEFT JOIN time_entries te ON te.user_id = u.id GROUP BY u.id, u.name, u.email ORDER BY minutes DESC, u.name');
+        } else {
+            $teamTimeQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, COALESCE((SELECT SUM(te.minutes) FROM time_entries te WHERE te.user_id = u.id), 0) AS minutes FROM users u WHERE u.id = ? OR EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted') ORDER BY minutes DESC, u.name");
+            $teamTimeQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+        }
+        $teamTime = $teamTimeQuery->fetchAll();
+    }
     $userMetrics = [];
     if ($isAdmin) {
         $userMetrics = [
