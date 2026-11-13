@@ -190,8 +190,15 @@ if ($requestedAccountantIds) {
 }
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
 if ($action === 'update' && $id !== '') {
-    $pdo->prepare('UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ? WHERE id = ?')->execute([$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $id]);
-    jsonResponse(true, 'Дані клієнта оновлено.');
+    $existingClientQuery = $pdo->prepare('SELECT id FROM clients WHERE id = ? LIMIT 1');
+    $existingClientQuery->execute([$id]);
+    if (!$existingClientQuery->fetchColumn()) jsonResponse(false, 'Клієнта не знайдено.', [], 404);
+    $update = $pdo->prepare('UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ? WHERE id = ?');
+    $update->execute([$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $id]);
+    $savedClientQuery = $pdo->prepare('SELECT id, name FROM clients WHERE id = ? LIMIT 1');
+    $savedClientQuery->execute([$id]);
+    $savedClient = $savedClientQuery->fetch();
+    jsonResponse(true, 'Дані клієнта оновлено.', ['client' => $savedClient]);
 }
 $newId = bin2hex(random_bytes(16));
 $pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $userId]);

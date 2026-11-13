@@ -44,6 +44,7 @@ export default function ClientEditPage() {
     setNotice("");
     const result = await post("/api/clients.php", { ...form, action: "update", id });
     if (!result.ok) return setError(result.message);
+    if (result.client?.name) setForm((current) => ({ ...current, name: result.client.name }));
     const services = [...(form.services || [])];
     let taskError = "";
     let tasksChanged = false;
