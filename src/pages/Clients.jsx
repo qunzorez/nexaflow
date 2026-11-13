@@ -276,8 +276,13 @@ function FieldTip({ children }) {
 }
 export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "" }) {
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
+  const formElementRef = useRef(null);
   const set = (field, value) =>
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const nameInput = formElementRef.current?.elements?.namedItem("name");
+      const currentName = typeof nameInput?.value === "string" ? nameInput.value : current.name;
+      return { ...current, [field]: value, name: field === "name" ? value : currentName };
+    });
   const toggleTax = (value) =>
     set(
       "special_taxes",
@@ -344,7 +349,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               {moduleNames[form.module] || moduleNames.accounting}
             </strong>
           </div>
-          <form className="client-form" onSubmit={(event) => { rememberServicePrices(); onSave(event); }}>
+          <form ref={formElementRef} className="client-form" onSubmit={(event) => { rememberServicePrices(); onSave(event); }}>
             {form.module !== "accounting" && (
               <div className="client-module-fields">
                 <h3>Дані модуля</h3>
