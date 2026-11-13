@@ -161,9 +161,9 @@ $requestedAccountantIds = array_values(array_unique(array_filter(array_map(stati
 if ($requestedAccountantIds) {
     $accountingGroupIds = [];
     foreach ($pdo->query('SELECT id, name FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
-        $name = (string)$group['name'];
-        $nameHex = strtoupper(bin2hex($name));
-        if (preg_match('/(?:бухгалт|бугалт|account)/iu', $name)
+        $groupName = (string)$group['name'];
+        $nameHex = strtoupper(bin2hex($groupName));
+        if (preg_match('/(?:бухгалт|бугалт|account)/iu', $groupName)
             || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0
             || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) {
             $accountingGroupIds[(string)$group['id']] = true;
