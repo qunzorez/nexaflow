@@ -115,11 +115,15 @@ if ($method === 'GET') {
     $projectTasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at FROM tasks t WHERE {$taskWhere} ORDER BY t.created_at DESC, t.due_date IS NULL, t.due_date");
     $projectTasksQuery->execute($taskParams);
     $projectTasks = $projectTasksQuery->fetchAll();
-    jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'project_tasks' => $projectTasks, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'update' => $canUpdate, 'delete' => $canDelete, 'manage_team' => $canManageTeam, 'admin' => $isAdmin]]);
+    jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'project_tasks' => $projectTasks, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'update' => $canUpdate, 'delete' => $canDelete, 'manage_team' => $canManageTeam, 'settings' => $isProjectOwner, 'admin' => $isAdmin]]);
 }
 if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
 if ($action === 'update' && !$canUpdate) jsonResponse(false, 'Недостатньо прав для оновлення цього проєкту.', [], 403);
 if ($action === 'delete' && !$canDelete) jsonResponse(false, 'Недостатньо прав для видалення цього проєкту.', [], 403);
+if ($action === 'update' && !$isProjectOwner) {
+    $data['status'] = $project['status'];
+    $data['visibility'] = $project['visibility'];
+}
 if ($method === 'POST' && $action === 'assign_global_group') {
     $manager = $pdo->prepare("SELECT role FROM users WHERE id = ? AND role IN ('admin', 'owner', 'manager') LIMIT 1");
     $manager->execute([$userId]);
