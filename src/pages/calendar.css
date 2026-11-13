@@ -76,3 +76,9 @@
 .month-grid .calendar-event-chip.compact.service{border-left-color:#1a9b6d!important;background:#dff3e7;color:#126d4d}
 .month-grid .calendar-event-chip.compact>strong{display:block!important;min-width:0;width:100%;margin:0;overflow:hidden;text-align:left!important;text-overflow:ellipsis;white-space:nowrap;font:600 9px/1.2 Inter,sans-serif;letter-spacing:-.01em}
 @media(max-width:600px){.month-grid .calendar-event-chip.compact{display:block!important;min-height:26px;height:26px;max-height:26px;padding:5px 6px!important}.month-grid .calendar-event-chip.compact>strong{display:block!important}}
+
+/* Keep every appointment visible in the month view. The row grows with the busiest day. */
+.month-grid .calendar-day{min-height:220px}
+.month-grid .calendar-day-events{overflow:visible}
+.month-grid .calendar-event-chip.compact{height:29px;max-height:29px}
+@media(max-width:600px){.month-grid .calendar-day{min-height:150px}.month-grid .calendar-event-chip.compact{height:25px;max-height:25px}}
