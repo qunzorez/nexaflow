@@ -347,6 +347,7 @@ export default function Tasks() {
               <option value="urgent">Термінові</option>
               <option value="todo">До виконання</option>
               <option value="in_progress">У роботі</option>
+              <option value="review">На перевірці</option>
               <option value="done">Завершені</option>
               <option value="cancelled">Скасовані</option>
               <option value="archived">Архів</option>
