@@ -48,18 +48,17 @@ if ($method === 'GET') {
         $client['module_data'] = $client['module_data'] ? (json_decode($client['module_data'], true) ?: []) : [];
     }
     unset($client);
-    // Only members of an accounting global group can be assigned to a client service.
-    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (LOWER(pg.name) LIKE '%бухгал%' OR LOWER(pg.name) LIKE '%account%') ORDER BY u.name, u.email")->fetchAll() : [];
+    // Only members of a global accounting group can be assigned to a client service.
+    // Some older live records contain a double-encoded Ukrainian group name, so match
+    // both the normal UTF-8 prefix and its legacy representation.
+    $accountingGroupPrefix = 'c390c2b1c391c283c391c285c390c2b3c390c2b0c390c2bb';
+    $availableUsers = $canManage ? $pdo->query("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE u.role IN ('admin', 'owner', 'manager', 'user') AND (LOWER(pg.name) LIKE '%бухгал%' OR LOWER(pg.name) LIKE '%account%' OR pg.name LIKE CONCAT('%', CONVERT(UNHEX('{$accountingGroupPrefix}') USING utf8mb4), '%')) ORDER BY u.name, u.email")->fetchAll() : [];
     $availableByClient = [];
     if ($canManage && $clients) {
-        $clientIds = array_column($clients, 'id');
-        $marks = implode(',', array_fill(0, count($clientIds), '?'));
-        $membersQuery = $pdo->prepare("SELECT cm.client_id, u.id, u.name, u.email, u.role FROM client_members cm JOIN users u ON u.id = cm.user_id JOIN project_group_members pgm ON pgm.user_id = u.id JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL WHERE cm.client_id IN ({$marks}) AND (LOWER(pg.name) LIKE '%бухгал%' OR LOWER(pg.name) LIKE '%account%') GROUP BY cm.client_id, u.id, u.name, u.email, u.role ORDER BY u.name, u.email");
-        $membersQuery->execute($clientIds);
-        foreach ($membersQuery->fetchAll() as $member) {
-            $clientId = (string)$member['client_id'];
-            unset($member['client_id']);
-            $availableByClient[$clientId][] = $member;
+        // A service accountant is selected from the manager's eligible accounting
+        // team; the accountant does not need to be a client_member first.
+        foreach ($clients as $clientRow) {
+            $availableByClient[(string)$clientRow['id']] = $availableUsers;
         }
     }
     jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'permissions' => ['manage' => $canManage]]);
