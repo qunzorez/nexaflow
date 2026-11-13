@@ -298,16 +298,21 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   }));
   const addService = () => set("services", [{ name: "", price: 0, period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
   const saveNewService = async (index) => {
-    const service = form.services?.[index];
+    const nameInput = formElementRef.current?.elements?.namedItem("name");
+    const currentForm = {
+      ...form,
+      name: typeof nameInput?.value === "string" ? nameInput.value : form.name,
+    };
+    const service = currentForm.services?.[index];
     if (!service?.name || !onAddService || savingServiceIndex !== null) return;
     if (Number(service.price || 0) === 0 && !window.confirm(`У послуги «${service.name}» вказана ціна 0 грн. Послуга дійсно коштує 0 грн?`)) return;
     setSavingServiceIndex(index);
-    const services = (form.services || []).map((item, itemIndex) => {
+    const services = (currentForm.services || []).map((item, itemIndex) => {
       const { _isNew, ...clean } = item;
       return itemIndex === index ? clean : (_isNew ? clean : item);
     });
     rememberServicePrice(services[index]?.name, services[index]?.price);
-    const saved = await onAddService({ ...form, services }, services[index]);
+    const saved = await onAddService({ ...currentForm, services }, services[index]);
     if (saved) set("services", services);
     setSavingServiceIndex(null);
   };
