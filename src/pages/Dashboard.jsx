@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [reminderTask, setReminderTask] = useState(null);
   const [notice, setNotice] = useState("");
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(true);
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");
   const [teamSearch, setTeamSearch] = useState("");
@@ -227,24 +228,37 @@ export default function Dashboard() {
           </section>
         )}
         {isManager && reviewTasks.length > 0 && (
-          <section className="panel review-notification-panel">
-            <div className="panel-heading review-notification-heading">
-              <div>
+          <section className={`panel review-notification-panel${reviewPanelOpen ? " is-open" : " is-collapsed"}`}>
+            <button
+              type="button"
+              className="review-notification-toggle"
+              onClick={() => setReviewPanelOpen((value) => !value)}
+              aria-expanded={reviewPanelOpen}
+              aria-controls="review-notification-content"
+            >
+              <span className="review-notification-copy">
                 <h2>Потрібна перевірка</h2>
                 <p>Задачі зі статусом «На перевірці» очікують вашого рішення.</p>
+              </span>
+              <span className="review-notification-heading-actions">
+                <span className="task-count-badge review-notification-count">{reviewTasks.length}</span>
+                <Icon name="down" />
+              </span>
+            </button>
+            {reviewPanelOpen && (
+              <div id="review-notification-content" className="review-notification-content">
+                <div className="review-notification-list">
+                  {reviewTasks.map((task) => (
+                    <Link className="review-notification-row" to={`/tasks/${task.id}`} key={task.id}>
+                      <span className="task-status status-review"><Icon name="urgent" /> На перевірці</span>
+                      <div><strong>{task.title}</strong><small>{task.project_name || "Без проєкту"}{task.due_date ? ` · до ${new Date(`${task.due_date}T00:00:00`).toLocaleDateString("uk-UA")}` : ""}</small></div>
+                      <Icon name="right" />
+                    </Link>
+                  ))}
+                </div>
+                <Link className="outline-btn review-notification-action" to="/tasks?status=review">Переглянути всі задачі на перевірці</Link>
               </div>
-              <span className="task-count-badge review-notification-count">{reviewTasks.length}</span>
-            </div>
-            <div className="review-notification-list">
-              {reviewTasks.map((task) => (
-                <Link className="review-notification-row" to={`/tasks/${task.id}`} key={task.id}>
-                  <span className="task-status status-review"><Icon name="urgent" /> На перевірці</span>
-                  <div><strong>{task.title}</strong><small>{task.project_name || "Без проєкту"}{task.due_date ? ` · до ${new Date(`${task.due_date}T00:00:00`).toLocaleDateString("uk-UA")}` : ""}</small></div>
-                  <Icon name="right" />
-                </Link>
-              ))}
-            </div>
-            <Link className="outline-btn review-notification-action" to="/tasks?status=review">Переглянути всі задачі на перевірці</Link>
+            )}
           </section>
         )}
         <section className={`stat-grid${isAdmin ? " admin-stat-grid" : ""}`}>
