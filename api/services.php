@@ -27,9 +27,12 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS service_catalog (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
 $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
+$isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
 $modules = ['all', 'accounting', 'dentistry', 'legal', 'real_estate'];
+$requestedModule = (string)($_GET['module'] ?? $data['module'] ?? 'accounting');
+$activeModule = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : 'accounting';
 $newId = static fn(): string => bin2hex(random_bytes(16));
 $moduleLabel = static fn(string $module): string => [
     'all' => 'Усі модулі клієнтів', 'accounting' => 'Бухгалтерія', 'dentistry' => 'Стоматологія',
@@ -37,7 +40,12 @@ $moduleLabel = static fn(string $module): string => [
 ][$module] ?? 'Бухгалтерія';
 
 if ($method === 'GET') {
-    $packages = $pdo->query('SELECT id, name, module, description, created_at FROM service_packages ORDER BY name')->fetchAll();
+    if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише менеджерам і адміністраторам.', [], 403);
+    $packageQuery = $isAdmin
+        ? $pdo->query('SELECT id, name, module, description, created_at FROM service_packages ORDER BY name')
+        : $pdo->prepare("SELECT id, name, module, description, created_at FROM service_packages WHERE module IN (?, 'all') ORDER BY name");
+    if (!$isAdmin) $packageQuery->execute([$activeModule]);
+    $packages = $packageQuery->fetchAll();
     $items = $pdo->query('SELECT s.id, s.package_id, s.name, s.client_price, s.responsible_amount, s.responsible_user_id, s.active, u.name AS responsible_name FROM service_catalog s LEFT JOIN users u ON u.id = s.responsible_user_id WHERE s.active = 1 ORDER BY s.name')->fetchAll();
     $users = $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('admin','owner','manager','user') ORDER BY name, email")->fetchAll();
     foreach ($packages as &$package) {
@@ -46,7 +54,7 @@ if ($method === 'GET') {
         $package['services_count'] = count($package['services']);
     }
     unset($package);
-    jsonResponse(true, 'Послуги завантажено.', ['user' => $user, 'packages' => $packages, 'users' => $users, 'modules' => array_map(fn(string $value): array => ['value' => $value, 'label' => $moduleLabel($value)], $modules), 'permissions' => ['manage' => $canManage]]);
+    jsonResponse(true, 'Послуги завантажено.', ['user' => $user, 'packages' => $packages, 'users' => $users, 'active_module' => $activeModule, 'is_admin' => $isAdmin, 'modules' => array_map(fn(string $value): array => ['value' => $value, 'label' => $moduleLabel($value)], $modules), 'permissions' => ['manage' => $canManage]]);
 }
 
 if (!$canManage) jsonResponse(false, 'Керувати послугами може лише менеджер або адміністратор.', [], 403);
@@ -57,6 +65,7 @@ $serviceId = trim((string)($data['service_id'] ?? $data['id'] ?? ''));
 if (in_array($action, ['create_package', 'update_package'], true)) {
     $name = trim((string)($data['name'] ?? ''));
     $module = in_array((string)($data['module'] ?? ''), $modules, true) ? (string)$data['module'] : 'accounting';
+    if (!$isAdmin) $module = $activeModule;
     $description = trim((string)($data['description'] ?? ''));
     if ($name === '') jsonResponse(false, 'Вкажіть назву пакета.', [], 422);
     if ($action === 'update_package') {
@@ -82,7 +91,7 @@ if (in_array($action, ['create_service', 'update_service'], true)) {
     $packageId = trim((string)($data['package_id'] ?? ''));
     $clientPrice = max(0, round((float)($data['client_price'] ?? 0), 2));
     $responsibleAmount = max(0, round((float)($data['responsible_amount'] ?? 0), 2));
-    $responsibleUserId = trim((string)($data['responsible_user_id'] ?? '')) ?: null;
+    $responsibleUserId = null;
     if ($name === '' || $packageId === '') jsonResponse(false, 'Вкажіть назву послуги та пакет.', [], 422);
     $packageCheck = $pdo->prepare('SELECT id FROM service_packages WHERE id = ? LIMIT 1');
     $packageCheck->execute([$packageId]);
