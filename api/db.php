@@ -20,6 +20,9 @@ function db(): PDO
     // The try/catch keeps first-run database initialization safe before project_groups exists.
     try {
         $pdo->exec("UPDATE project_groups SET name = 'Бухгалтер' WHERE name = 'Бугалтер'");
+        // Repair legacy records that were stored as double-encoded UTF-8.
+        // HEX() avoids collation/charset errors on older MySQL installations.
+        $pdo->exec("UPDATE project_groups SET name = 'Бухгалтер' WHERE project_id IS NULL AND HEX(name) LIKE 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB%'");
     } catch (Throwable $ignored) {
         // The schema migration will handle it after the table is created.
     }
