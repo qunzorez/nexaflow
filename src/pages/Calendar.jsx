@@ -40,6 +40,11 @@ function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function dateTimeKey(date, hour = null) {
+  const base = dateKey(date);
+  return hour === null ? base : `${base}T${String(hour).padStart(2, "0")}:00`;
+}
+
 function formatDate(date, options = { day: "numeric", month: "long", year: "numeric" }) {
   return date.toLocaleDateString("uk-UA", options);
 }
@@ -75,11 +80,11 @@ function EventChip({ event, onOpen, compact = false }) {
   );
 }
 
-function TimeGrid({ days, eventsByDay, onOpen }) {
+function TimeGrid({ days, eventsByDay, onOpen, onCreate }) {
   return <div className={`calendar-time-grid ${days.length === 1 ? "single-day" : ""}`}>
-    <div className="calendar-time-head"><span>Час</span>{days.map((date, index) => <strong key={dateKey(date)} className={dateKey(date) === dateKey(new Date()) ? "today" : ""}>{days.length > 1 ? `${WEEKDAYS[index]} · ` : ""}{date.getDate()} {date.toLocaleDateString("uk-UA", { month: "short" })}</strong>)}</div>
-    <div className="calendar-all-day-row"><span>Весь день</span>{days.map(date => <div key={dateKey(date)}>{(eventsByDay[dateKey(date)] || []).filter(event => !event.time).map(event => <EventChip key={event.id} event={event} onOpen={onOpen} />)}</div>)}</div>
-    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <div className="calendar-hour-slot" key={hour} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}`} style={{ top: `${Math.max(0, minutes)}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · {event.title}</strong><small>{event.subtitle}</small></button>; })}</div>)}</div></div>
+    <div className="calendar-time-head"><span>Час</span>{days.map((date, index) => <button type="button" key={dateKey(date)} className={dateKey(date) === dateKey(new Date()) ? "today" : ""} onClick={() => onCreate(date)}>{days.length > 1 ? `${WEEKDAYS[index]} · ` : ""}{date.getDate()} {date.toLocaleDateString("uk-UA", { month: "short" })}</button>)}</div>
+    <div className="calendar-all-day-row"><span>Весь день</span>{days.map(date => <div key={dateKey(date)} role="button" tabIndex="0" onClick={() => onCreate(date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") onCreate(date); }}>{(eventsByDay[dateKey(date)] || []).filter(event => !event.time).map(event => <EventChip key={event.id} event={event} onOpen={onOpen} />)}</div>)}</div>
+    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <button type="button" className="calendar-hour-slot" key={hour} onClick={() => onCreate(date, hour)} aria-label={`Створити задачу ${dateTimeKey(date, hour)}`} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}`} style={{ top: `${Math.max(0, minutes)}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · {event.title}</strong><small>{event.subtitle}</small></button>; })}</div>)}</div></div>
   </div>;
 }
 
@@ -183,9 +188,9 @@ export default function Calendar() {
 
             {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)} onClick={() => navigate(`/tasks?create=1&due_date=${dateKey(date)}`)} role="button" tabIndex="0" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") navigate(`/tasks?create=1&due_date=${dateKey(date)}`); }}><span className="calendar-day-number"><span>{date.getDate()}</span><button type="button" className="calendar-day-add" onClick={event => { event.stopPropagation(); navigate(`/tasks?create=1&due_date=${dateKey(date)}`); }} aria-label={`Створити задачу на ${dateKey(date)}`}><Icon name="plus" /></button></span><div className="calendar-day-events">{dayEvents.map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}</div></div>; })}</div></>}
 
-            {view === "week" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} />}
+            {view === "week" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={(date, hour = null) => navigate(`/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}`)} />}
 
-            {view === "day" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} />}
+            {view === "day" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={(date, hour = null) => navigate(`/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}`)} />}
           </section>
 
           <section className="panel upcoming-deadlines-panel">

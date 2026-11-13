@@ -105,6 +105,8 @@
 .calendar-time-head span,.calendar-time-head strong{padding:13px 10px;font-size:10px}
 .calendar-time-head strong{color:#34463e}
 .calendar-time-head strong.today{background:#dff3e8;color:var(--cal-green)}
+.calendar-time-head>button{border:0;border-left:1px solid var(--cal-line);background:transparent;color:#34463e;font:inherit;cursor:pointer}
+.calendar-time-head>button:hover{background:#eef8f3}
 .calendar-all-day-row{background:#fbfdfc}
 .calendar-all-day-row>span{padding:12px 8px;color:#71847a}
 .calendar-all-day-row>div{min-height:56px;padding:8px;border-left-color:#e4eee9}
@@ -113,6 +115,10 @@
 .calendar-time-labels span{padding:8px 10px 0;color:#86988e;font-size:9px}
 .calendar-time-column{background:#fff}
 .calendar-hour-slot{height:60px;background:linear-gradient(180deg,#fff,#fcfefd);border-bottom:1px solid #e7efeb}
+.calendar-hour-slot{display:block;width:100%;padding:0;border-top:0;border-right:0;border-left:0;cursor:pointer}
+.calendar-hour-slot:hover{background:#f0f8f4}
+.calendar-all-day-row>div{cursor:pointer}
+.calendar-all-day-row>div:hover{background:#f0f8f4}
 .calendar-timed-event{left:8px;right:8px;min-height:50px;border-radius:8px;box-shadow:0 3px 8px rgba(30,79,56,.08)}
 .calendar-timed-event strong{font-size:10px}
 .calendar-timed-event small{font-size:9px}
