@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
 import DateTimePicker from "../components/DateTimePicker.jsx";
+import SearchableSelect from "../components/SearchableSelect.jsx";
 import "./clients.css";
 
 export const specialTaxOptions = [
@@ -561,7 +562,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               <legend>Необхідні бухгалтерські послуги</legend>
               <p className="client-field-hint">Додайте послуги для цього клієнта та їхню вартість.</p>
               <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>Оберіть послугу — дата заповниться автоматично за відомим строком.</small></div><button type="button" className="primary-action" onClick={addService}><Icon name="plus" /> Додати послугу</button></div>
-              {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><select value={selectedPackageId} onChange={(event) => setSelectedPackageId(event.target.value)}><option value="">Оберіть пакет</option>{servicePackages.map((packageItem) => <option value={packageItem.id} key={packageItem.id}>{packageItem.name} — {Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн</option>)}</select><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
+              {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн` }))} value={selectedPackageId} onChange={setSelectedPackageId} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
               <div className="client-services-list-label">Додані послуги <span>{(form.services || []).length}</span></div>
               <div className="client-services-list">
                 {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}`} key={`${index}-${service.name}`}>
