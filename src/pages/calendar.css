@@ -70,9 +70,9 @@
 
 /* Month events follow Outlook's flat appointment rows. */
 .month-grid .calendar-day-events{display:grid;gap:4px;align-content:start;min-width:0;pointer-events:none}
-.month-grid .calendar-event-chip.compact{display:block!important;width:100%;min-width:0;min-height:29px;height:29px;max-height:29px;margin:0;padding:6px 4px 6px 0!important;border-radius:3px!important;border-top:0;border-right:0;border-bottom:0;border-left:4px solid!important;box-sizing:border-box;text-align:left!important;font-size:10px;font-weight:600;line-height:1.2;overflow:hidden;box-shadow:none;transform:none}
+.month-grid .calendar-event-chip.compact{display:block!important;justify-content:flex-start!important;align-items:flex-start!important;width:100%;min-width:0;min-height:29px;height:29px;max-height:29px;margin:0;padding:6px 4px 6px 0!important;border-radius:3px!important;border-top:0;border-right:0;border-bottom:0;border-left:4px solid!important;box-sizing:border-box;text-align:left!important;font-size:10px;font-weight:600;line-height:1.2;overflow:hidden;box-shadow:none;transform:none}
 .month-grid .calendar-event-chip.compact:hover{filter:brightness(.97);transform:none;box-shadow:none}
 .month-grid .calendar-event-chip.compact.task{border-left-color:var(--cal-blue)!important;background:#dcecff;color:#174f97}
 .month-grid .calendar-event-chip.compact.service{border-left-color:#1a9b6d!important;background:#dff3e7;color:#126d4d}
-.month-grid .calendar-event-chip.compact>span{display:block!important;min-width:0;width:auto;margin:0;overflow:hidden;text-align:left;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
+.month-grid .calendar-event-chip.compact>span{display:block!important;min-width:0;width:auto;margin:0;overflow:hidden;text-align:left!important;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
 @media(max-width:600px){.month-grid .calendar-event-chip.compact{display:block!important;min-height:26px;height:26px;max-height:26px;padding:5px 6px!important}.month-grid .calendar-event-chip.compact>span{display:block!important}}
