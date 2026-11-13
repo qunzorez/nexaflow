@@ -105,8 +105,8 @@ try {
             $projectProgress[] = ['id' => $project['id'], 'name' => $project['name'], 'total' => (int)$progress['total'], 'done' => (int)$progress['done'], 'in_progress' => (int)$progress['in_progress'], 'status' => $project['status'] ?? 'active'];
         }
         $workloadQuery = $isAdmin
-            ? $pdo->query("SELECT u.id, u.name, u.email, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') GROUP BY u.id, u.name, u.email ORDER BY tasks DESC, u.name LIMIT 12")
-            : $pdo->prepare("SELECT u.id, u.name, u.email, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') WHERE u.id IN (SELECT DISTINCT pm.user_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id = ? OR pm.user_id = ?) OR u.id = ? GROUP BY u.id, u.name, u.email ORDER BY tasks DESC, u.name LIMIT 12");
+            ? $pdo->query("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12")
+            : $pdo->prepare("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') WHERE u.id IN (SELECT DISTINCT pm.user_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id = ? OR pm.user_id = ?) OR u.id = ? GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12");
         if (!$isAdmin) $workloadQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
         $recentQuery = $isAdmin
             ? $pdo->query("SELECT h.message, h.created_at, u.name AS user_name, t.id AS task_id, t.title AS task_title FROM task_history h JOIN tasks t ON t.id = h.task_id LEFT JOIN users u ON u.id = h.user_id ORDER BY h.created_at DESC LIMIT 8")

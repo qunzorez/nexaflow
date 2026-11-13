@@ -119,6 +119,8 @@
 .dashboard-page .team-time-row:hover,
 .dashboard-page .reminder-row:hover { background: #f7fcf8; padding-left: 8px; padding-right: 8px; }
 .dashboard-page .project-icon { border-radius: 12px; box-shadow: 0 5px 12px #7564c822; }
+.dashboard-page .manager-list-row .member-avatar { overflow: hidden; }
+.dashboard-page .manager-list-row .member-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .dashboard-page .project-list { margin-top: 18px; }
 .dashboard-page .project-list.is-scrollable { height: 280px; max-height: 280px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
 .dashboard-page .project-row { min-height: 56px; box-sizing: border-box; }
