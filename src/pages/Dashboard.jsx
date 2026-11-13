@@ -16,6 +16,14 @@ const statusLabels = {
   cancelled: "Скасовано",
   archived: "Архів",
 };
+const dashboardStatusOrder = {
+  review: 0,
+  in_progress: 1,
+  todo: 2,
+  done: 3,
+  cancelled: 4,
+  archived: 5,
+};
 const projectStatusLabels = {
   active: "Активний",
   paused: "Призупинений",
@@ -95,7 +103,17 @@ export default function Dashboard() {
         `${task.title} ${task.project_name || ""} ${task.client_name || ""}`
           .toLowerCase()
           .includes(taskSearch.trim().toLowerCase()),
-      ) || [];
+      )
+      .sort((left, right) => {
+        const statusDifference =
+          (dashboardStatusOrder[left.status] ?? 99) -
+          (dashboardStatusOrder[right.status] ?? 99);
+        if (statusDifference) return statusDifference;
+        const leftDue = left.due_date ? new Date(`${left.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+        const rightDue = right.due_date ? new Date(`${right.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+        if (leftDue !== rightDue) return leftDue - rightDue;
+        return String(right.created_at || "").localeCompare(String(left.created_at || ""));
+      }) || [];
   const teamTimeRows = (data.time_by_user || [])
     .filter((person) =>
       `${person.name} ${person.email}`
