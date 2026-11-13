@@ -332,6 +332,15 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   // membership list is narrower and made the edit form behave differently.
   const eligibleAccountants = availableUsers;
   const removeService = (index) => set("services", (form.services || []).filter((_, itemIndex) => itemIndex !== index));
+  const packagePriceTiers = ["gray", "cyan", "blue", "purple", "red", "gold"];
+  const packageTier = (service) => {
+    if (!service.is_package) return "";
+    const prices = servicePackages.map((item) => Number(item.client_price || 0)).sort((left, right) => left - right);
+    if (prices.length <= 1) return "gold";
+    const price = Number(service.price || 0);
+    const index = Math.max(0, prices.findIndex((item) => item >= price));
+    return packagePriceTiers[Math.round(index / (prices.length - 1) * (packagePriceTiers.length - 1))];
+  };
   const serviceTotal = (form.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0);
   const rememberServicePrice = (name, price) => {
     if (form.module !== "accounting" || !name) return;
@@ -565,7 +574,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн` }))} value={selectedPackageId} onChange={setSelectedPackageId} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
               <div className="client-services-list-label">Додані послуги <span>{(form.services || []).length}</span></div>
               <div className="client-services-list">
-                {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}`} key={`${index}-${service.name}`}>
+                {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}${service.is_package ? ` client-package-card price-tier-${packageTier(service)}` : ""}`} key={`${index}-${service.name}`}>
                   <div className="client-service-row">
                     {service.is_package ? <div className="client-package-name"><span className="client-package-badge">ПАКЕТ</span><strong>{service.package_name || service.name}</strong><small>{(service.package_services || service.parameters || []).length} послуг у пакеті</small></div> : <ServiceSelect value={service.name} legalForm={form.legal_form} onChange={(value) => updateService(index, "name", value)} />}
                     <span className={`client-service-price${service.is_package ? " is-readonly" : ""}`}><input type="number" min="0" step="0.01" value={service.price} readOnly={Boolean(service.is_package)} onChange={(event) => updateService(index, "price", event.target.value)} onBlur={(event) => rememberServicePrice(service.name, event.target.value)} placeholder="0" aria-label={service.is_package ? "Ціна пакета" : "Ціна послуги"} /><b>грн</b></span>
