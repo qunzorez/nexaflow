@@ -8,10 +8,16 @@ import './project-management-cleanup.css';
 import './project-member-add.css';
 
 const initials = name => String(name || '?').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
+const avatarSource = value => {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  return /^(?:data:|blob:|https?:|\/)/i.test(source) ? source : `/${source}`;
+};
 
 function MemberAvatar({ member }) {
   const [imageFailed, setImageFailed] = useState(false);
-  return <span className="member-avatar">{member.avatar_url && !imageFailed ? <img src={member.avatar_url} alt="" onError={() => setImageFailed(true)} /> : initials(member.name)}</span>;
+  const source = avatarSource(member.avatar_url);
+  return <span className="member-avatar">{source && !imageFailed ? <img src={source} alt="" onError={() => setImageFailed(true)} /> : initials(member.name)}</span>;
 }
 
 export default function ProjectManagement({ projectId, canManageTeam = false, members = [], groups = [], availableUsers = [], onChanged }) {

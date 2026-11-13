@@ -82,7 +82,7 @@
 }
 
 .project-management .management-section {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .project-management .management-section:has(.searchable-user-trigger.is-open) {
