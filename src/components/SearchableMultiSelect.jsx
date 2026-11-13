@@ -73,7 +73,7 @@ export default function SearchableMultiSelect({ options, value = [], onChange, p
   }
 
   const menu = open && <div className={`searchable-multi-menu${portal ? ' is-portaled' : ''}`} ref={menuRef} style={portal ? menuStyle : undefined}>
-    <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Пошук..." />
+    <input type="search" autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Пошук..." />
     {filtered.length ? filtered.map(option => <label className={`multi-option${option.disabled ? ' is-disabled' : ''}`} key={option.id}>
       <input type="checkbox" checked={value.includes(option.id)} disabled={option.disabled} onChange={() => toggle(option.id)} />
       <span><strong>{option.name}</strong>{option.disabled ? <small className="multi-option-disabled">Вже додано</small> : option.email && <small>{option.email}</small>}{option.project_names && <small className="multi-option-projects">Проєкти: {option.project_names}</small>}</span>
