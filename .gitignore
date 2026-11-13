@@ -4,4 +4,5 @@ node_modules/
 *.sqlite
 api/config.local.php
 api/config.web.php
+api/config.php
 dist/.DS_Store

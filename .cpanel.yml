@@ -6,4 +6,4 @@ deployment:
     - /bin/mkdir -p $DEPLOYPATH/api
     - /bin/cp appsettings.json $DEPLOYPATH/appsettings.json
     - /usr/local/bin/php tools/set-web-environment.php $DEPLOYPATH
-    - /usr/bin/find api -maxdepth 1 -name '*.php' ! -name 'config.local.php' ! -name 'config.web.php' -exec /bin/cp {} $DEPLOYPATH/api/ \;
+    - /usr/bin/find api -maxdepth 1 -name '*.php' ! -name 'config.local.php' ! -name 'config.web.php' ! -name 'config.php' -exec /bin/cp {} $DEPLOYPATH/api/ \;
