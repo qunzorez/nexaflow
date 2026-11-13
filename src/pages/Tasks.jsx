@@ -531,7 +531,7 @@ export default function Tasks() {
             onClose={closeModal}
           />
         )}
-        {archivePrompt && (
+        {archivePrompt && createPortal(
           <div className="completion-prompt-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setArchivePrompt(null); }}>
             <section className="completion-prompt" role="dialog" aria-modal="true" aria-labelledby="tasks-completion-prompt-title">
               <button className="completion-prompt-close" type="button" onClick={() => setArchivePrompt(null)} aria-label="Закрити"><Icon name="close" /></button>
@@ -544,7 +544,8 @@ export default function Tasks() {
                 <button className="primary-action" type="button" onClick={archiveCompletedTask}>Перенести в архів <Icon name="archive" /></button>
               </div>
             </section>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </Layout>

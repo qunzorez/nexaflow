@@ -1,5 +1,6 @@
 import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import Layout from "../components/Layout.jsx";
@@ -349,7 +350,7 @@ export default function TaskDetail() {
             onClose={() => setTimeModal(false)}
           />
         )}
-        {archivePrompt && (
+        {archivePrompt && createPortal(
           <div className="completion-prompt-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setArchivePrompt(false); }}>
             <section className="completion-prompt" role="dialog" aria-modal="true" aria-labelledby="completion-prompt-title">
               <button className="completion-prompt-close" type="button" onClick={() => setArchivePrompt(false)} aria-label="Закрити"><Icon name="close" /></button>
@@ -362,7 +363,8 @@ export default function TaskDetail() {
                 <button className="primary-action" type="button" onClick={archiveCompletedTask}>Перенести в архів <Icon name="archive" /></button>
               </div>
             </section>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </Layout>
