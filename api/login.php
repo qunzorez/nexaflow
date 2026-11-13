@@ -14,7 +14,11 @@ try {
     $query = db()->prepare('SELECT id, name, email, password_hash, role, email_verified_at FROM users WHERE email = ? LIMIT 1');
     $query->execute([$email]);
     $user = $query->fetch();
-    if (!$user || !password_verify($password, $user['password_hash'])) {
+    // Old/imported accounts can contain an empty or malformed hash. Treat
+    // those records as invalid credentials instead of allowing PHP 7.4 to
+    // throw a TypeError and return an opaque HTTP 500 response.
+    $passwordHash = is_array($user) ? (string)($user['password_hash'] ?? '') : '';
+    if (!$user || $passwordHash === '' || !password_verify($password, $passwordHash)) {
         jsonResponse(false, 'Невірна пошта або пароль.', [], 401);
     }
     if (empty($user['email_verified_at'])) jsonResponse(false, 'Підтвердіть email перед входом.', ['code' => 'email_not_verified', 'email' => $email], 403);
