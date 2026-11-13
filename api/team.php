@@ -39,7 +39,7 @@ try {
             $projects = $pdo->query('SELECT id, name FROM projects ORDER BY name')->fetchAll();
             $members = $pdo->query('SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id ORDER BY p.name, u.name')->fetchAll();
         } else {
-            $projectsQuery = $pdo->prepare("SELECT DISTINCT p.id, p.name FROM projects p LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR (p.visibility = 'team' AND pm.user_id IS NOT NULL) ORDER BY p.name");
+            $projectsQuery = $pdo->prepare("SELECT DISTINCT p.id, p.name FROM projects p LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR pm.user_id IS NOT NULL ORDER BY p.name");
             $projectsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
             $projects = $projectsQuery->fetchAll();
             $membersQuery = $pdo->prepare("SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id JOIN project_invitations pi ON pi.project_id = pm.project_id AND pi.email = u.email WHERE pi.invited_by = ? AND pi.status = 'accepted' ORDER BY p.name, u.name");
