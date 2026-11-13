@@ -69,7 +69,7 @@ function viewTitle(date, view) {
 function EventChip({ event, onOpen, compact = false }) {
   return (
     <button type="button" className={`calendar-event-chip ${event.kind}${compact ? " compact" : ""}`} onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event); }} title={`${event.title} · ${event.subtitle}`}>
-      <Icon name={event.kind === "task" ? "check" : "calendar"} />
+      {!compact && <Icon name={event.kind === "task" ? "check" : "calendar"} />}
       <span>{event.title}</span>
     </button>
   );
