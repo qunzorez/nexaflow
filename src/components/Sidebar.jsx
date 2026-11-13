@@ -67,9 +67,6 @@ export default function Sidebar({ user, open }) {
         <Link className="nav-item" to="/clients">
           <span><Icon name="users" /></span> Клієнти <b>{counts.clients}</b>
         </Link>
-        {canManage && <Link className="nav-item" to="/services">
-          <span><Icon name="subscription" /></span> Послуги
-        </Link>}
         <Link className="nav-item" to="/projects">
           <span><Icon name="project" /></span> Проєкти <b>{counts.projects}</b>
         </Link>
@@ -93,6 +90,9 @@ export default function Sidebar({ user, open }) {
           </Link>
         )}
         <p className="nav-label">РОБОЧІ ІНСТРУМЕНТИ</p>
+        {canManage && <Link className="nav-item" to="/services">
+          <span><Icon name="subscription" /></span> Послуги
+        </Link>}
         <Link className="nav-item" to="/calendar">
           <span><Icon name="calendar" /></span> Календар <b>0</b>
         </Link>
