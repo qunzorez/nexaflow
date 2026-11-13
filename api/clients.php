@@ -51,6 +51,12 @@ if ($method === 'GET') {
     // Match accounting groups in PHP: older production tables can use different
     // collations for group names and user IDs, making the joined SQL query fail.
     $availableUsers = [];
+    $managerTeamIds = [];
+    if ($user['role'] === 'manager') {
+        $teamUsersQuery = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE u.id = ? OR EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted')");
+        $teamUsersQuery->execute([$userId, $userId, $userId]);
+        foreach ($teamUsersQuery->fetchAll(PDO::FETCH_COLUMN) as $teamUserId) $managerTeamIds[(string)$teamUserId] = true;
+    }
     if ($canManage) {
         $accountingGroupIds = [];
         foreach ($pdo->query('SELECT id, name FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
@@ -68,7 +74,8 @@ if ($method === 'GET') {
             $membershipQuery->execute(array_keys($accountingGroupIds));
             foreach ($membershipQuery->fetchAll() as $membership) {
                 $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-                if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true)) {
+                $isAllowedManagerMember = $user['role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
+                if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
                     $availableUsers[(string)$person['id']] = $person;
                 }
             }
@@ -89,7 +96,8 @@ if ($method === 'GET') {
         $clientMembersQuery->execute($clientIds);
         foreach ($clientMembersQuery->fetchAll() as $membership) {
             $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-            if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true)) {
+            $isAllowedManagerMember = $user['role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
+            if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
                 $availableByClient[(string)$membership['client_id']][] = $person;
             }
         }
