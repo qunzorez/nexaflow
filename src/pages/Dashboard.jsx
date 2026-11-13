@@ -134,6 +134,16 @@ export default function Dashboard() {
   );
   const managerDashboard = data.manager_dashboard || {};
   const managerAttention = managerDashboard.attention || {};
+  const reviewTasks = isManager
+    ? [...(data.tasks || [])]
+        .filter((task) => task.status === "review")
+        .sort((left, right) => {
+          const leftDue = left.due_date ? new Date(`${left.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+          const rightDue = right.due_date ? new Date(`${right.due_date}T00:00:00`).getTime() : Number.POSITIVE_INFINITY;
+          if (leftDue !== rightDue) return leftDue - rightDue;
+          return String(right.created_at || "").localeCompare(String(left.created_at || ""));
+        })
+    : [];
   const visibleProjectProgress = (managerDashboard.project_progress || []).filter((project) => {
     const matchesName = String(project.name || "").toLocaleLowerCase("uk").includes(projectSearch.trim().toLocaleLowerCase("uk"));
     return matchesName;
@@ -214,6 +224,27 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
+          </section>
+        )}
+        {isManager && reviewTasks.length > 0 && (
+          <section className="panel review-notification-panel">
+            <div className="panel-heading review-notification-heading">
+              <div>
+                <h2>Потрібна перевірка</h2>
+                <p>Задачі зі статусом «На перевірці» очікують вашого рішення.</p>
+              </div>
+              <span className="task-count-badge review-notification-count">{reviewTasks.length}</span>
+            </div>
+            <div className="review-notification-list">
+              {reviewTasks.map((task) => (
+                <Link className="review-notification-row" to={`/tasks/${task.id}`} key={task.id}>
+                  <span className="task-status status-review"><Icon name="urgent" /> На перевірці</span>
+                  <div><strong>{task.title}</strong><small>{task.project_name || "Без проєкту"}{task.due_date ? ` · до ${new Date(`${task.due_date}T00:00:00`).toLocaleDateString("uk-UA")}` : ""}</small></div>
+                  <Icon name="right" />
+                </Link>
+              ))}
+            </div>
+            <Link className="outline-btn review-notification-action" to="/tasks?status=review">Переглянути всі задачі на перевірці</Link>
           </section>
         )}
         <section className={`stat-grid${isAdmin ? " admin-stat-grid" : ""}`}>
