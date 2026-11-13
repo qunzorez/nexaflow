@@ -12,10 +12,13 @@ require __DIR__ . '/telegram.php';
 require __DIR__ . '/mailer.php';
 
 $pdo = db();
+$pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
 // Додаткове очищення під час cron гарантує видалення старих записів навіть
 // якщо ніхто не відкриває сторінку сповіщень.
 $pdo->exec("DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
-$notificationColumns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME IN ('telegram_sent_at', 'email_sent_at')")->fetchAll(PDO::FETCH_COLUMN);
+$notificationColumnsQuery = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME IN ('telegram_sent_at', 'email_sent_at')");
+$notificationColumns = $notificationColumnsQuery->fetchAll(PDO::FETCH_COLUMN);
+$notificationColumnsQuery->closeCursor();
 if (!in_array('telegram_sent_at', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD telegram_sent_at DATETIME NULL");
 if (!in_array('email_sent_at', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD email_sent_at DATETIME NULL");
 $log = static function (string $message): void {
@@ -62,7 +65,9 @@ foreach ($tasks as $task) {
     }
 
     $assignees->execute([$task['id']]);
-    foreach ($assignees->fetchAll(PDO::FETCH_COLUMN) as $assigneeId) {
+    $assigneeIds = $assignees->fetchAll(PDO::FETCH_COLUMN);
+    $assignees->closeCursor();
+    foreach ($assigneeIds as $assigneeId) {
         $recipientIds[] = (string)$assigneeId;
     }
 
@@ -70,11 +75,13 @@ foreach ($tasks as $task) {
     $legacy = $pdo->prepare('SELECT assignee_id FROM tasks WHERE id = ? LIMIT 1');
     $legacy->execute([$task['id']]);
     $legacyAssignee = (string)($legacy->fetchColumn() ?: '');
+    $legacy->closeCursor();
     if ($legacyAssignee !== '') $recipientIds[] = $legacyAssignee;
 
     foreach (array_unique(array_filter($recipientIds)) as $userId) {
         $alreadySent->execute([$userId, $task['id'], $task['reminder_at']]);
         $existingNotification = $alreadySent->fetch(PDO::FETCH_ASSOC);
+        $alreadySent->closeCursor();
         if ($existingNotification && !empty($existingNotification['telegram_sent_at'])) {
             $skipped++;
             continue;
@@ -100,6 +107,7 @@ foreach ($tasks as $task) {
         }
         $recipient->execute([$userId]);
         $recipientEmail = (string)($recipient->fetchColumn() ?: '');
+        $recipient->closeCursor();
         if ($recipientEmail !== '' && empty($existingNotification['email_sent_at'] ?? null)) {
             $title = 'Нагадування про задачу';
             $safeTitle = htmlspecialchars((string)$task['title'], ENT_QUOTES, 'UTF-8');
