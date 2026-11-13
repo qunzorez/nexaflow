@@ -6,9 +6,10 @@ import "./sidebar-icons.css";
 
 export default function Sidebar({ user, open }) {
   const navigate = useNavigate();
+  const countsStorageKey = `nexaflow.sidebar.counts.${user?.id || "guest"}`;
   const [counts, setCounts] = useState(() => {
     try {
-      return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, ...JSON.parse(window.localStorage.getItem("nexaflow.sidebar.counts") || "{}") };
+      return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, ...JSON.parse(window.localStorage.getItem(countsStorageKey) || "{}") };
     } catch {
       return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0 };
     }
@@ -33,7 +34,7 @@ export default function Sidebar({ user, open }) {
         team: Number(dashboard.users?.length || 0),
         notifications: Number(notifications.unread || 0),
       };
-      window.localStorage.setItem("nexaflow.sidebar.counts", JSON.stringify(nextCounts));
+      window.localStorage.setItem(countsStorageKey, JSON.stringify(nextCounts));
       setCounts(current => JSON.stringify(current) === JSON.stringify(nextCounts) ? current : nextCounts);
     };
     loadCounts();
@@ -42,7 +43,7 @@ export default function Sidebar({ user, open }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [user?.id]);
+  }, [countsStorageKey, user?.id]);
   async function logout() {
     await post("/api/logout.php", {});
     navigate("/");
