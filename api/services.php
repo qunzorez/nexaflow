@@ -108,6 +108,9 @@ if (in_array($action, ['create_service', 'update_service'], true)) {
     $packageCheck = $pdo->prepare('SELECT id FROM service_packages WHERE id = ? LIMIT 1');
     $packageCheck->execute([$packageId]);
     if (!$packageCheck->fetch()) jsonResponse(false, 'Пакет не знайдено.', [], 422);
+    $duplicateCheck = $pdo->prepare('SELECT id FROM service_catalog WHERE package_id = ? AND name = ? AND active = 1 LIMIT 1');
+    $duplicateCheck->execute([$packageId, $name]);
+    if ($duplicateCheck->fetch()) jsonResponse(false, 'Ця послуга вже є в пакеті.', [], 422);
     if ($responsibleUserId !== null) {
         $userCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('admin','owner','manager','user') LIMIT 1");
         $userCheck->execute([$responsibleUserId]);
