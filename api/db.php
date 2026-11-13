@@ -16,6 +16,25 @@ function db(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
     ]);
+    // Keep the API usable when the live database predates the time-tracking
+    // migration. Dashboard reads this table before the Tasks page gets a
+    // chance to create it, so initialize it centrally during DB bootstrap.
+    // Only run this after the tasks table exists; this keeps first-run auth
+    // working while the rest of the schema is being bootstrapped.
+    $hasTasksTable = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks'")->fetchColumn();
+    if ($hasTasksTable > 0) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS time_entries (
+            id CHAR(32) PRIMARY KEY,
+            task_id CHAR(32) NOT NULL,
+            user_id CHAR(32) NOT NULL,
+            minutes INT UNSIGNED NOT NULL,
+            note VARCHAR(500) NULL,
+            logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT fk_time_entries_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            CONSTRAINT fk_time_entries_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
     // Normalize the legacy typo in existing claims groups so it is never shown again.
     // The try/catch keeps first-run database initialization safe before project_groups exists.
     try {
