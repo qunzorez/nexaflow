@@ -169,6 +169,7 @@ export default function Tasks() {
   const [projectIds, setProjectIds] = useState([]);
   const [assigneeIds, setAssigneeIds] = useState([]);
   const [clientIds, setClientIds] = useState([]);
+  const [initialDueDate, setInitialDueDate] = useState("");
   const [archivePrompt, setArchivePrompt] = useState(null);
   const navigate = useNavigate();
   const openedFromQuery = useRef(false);
@@ -193,7 +194,7 @@ export default function Tasks() {
   useEffect(() => {
     if (data && params.get("create") === "1" && !openedFromQuery.current) {
       openedFromQuery.current = true;
-      createTask();
+      createTask(params.get("due_date") || "");
     }
   }, [data, params]);
   useEffect(() => {
@@ -202,13 +203,14 @@ export default function Tasks() {
   useEffect(() => {
     window.localStorage.setItem("nexaflow.tasks.filter", filter);
   }, [filter]);
-  function createTask() {
+  function createTask(dueDate = "") {
     setModalError("");
     setEditing(null);
     setProjectIds([]);
     const canManage = ["admin", "owner", "manager"].includes(data?.user?.role);
     setAssigneeIds(!canManage && data?.user?.id ? [data.user.id] : []);
     setClientIds([]);
+    setInitialDueDate(dueDate);
     setModalOpen(true);
   }
   function editTask(task) {
@@ -226,6 +228,7 @@ export default function Tasks() {
     setProjectIds([]);
     setAssigneeIds([]);
     setClientIds([]);
+    setInitialDueDate("");
     if (params.get("create") === "1") navigate("/tasks", { replace: true });
   }
   async function save(event) {
@@ -524,6 +527,7 @@ export default function Tasks() {
             projectIds={projectIds}
             assigneeIds={assigneeIds}
             clientIds={clientIds}
+            initialDueDate={initialDueDate}
             setProjectIds={setProjectIds}
             setAssigneeIds={setAssigneeIds}
             setClientIds={setClientIds}

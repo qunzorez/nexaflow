@@ -22,6 +22,7 @@ export default function TaskFormModal({
   projectIds,
   assigneeIds,
   clientIds,
+  initialDueDate = "",
   setProjectIds,
   setAssigneeIds,
   setClientIds,
@@ -137,7 +138,7 @@ export default function TaskFormModal({
             <div className="task-form-grid">
               <label>
                 Дедлайн
-                <DateTimePicker name="due_date" defaultValue={editing?.due_date || ""} />
+                <DateTimePicker name="due_date" defaultValue={editing?.due_date || initialDueDate || ""} />
               </label>
               <label>
                 Нагадування

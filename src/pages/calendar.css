@@ -10,6 +10,7 @@
 .calendar-day.today{background:#eefaf3;box-shadow:inset 0 0 0 2px #78c69d}
 .calendar-day.outside{background:#fafcfb}
 .calendar-day-number{font-size:12px}
+.calendar-day{position:relative;cursor:pointer}.calendar-day-number{display:flex;align-items:center;justify-content:space-between}.calendar-day-add{display:grid;place-items:center;width:20px;height:20px;border:0;border-radius:50%;background:transparent;color:#7e9388;opacity:0;cursor:pointer;transition:opacity .16s ease,background .16s ease,color .16s ease}.calendar-day:hover .calendar-day-add,.calendar-day:focus-within .calendar-day-add{opacity:1}.calendar-day-add:hover{background:#dff2e8;color:var(--cal-green)}.calendar-day-add .nf-icon{font-size:10px}.calendar-day-events{pointer-events:none}.calendar-day-events .calendar-event-chip{pointer-events:auto}
 .calendar-day-events{gap:5px}
 .calendar-time-grid{margin-top:18px;overflow:auto;border:1px solid var(--cal-line);border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(30,79,56,.05)}
 .calendar-time-head,.calendar-all-day-row,.calendar-time-body{display:grid;grid-template-columns:72px repeat(7,minmax(130px,1fr));min-width:980px}

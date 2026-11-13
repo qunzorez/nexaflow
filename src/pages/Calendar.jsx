@@ -68,7 +68,7 @@ function viewTitle(date, view) {
 
 function EventChip({ event, onOpen, compact = false }) {
   return (
-    <button type="button" className={`calendar-event-chip ${event.kind}${compact ? " compact" : ""}`} onClick={() => onOpen(event)} title={`${event.title} · ${event.subtitle}`}>
+    <button type="button" className={`calendar-event-chip ${event.kind}${compact ? " compact" : ""}`} onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event); }} title={`${event.title} · ${event.subtitle}`}>
       <Icon name={event.kind === "task" ? "check" : "calendar"} />
       <span>{event.title}</span>
     </button>
@@ -186,7 +186,7 @@ export default function Calendar() {
               <span className="calendar-legend-item"><i className="calendar-legend-dot service" />Бухгалтерські послуги</span>
             </div>
 
-            {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)}><span className="calendar-day-number">{date.getDate()}</span><div className="calendar-day-events">{dayEvents.slice(0, 3).map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}{dayEvents.length > 3 && <small>+{dayEvents.length - 3} ще</small>}</div></div>; })}</div></>}
+            {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)} onClick={() => navigate(`/tasks?create=1&due_date=${dateKey(date)}`)} role="button" tabIndex="0" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") navigate(`/tasks?create=1&due_date=${dateKey(date)}`); }}><span className="calendar-day-number"><span>{date.getDate()}</span><button type="button" className="calendar-day-add" onClick={event => { event.stopPropagation(); navigate(`/tasks?create=1&due_date=${dateKey(date)}`); }} aria-label={`Створити задачу на ${dateKey(date)}`}><Icon name="plus" /></button></span><div className="calendar-day-events">{dayEvents.slice(0, 3).map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}{dayEvents.length > 3 && <small>+{dayEvents.length - 3} ще</small>}</div></div>; })}</div></>}
 
             {view === "week" && <TimeGrid days={calendarDays} eventsByDay={eventsByDay} onOpen={openEvent} />}
 
