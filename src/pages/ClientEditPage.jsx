@@ -37,6 +37,7 @@ export default function ClientEditPage() {
         special_taxes: client.special_taxes || [],
         module: client.module || window.localStorage.getItem("nexaflow.client.module") || "accounting",
         module_data: client.module_data || {},
+        services: (client.services || []).map((service) => ({ ...service, is_package: Boolean(service.is_package || service.package_id) })),
       });
     });
   }, [id, navigate]);

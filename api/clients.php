@@ -155,7 +155,7 @@ $services = array_values(array_filter(array_map(static function ($service): arra
         'period' => in_array((string)($service['period'] ?? 'Місяць'), $allowedPeriods, true) ? (string)$service['period'] : 'Місяць',
         'official_due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($service['official_due_date'] ?? '')) ? (string)$service['official_due_date'] : '',
         'accountant_id' => trim((string)($service['accountant_id'] ?? '')),
-        'is_package' => !empty($service['is_package']),
+        'is_package' => !empty($service['is_package']) || trim((string)($service['package_id'] ?? '')) !== '',
         'package_id' => trim((string)($service['package_id'] ?? '')),
         'package_name' => trim((string)($service['package_name'] ?? '')),
         'package_services' => array_values(array_filter(array_map(static fn($item): string => trim((string)$item), (array)($service['package_services'] ?? [])), static fn(string $item): bool => $item !== '')),
