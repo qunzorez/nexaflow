@@ -126,6 +126,7 @@ export default function TaskFormModal({
                   <select name="status" defaultValue={editing.status || "todo"}>
                     <option value="todo">До виконання</option>
                     <option value="in_progress">У роботі</option>
+                    <option value="review">На перевірці</option>
                     <option value="done">Завершено</option>
                     <option value="cancelled">Скасовано</option>
                     <option value="archived">Архів</option>
