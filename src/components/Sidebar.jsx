@@ -82,6 +82,9 @@ export default function Sidebar({ user, open }) {
             Команда <b>{counts.team}</b>
           </Link>
         )}
+        {canManage && <Link className="nav-item" to="/services">
+          <span><Icon name="subscription" /></span> Послуги
+        </Link>}
         {isAdmin && (
           <Link className="nav-item" to="/notifications">
             <span className="nav-icon">
@@ -91,9 +94,6 @@ export default function Sidebar({ user, open }) {
           </Link>
         )}
         <p className="nav-label">РОБОЧІ ІНСТРУМЕНТИ</p>
-        {canManage && <Link className="nav-item" to="/services">
-          <span><Icon name="subscription" /></span> Послуги
-        </Link>}
         <Link className="nav-item" to="/calendar">
           <span><Icon name="calendar" /></span> Календар <b>0</b>
         </Link>
