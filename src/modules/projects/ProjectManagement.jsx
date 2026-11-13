@@ -9,6 +9,11 @@ import './project-member-add.css';
 
 const initials = name => String(name || '?').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
 
+function MemberAvatar({ member }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  return <span className="member-avatar">{member.avatar_url && !imageFailed ? <img src={member.avatar_url} alt="" onError={() => setImageFailed(true)} /> : initials(member.name)}</span>;
+}
+
 export default function ProjectManagement({ projectId, canManageTeam = false, members = [], groups = [], availableUsers = [], onChanged }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +49,7 @@ export default function ProjectManagement({ projectId, canManageTeam = false, me
     <section className="management-section">
       <div className="management-section-head"><div><h3>Учасники проєкту</h3><p>Переглядайте учасників і призначені їм claims. Керування виконується на сторінці «Команда».</p></div><div className="section-head-actions"><button type="button" className="primary-action add-member-btn" disabled={!canManageTeam} onClick={() => setShowAdd(value => !value)}><Icon name="plus" /> Додати учасника</button><span>{members.length}</span></div></div>
       {showAdd && canManageTeam && <div className="member-add-panel"><div className="add-mode-tabs"><button type="button" className={mode === 'existing' ? 'active' : ''} onClick={() => setMode('existing')}>Додати наявного</button><button type="button" className={mode === 'invite' ? 'active' : ''} onClick={() => setMode('invite')}>Запросити по email</button></div>{mode === 'existing' ? <div className="add-member-row existing-member-row"><SearchableUserSelect users={availableForProject} value={selectedUser} onChange={setSelectedUser} /><button type="button" className="primary-action" onClick={addExisting}>Додати</button></div> : <form className="add-member-row" onSubmit={inviteNew}><input type="email" name="email" required placeholder="name@company.com" /><button className="primary-action">Відправити запрошення</button></form>}</div>}
-      <div className="member-management-list">{members.map(item => <div className="managed-member" key={item.user_id}><span className="member-avatar">{initials(item.name)}</span><div className="member-info"><strong>{item.name}</strong><small>{item.email}</small></div><span className="role-badge project-member-claim">{item.group_names || 'Учасник'}</span><button type="button" className="remove-member" disabled={!canManageTeam} onClick={() => action({ action: 'remove_member', user_id: item.user_id })}>Видалити</button></div>)}</div>
+      <div className="member-management-list">{members.map(item => <div className="managed-member" key={item.user_id}><MemberAvatar member={item} /><div className="member-info"><strong>{item.name}</strong><small>{item.email}</small></div><span className="role-badge project-member-claim">{item.group_names || 'Учасник'}</span><button type="button" className="remove-member" disabled={!canManageTeam} onClick={() => action({ action: 'remove_member', user_id: item.user_id })}>Видалити</button></div>)}</div>
     </section>
   </div>;
 }
