@@ -35,6 +35,28 @@ body { background: var(--bg); color: var(--ink); }
 .review-notification-action:hover { border-color: #333; background: #333; color: #fff; }
 .review-notification-row { border-color: #e5e5e5; }
 
+/* Dashboard keeps the NexaFlow green as its product-level accent. */
+.dashboard-page { background: radial-gradient(circle at 88% 2%, #e9f7ef 0, transparent 23rem); }
+.dashboard-page::before { border-color: #e2f4e9; }
+.dashboard-page .welcome-row { background: linear-gradient(120deg, #fff 0%, #f5fbf7 100%); border-color: #dcebe2; }
+.dashboard-page .welcome-row::after { border-color: #dff2e7; }
+.dashboard-page .welcome-row h1 span { color: #1f8a68; }
+.dashboard-page .welcome-row h1 span::after { background: #c9ecd9; }
+.dashboard-page .dashboard-actions .primary-action { background: #1f8a68; box-shadow: 0 8px 16px #1f8a682b; }
+.dashboard-page .dashboard-actions .outline-btn { border-color: #b9d9c6; color: #1f8a68; }
+.dashboard-page .stat-icon { background: #e2f4e8; color: #1f8a68; box-shadow: inset 0 0 0 1px #ccebd8; }
+.dashboard-page .stat-card:hover, .dashboard-page .panel:hover { border-color: #c4e2d0; }
+.dashboard-page .project-status.active { background: #eaf5ee; color: #1f8a68; box-shadow: inset 0 0 0 1px #d1ecdc; }
+.dashboard-page .team-chart-bar-track span { background: linear-gradient(180deg, #5bc394, #1f8a68); }
+
+/* Review status intentionally remains purple, including its action button. */
+.review-notification-panel { border-left-color: #8b70d6; background: linear-gradient(110deg, #faf8ff, #fff); }
+.review-notification-count { background: #f0eafd; color: #7257b4; border-color: #ded4f7; }
+.review-notification-heading-actions > .nf-icon { color: #7257b4; }
+.review-notification-action { border-color: #8b70d6; background: #7257b4; color: #fff; }
+.review-notification-action:hover { border-color: #6447aa; background: #6447aa; color: #fff; }
+.dashboard-page .review-notification-panel:hover { border-color: #ded4f7; border-left-color: #8b70d6; }
+
 /* Legacy page-level colors kept outside the design tokens. */
 input:focus, textarea:focus, select:focus,
 .task-search:focus-within, .dashboard-task-tools label:focus-within,
