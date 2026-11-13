@@ -114,10 +114,20 @@ if ($action === 'create' || $action === 'update') {
             $clientCheck = $pdo->prepare('SELECT c.id FROM clients c LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.id = ? AND (c.created_by = ? OR cm.user_id IS NOT NULL) LIMIT 1');
         }
         foreach ($clientIds as $clientId) {
-            if ($canManage) $clientCheck->execute([$clientId]);
-            else $clientCheck->execute([$userId, $clientId, $userId]);
-            if (!$clientCheck->fetchColumn()) jsonResponse(false, 'У вас немає доступу до одного з вибраних клієнтів.', [], 403);
+            if ($canManage) {
+                $clientCheck->execute([$clientId]);
+                $hasClientAccess = (bool)$clientCheck->fetchColumn();
+            } else {
+                $clientCheck->execute([$userId, $clientId, $userId]);
+                $hasClientAccess = (bool)$clientCheck->fetchColumn();
+                $clientCheck->closeCursor();
+                if (!$hasClientAccess) {
+                    $clientClaims = resourceClaims($pdo, $userId, 'client', $clientId);
+                    $hasClientAccess = hasClaim($clientClaims, 'read');
+                }
+            }
             $clientCheck->closeCursor();
+            if (!$hasClientAccess) jsonResponse(false, 'У вас немає доступу до одного з вибраних клієнтів.', [], 403);
         }
     }
     $primaryProject = $projectIds[0] ?? null; $primaryAssignee = $assigneeIds[0] ?? null; $oldAssigneeIds = [];
