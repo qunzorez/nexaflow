@@ -147,6 +147,35 @@ $services = array_values(array_filter(array_map(static function ($service): arra
         'task_id' => preg_match('/^[a-f0-9]{32}$/', (string)($service['task_id'] ?? '')) ? (string)$service['task_id'] : '',
     ];
 }, (array)($data['services'] ?? [])), static fn(array $service): bool => $service['name'] !== ''));
+$requestedAccountantIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['accountant_id'] ?? ''), $services))));
+if ($requestedAccountantIds) {
+    $accountingGroupIds = [];
+    foreach ($pdo->query('SELECT id, name FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+        $name = (string)$group['name'];
+        $nameHex = strtoupper(bin2hex($name));
+        if (preg_match('/(?:бухгалт|бугалт|account)/iu', $name)
+            || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0
+            || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) {
+            $accountingGroupIds[(string)$group['id']] = true;
+        }
+    }
+    $allowedAccountantIds = [];
+    if ($accountingGroupIds) {
+        $groupMarks = implode(',', array_fill(0, count($accountingGroupIds), '?'));
+        $membershipQuery = $pdo->prepare("SELECT DISTINCT user_id FROM project_group_members WHERE group_id IN ($groupMarks)");
+        $membershipQuery->execute(array_keys($accountingGroupIds));
+        $allowedAccountantIds = array_fill_keys(array_map('strval', $membershipQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+    }
+    if ($user['role'] === 'manager' && $allowedAccountantIds) {
+        $teamUsersQuery = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE u.id = ? OR EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted')");
+        $teamUsersQuery->execute([$userId, $userId, $userId]);
+        $managerTeamIds = array_fill_keys(array_map('strval', $teamUsersQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+        $allowedAccountantIds = array_filter($allowedAccountantIds, static fn($_, $id): bool => isset($managerTeamIds[(string)$id]), ARRAY_FILTER_USE_BOTH);
+    }
+    foreach ($requestedAccountantIds as $accountantId) {
+        if (!isset($allowedAccountantIds[$accountantId])) jsonResponse(false, 'Відповідального бухгалтера не знайдено у вашій команді.', [], 422);
+    }
+}
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
 if ($action === 'update' && $id !== '') {
     $pdo->prepare('UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ? WHERE id = ?')->execute([$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $id]);

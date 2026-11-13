@@ -305,7 +305,9 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     if (saved) set("services", services);
     setSavingServiceIndex(null);
   };
-  const eligibleAccountants = clientId ? (availableUsersByClient[clientId] || []) : availableUsers;
+  // Create and edit must use the same manager-scoped list. The per-client
+  // membership list is narrower and made the edit form behave differently.
+  const eligibleAccountants = availableUsers;
   const removeService = (index) => set("services", (form.services || []).filter((_, itemIndex) => itemIndex !== index));
   const serviceTotal = (form.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0);
   const rememberServicePrice = (name, price) => {
