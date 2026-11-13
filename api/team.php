@@ -168,13 +168,29 @@ try {
 
     if ($action === 'assign_role') {
         $projectId = trim((string)($data['project_id'] ?? ''));
-        $userId = trim((string)($data['user_id'] ?? ''));
+        $targetUserId = trim((string)($data['user_id'] ?? ''));
         $role = trim((string)($data['role'] ?? 'member'));
-        if ($projectId === '' || $userId === '' || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) {
+        if ($projectId === '' || $targetUserId === '' || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) {
             jsonResponse(false, 'Оберіть проєкт, користувача та коректну роль.', [], 422);
         }
+
+        // A manager may only change roles in projects they own. Administrators
+        // retain global management access, but the target project and user must
+        // still exist so this endpoint cannot create orphan memberships.
+        $projectCheck = $pdo->prepare('SELECT owner_id FROM projects WHERE id = ? LIMIT 1');
+        $projectCheck->execute([$projectId]);
+        $projectOwnerId = $projectCheck->fetchColumn();
+        $projectCheck->closeCursor();
+        if (!$projectOwnerId) jsonResponse(false, 'Проєкт не знайдено.', [], 404);
+        if (!$isAdmin && (string)$projectOwnerId !== (string)$_SESSION['user_id']) {
+            jsonResponse(false, 'Керувати ролями можна лише у власному проєкті.', [], 403);
+        }
+
+        $targetCheck = $pdo->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
+        $targetCheck->execute([$targetUserId]);
+        if (!$targetCheck->fetchColumn()) jsonResponse(false, 'Користувача не знайдено.', [], 404);
         $upsert = $pdo->prepare('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), updated_at = CURRENT_TIMESTAMP');
-        $upsert->execute([$projectId, $userId, $role]);
+        $upsert->execute([$projectId, $targetUserId, $role]);
         jsonResponse(true, 'Роль користувача оновлено.');
     }
 
