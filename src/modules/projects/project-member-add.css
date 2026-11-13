@@ -8,6 +8,13 @@
 .member-add-panel .add-member-row{display:grid;grid-template-columns:minmax(0,1fr) 220px auto;gap:10px;align-items:center}
 .member-add-panel .existing-member-row{grid-template-columns:minmax(180px,1fr) 200px auto}
 .member-add-panel input,.member-add-panel select{width:100%;min-width:0}
+.member-add-panel .invite-member-row{grid-template-columns:minmax(0,1fr) 220px}
+.invite-email-field{display:flex;align-items:center;gap:10px;height:42px;padding:0 13px;border:1px solid #d5e4dc;border-radius:10px;background:#fff;color:#7b8e85;box-shadow:0 3px 10px rgba(31,138,104,.04);transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
+.invite-email-field:focus-within{border-color:#70b897;background:#fff;box-shadow:0 0 0 4px rgba(31,138,104,.11)}
+.invite-email-field .nf-icon{display:grid;place-items:center;flex:none;width:18px;color:#1f8a68;font-size:14px}
+.invite-email-field input{height:40px;padding:0!important;border:0!important;outline:0!important;background:transparent!important;color:var(--ink);font-size:12px;box-shadow:none!important}
+.invite-email-field input::placeholder{color:#9ba9a2}
+.invite-member-row .primary-action{height:42px;padding:0 18px;white-space:nowrap}
 .searchable-user-select{position:relative;min-width:0}
 .searchable-user-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#fff;color:#283a34;font-size:11px;text-align:left;cursor:pointer;min-height:38px}
 .searchable-user-trigger span{color:#168363;font-size:15px;line-height:1}
@@ -18,4 +25,4 @@
 .searchable-user-option:hover{background:#eef8f2;color:#168363}
 .searchable-user-option small{color:var(--muted);font-size:10px;margin-top:3px}
 .searchable-user-empty{padding:12px 10px;color:var(--muted);font-size:11px}
-@media (max-width:760px){.section-head-actions{align-items:flex-end;flex-direction:column}.member-add-panel .add-member-row,.member-add-panel .existing-member-row{grid-template-columns:1fr}.member-add-panel .primary-action{width:100%}}
+@media (max-width:760px){.section-head-actions{align-items:flex-end;flex-direction:column}.member-add-panel .add-member-row,.member-add-panel .existing-member-row,.member-add-panel .invite-member-row{grid-template-columns:1fr}.member-add-panel .primary-action{width:100%}}
