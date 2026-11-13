@@ -455,6 +455,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               <label>
                 Назва клієнта
                 <input
+                  name="name"
                   value={form.name}
                   onChange={(event) => set("name", event.target.value)}
                   required

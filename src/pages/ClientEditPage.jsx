@@ -42,10 +42,12 @@ export default function ClientEditPage() {
     event.preventDefault();
     setError("");
     setNotice("");
-    const result = await post("/api/clients.php", { ...form, action: "update", id });
+    const submittedName = new FormData(event.currentTarget).get("name");
+    const submittedForm = { ...form, name: typeof submittedName === "string" ? submittedName.trim() : form.name };
+    const result = await post("/api/clients.php", { ...submittedForm, action: "update", id });
     if (!result.ok) return setError(result.message);
     if (result.client?.name) setForm((current) => ({ ...current, name: result.client.name }));
-    const services = [...(form.services || [])];
+    const services = [...(submittedForm.services || [])];
     let taskError = "";
     let tasksChanged = false;
     let tasksCreated = 0;
@@ -54,7 +56,7 @@ export default function ClientEditPage() {
     for (let index = 0; index < services.length; index += 1) {
       const service = services[index];
       if (!service.create_task || !service.name || service.task_id) continue;
-      const taskResult = await post("/api/tasks.php", serviceTaskPayload(form, service, id));
+      const taskResult = await post("/api/tasks.php", serviceTaskPayload(submittedForm, service, id));
       if (!taskResult.ok) {
         taskError = taskResult.message;
         continue;
@@ -65,7 +67,7 @@ export default function ClientEditPage() {
       tasksCreated += 1;
     }
     if (tasksChanged) {
-      const taskSave = await post("/api/clients.php", { ...form, services, action: "update", id });
+      const taskSave = await post("/api/clients.php", { ...submittedForm, services, action: "update", id });
       if (!taskSave.ok) {
         await removeCreatedTasks();
         return setError(`Дані клієнта збережено, але не вдалося прив’язати створені задачі: ${taskSave.message}`);

@@ -36,10 +36,12 @@ export default function ClientCreatePage() {
   async function save(event) {
     event.preventDefault();
     setError("");
-    const result = await post("/api/clients.php", { ...form, action: "create" });
+    const submittedName = new FormData(event.currentTarget).get("name");
+    const submittedForm = { ...form, name: typeof submittedName === "string" ? submittedName.trim() : form.name };
+    const result = await post("/api/clients.php", { ...submittedForm, action: "create" });
     if (!result.ok) return setError(result.message);
     const clientId = result.id || result.data?.id;
-    const services = [...(form.services || [])];
+    const services = [...(submittedForm.services || [])];
     const createdTaskIds = [];
     const rollback = async () => {
       await Promise.all(createdTaskIds.map((taskId) => post("/api/tasks.php", { action: "delete", id: taskId })));
@@ -48,7 +50,7 @@ export default function ClientCreatePage() {
     for (let index = 0; index < services.length; index += 1) {
       const service = services[index];
       if (!service.create_task || !service.name) continue;
-      const taskResult = await post("/api/tasks.php", serviceTaskPayload(form, service, clientId));
+      const taskResult = await post("/api/tasks.php", serviceTaskPayload(submittedForm, service, clientId));
       if (!taskResult.ok) {
         await rollback();
         return setError(`Не вдалося зберегти клієнта і пов’язані задачі: ${taskResult.message}`);
@@ -57,7 +59,7 @@ export default function ClientCreatePage() {
       services[index] = { ...service, task_id: taskResult.task_id || "" };
     }
     if (services.some((service, index) => service.task_id !== (form.services || [])[index]?.task_id)) {
-      const updateResult = await post("/api/clients.php", { ...form, services, action: "update", id: clientId });
+      const updateResult = await post("/api/clients.php", { ...submittedForm, services, action: "update", id: clientId });
       if (!updateResult.ok) {
         await rollback();
         return setError(`Не вдалося завершити збереження клієнта: ${updateResult.message}`);
