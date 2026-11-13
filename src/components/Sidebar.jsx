@@ -93,12 +93,12 @@ export default function Sidebar({ user, open }) {
         <Link className="nav-item" to="/calendar">
           <span><Icon name="calendar" /></span> Календар <b>0</b>
         </Link>
-        <a className="nav-item disabled" href="#">
+        <span className="nav-item disabled" aria-disabled="true">
           <span><Icon name="document" /></span> Документи <b>0</b>
-        </a>
-        <a className="nav-item disabled" href="#">
+        </span>
+        <span className="nav-item disabled" aria-disabled="true">
           <span><Icon name="chart" /></span> Аналітика <b>0</b>
-        </a>
+        </span>
       </nav>
       <div className="sidebar-bottom">
         <button className="logout" onClick={logout}>
