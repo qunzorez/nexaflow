@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
 import { ClientFormModal, emptyForm, serviceTaskPayload } from "./Clients.jsx";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./clients.css";
 
 export default function ClientCreatePage() {
@@ -72,6 +73,7 @@ export default function ClientCreatePage() {
   }
 
   if (!user) return <div className="loading-screen">Завантаження форми клієнта…</div>;
+  const clientLimitReached = isPlanLimitReached(user.subscription, "clients");
   return (
     <Layout page="Новий клієнт" user={user}>
       <div className="content clients-page client-create-page">
@@ -80,6 +82,7 @@ export default function ClientCreatePage() {
           <div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Створити клієнта</h1><p className="subtext">Заповніть дані клієнта за полями активного модуля.</p></div>
         </section>
         {error && <div className="form-notice">{error}</div>}
+        {clientLimitReached && <div className="form-notice plan-limit-message">{planLimitHint(user.subscription, "clients")}</div>}
         <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>

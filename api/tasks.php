@@ -25,6 +25,7 @@ $userQuery = $pdo->prepare('SELECT id, name, email, role, avatar_url FROM users 
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
+$user['subscription'] = planSettingsPayload($planContext);
 $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
 $claimTaskId = trim((string)($data['id'] ?? $data['task_id'] ?? $_GET['id'] ?? ''));
 if ($claimTaskId !== '') {
@@ -152,6 +153,7 @@ if ($action === 'create' || $action === 'update') {
     } catch (Throwable $error) {
         error_log('Task notification error: ' . $error->getMessage());
     }
+    if ($action === 'create') { $taskPlanLimit = $planContext['plan']['tasks_month'] ?? null; if ($taskPlanLimit !== null && (int)$planContext['counts']['tasks_month'] + 1 >= (int)$taskPlanLimit) notifyPlanCapacityReached($planContext, 'tasks_month', (int)$taskPlanLimit, (int)$taskPlanLimit); }
     jsonResponse(true, $action === 'create' ? 'Задачу створено.' : 'Задачу оновлено.', ['task_id' => $taskId]);
 }
 if ($action === 'delete') $action = 'archive';

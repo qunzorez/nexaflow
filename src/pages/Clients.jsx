@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import DateTimePicker from "../components/DateTimePicker.jsx";
 import SearchableSelect from "../components/SearchableSelect.jsx";
 import "./clients.css";
@@ -280,6 +281,7 @@ function FieldTip({ children }) {
   </span>;
 }
 export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [], currentUserId = "", subscription = null }) {
+  const clientCreationLimitReached = !editing && isPlanLimitReached(subscription, "clients");
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState("");
@@ -629,8 +631,8 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               <button type="button" className="outline-btn" onClick={onClose}>
                 Скасувати
               </button>
-              <button className={`primary-action client-submit-action ${editing ? "is-save" : "is-create"}`}>
-                {editing ? "Зберегти зміни" : "Створити клієнта"}
+              <button className={`primary-action client-submit-action ${editing ? "is-save" : "is-create"}`} disabled={clientCreationLimitReached} title={clientCreationLimitReached ? planLimitHint(subscription, "clients") : undefined}>
+                {editing ? "Зберегти зміни" : clientCreationLimitReached ? "Ліміт клієнтів досягнуто" : "Створити клієнта"}
               </button>
             </div>
           </form>
@@ -777,6 +779,7 @@ export default function Clients() {
   }
   if (!data)
     return <div className="loading-screen">Завантаження клієнтів…</div>;
+  const clientLimitReached = isPlanLimitReached(data.user?.subscription, "clients");
   const filtered = data.clients.filter((client) => {
     const text =
       `${client.name} ${client.legal_form} ${client.tax_system}`.toLowerCase();
@@ -819,9 +822,11 @@ export default function Clients() {
             <button
               className="primary-action client-create-action"
               type="button"
+              disabled={clientLimitReached}
+              title={clientLimitReached ? planLimitHint(data.user.subscription, "clients") : undefined}
               onClick={openCreate}
             >
-              <Icon name="plus" /> Новий клієнт
+              <Icon name="plus" /> {clientLimitReached ? "Ліміт клієнтів досягнуто" : "Новий клієнт"}
             </button>
           )}
         </section>

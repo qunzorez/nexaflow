@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
 import { api, post } from "../services/api.js";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./tasks.css";
 import "./tasks-multiselect.css";
 import "./tasks-page-extra.css";
@@ -172,6 +173,7 @@ export default function Tasks() {
   const [initialDueDate, setInitialDueDate] = useState("");
   const [archivePrompt, setArchivePrompt] = useState(null);
   const navigate = useNavigate();
+  const taskLimitReached = isPlanLimitReached(data?.user?.subscription, "tasks_month");
   const openedFromQuery = useRef(false);
   async function load() {
     const [result, clients] = await Promise.all([
@@ -204,6 +206,11 @@ export default function Tasks() {
     window.localStorage.setItem("nexaflow.tasks.filter", filter);
   }, [filter]);
   function createTask(dueDate = "") {
+    if (taskLimitReached) {
+      setNotice(planLimitHint(data?.user?.subscription, "tasks_month"));
+      if (params.get("create") === "1") navigate("/tasks", { replace: true });
+      return;
+    }
     setModalError("");
     setEditing(null);
     setProjectIds([]);
@@ -331,6 +338,8 @@ export default function Tasks() {
           <button
             className="primary-action hero-create"
             type="button"
+            disabled={taskLimitReached}
+            title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined}
             onClick={createTask}
           >
             <Icon name="plus" /> Створити задачу
@@ -530,6 +539,7 @@ export default function Tasks() {
             data={data}
             editing={editing}
             error={modalError}
+            createDisabled={!editing && taskLimitReached}
             projectIds={projectIds}
             assigneeIds={assigneeIds}
             clientIds={clientIds}

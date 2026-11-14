@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import ReminderModal from "../modules/tasks/ReminderModal.jsx";
 import "./task-review-status.css";
 import "./dashboard-tasks.css";
@@ -79,6 +80,8 @@ export default function Dashboard() {
   const isAdmin = ["admin", "owner"].includes(data.user.role);
   const isManager = data.user.role === "manager";
   const hasAnalytics = Boolean(data.user.subscription?.features?.analytics);
+  const taskLimitReached = isPlanLimitReached(data.user.subscription, "tasks_month");
+  const projectLimitReached = isPlanLimitReached(data.user.subscription, "projects");
   const showProjectInsights = !isAdmin;
   const adminMetrics = isAdmin
     ? [
@@ -182,11 +185,11 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="dashboard-actions">
-            <Link className="primary-action" to="/tasks?create=1">
+            <Link aria-disabled={taskLimitReached} title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined} className={`primary-action${taskLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => taskLimitReached && event.preventDefault()} to="/tasks?create=1">
               <Icon name="plus" /> Створити задачу
             </Link>
             {canManage && (
-              <Link className="outline-btn" to="/projects/new">
+              <Link aria-disabled={projectLimitReached} title={projectLimitReached ? planLimitHint(data.user.subscription, "projects") : undefined} className={`outline-btn${projectLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => projectLimitReached && event.preventDefault()} to="/projects/new">
                 <Icon name="plus" /> Створити проєкт
               </Link>
             )}
@@ -312,8 +315,8 @@ export default function Dashboard() {
                     : "Коли менеджер додасть вас до проєкту, він з’явиться тут."}
                 </p>
                 {canManage && (
-                  <Link className="outline-btn" to="/projects/new">
-                    <Icon name="plus" /> Створити проєкт
+                  <Link aria-disabled={projectLimitReached} title={projectLimitReached ? planLimitHint(data.user.subscription, "projects") : undefined} className={`outline-btn${projectLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => projectLimitReached && event.preventDefault()} to="/projects/new">
+                    <Icon name="plus" /> {projectLimitReached ? "Ліміт проєктів досягнуто" : "Створити проєкт"}
                   </Link>
                 )}
               </div>
@@ -379,7 +382,7 @@ export default function Dashboard() {
               <div className="dashboard-task-empty">
                 <span><Icon name="check" /></span>
                 <p>Задач за цим фільтром немає.</p>
-                <Link className="outline-btn" to="/tasks?create=1">
+                <Link aria-disabled={taskLimitReached} title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined} className={`outline-btn${taskLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => taskLimitReached && event.preventDefault()} to="/tasks?create=1">
                   Створити задачу
                 </Link>
               </div>

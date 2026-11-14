@@ -254,6 +254,7 @@ if (empty($planContext['plan']['services'])) {
     if ($serviceLimit !== null) {
         $standaloneCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
         if ($standaloneCount > (int)$serviceLimit && $addedStandalone > 0) {
+            notifyPlanCapacityReached($planContext, 'services_per_client', (int)$serviceLimit, (int)$serviceLimit);
             jsonResponse(false, 'У плані «' . $planContext['plan']['name'] . '» можна додати не більше ' . (int)$serviceLimit . ' послуг на одного клієнта.', ['code' => 'plan_limit_reached', 'metric' => 'services_per_client', 'limit' => (int)$serviceLimit, 'current' => (int)$serviceLimit, 'plan' => $planContext['key']], 403);
         }
     } elseif ($addedStandalone > 0) {
@@ -269,9 +270,15 @@ if ($action === 'update' && $id !== '') {
     $savedClientQuery = $pdo->prepare('SELECT id, name FROM clients WHERE id = ? LIMIT 1');
     $savedClientQuery->execute([$id]);
     $savedClient = $savedClientQuery->fetch();
+    if ($serviceLimit !== null && $addedStandalone > 0 && $standaloneCount >= (int)$serviceLimit) notifyPlanCapacityReached($planContext, 'services_per_client', (int)$serviceLimit, (int)$serviceLimit);
     jsonResponse(true, 'Дані клієнта оновлено.', ['client' => $savedClient]);
 }
 requirePlanCapacity($planContext, 'clients');
 $newId = bin2hex(random_bytes(16));
 $pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $userId]);
-jsonResponse(true, 'Клієнта створено.', ['id' => $newId]);
+    $clientPlanLimit = $planContext['plan']['clients'] ?? null;
+    if ($clientPlanLimit !== null && (int)$planContext['counts']['clients'] + 1 >= (int)$clientPlanLimit) notifyPlanCapacityReached($planContext, 'clients', (int)$clientPlanLimit, (int)$clientPlanLimit);
+    $clientServiceLimit = $planContext['plan']['services_per_client'] ?? null;
+    $clientStandaloneServiceCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
+    if ($clientServiceLimit !== null && $clientStandaloneServiceCount >= (int)$clientServiceLimit) notifyPlanCapacityReached($planContext, 'services_per_client', (int)$clientServiceLimit, (int)$clientServiceLimit);
+    jsonResponse(true, 'Клієнта створено.', ['id' => $newId]);

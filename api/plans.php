@@ -144,12 +144,38 @@ function telegramPlanAvailable(PDO $pdo, string $userId): bool
     return $cache[$userId] = !empty($plans[$key]['telegram']);
 }
 
+function notifyPlanCapacityReached(array $context, string $metric, int $current, int $limit): void
+{
+    global $pdo;
+    $labels = ['projects' => 'проєктів', 'clients' => 'клієнтів', 'tasks_month' => 'задач цього місяця', 'participants' => 'учасників', 'services_per_client' => 'окремих послуг на клієнта'];
+    $title = 'Досягнуто ліміту плану';
+    $message = 'У плані «' . $context['plan']['name'] . '» вичерпано ліміт ' . ($labels[$metric] ?? $metric) . ' (' . $current . ' з ' . $limit . '). Перегляньте доступні плани в Налаштуваннях.';
+    try {
+        $memberIds = array_values(array_unique(array_map('strval', $context['member_ids'] ?? [])));
+        if (!$memberIds) $memberIds = [(string)$context['owner_id']];
+        $marks = implode(',', array_fill(0, count($memberIds), '?'));
+        $managers = $pdo->prepare("SELECT id FROM users WHERE id IN ({$marks}) AND role IN ('manager','admin','owner')");
+        $managers->execute($memberIds);
+        $recipients = $managers->fetchAll(PDO::FETCH_COLUMN);
+        if (!$recipients) $recipients = [(string)$context['owner_id']];
+        $exists = $pdo->prepare("SELECT id FROM notifications WHERE user_id = ? AND type = 'plan_limit' AND title = ? AND message = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) LIMIT 1");
+        $insert = $pdo->prepare("INSERT INTO notifications (id, user_id, type, title, message) VALUES (?, ?, 'plan_limit', ?, ?)");
+        foreach ($recipients as $recipientId) {
+            $exists->execute([$recipientId, $title, $message]);
+            if (!$exists->fetchColumn()) $insert->execute([bin2hex(random_bytes(16)), $recipientId, $title, $message]);
+        }
+    } catch (Throwable $notificationError) {
+        error_log('Plan limit notification error: ' . $notificationError->getMessage());
+    }
+}
+
 function requirePlanCapacity(array $context, string $metric, int $add = 1): void
 {
     $limit = $context['plan'][$metric] ?? null;
     if ($limit === null) return;
     $current = (int)($context['counts'][$metric] ?? 0);
     if ($current + $add <= (int)$limit) return;
+    notifyPlanCapacityReached($context, $metric, max($current, (int)$limit), (int)$limit);
     jsonResponse(false, 'Досягнуто ліміту плану «' . $context['plan']['name'] . '». Перегляньте доступні плани в Налаштуваннях.', ['code' => 'plan_limit_reached', 'metric' => $metric, 'limit' => (int)$limit, 'current' => $current, 'plan' => $context['key']], 403);
 }
 

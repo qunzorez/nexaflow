@@ -193,6 +193,8 @@ try {
         }
         $inviteMessage = $invited ? " Запрошень створено: {$invited}; успішно передано поштовому серверу: {$sent}." : '';
         if ($failed) $inviteMessage .= " Не вдалося передати: {$failed}. Перевірте Mailpit або SMTP-конфігурацію.";
+        $projectPlanLimit = $planContext['plan']['projects'] ?? null;
+        if ($projectPlanLimit !== null && (int)$planContext['counts']['projects'] + 1 >= (int)$projectPlanLimit) notifyPlanCapacityReached($planContext, 'projects', (int)$projectPlanLimit, (int)$projectPlanLimit);
         jsonResponse(true, 'Проєкт створено.' . $inviteMessage, ['project' => ['id' => $id, 'name' => $name], 'invited' => $invited, 'sent' => $sent, 'failed' => $failed]);
     }
 

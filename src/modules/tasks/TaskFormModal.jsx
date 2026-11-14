@@ -19,6 +19,7 @@ export default function TaskFormModal({
   data,
   editing,
   error,
+  createDisabled = false,
   projectIds,
   assigneeIds,
   clientIds,
@@ -161,8 +162,8 @@ export default function TaskFormModal({
               </label>
             )}
             <div className="task-form-actions">
-              <button className="primary-action">
-                {editing ? "Зберегти зміни" : "Створити задачу"}
+              <button className="primary-action" disabled={createDisabled} title={createDisabled ? "Вичерпано місячний ліміт задач у вашому плані." : undefined}>
+                {editing ? "Зберегти зміни" : createDisabled ? "Ліміт задач досягнуто" : "Створити задачу"}
               </button>
               <button type="button" className="outline-btn" onClick={onClose}>
                 Скасувати
