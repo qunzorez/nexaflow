@@ -32,7 +32,7 @@ $tasks = $pdo->query(
      LEFT JOIN projects p ON p.id = t.project_id
      WHERE t.reminder_at IS NOT NULL
        AND t.reminder_at <= NOW()
-       AND t.status IN ('todo', 'in_progress')
+       AND t.status IN ('todo', 'in_progress', 'review')
      ORDER BY t.reminder_at ASC
      LIMIT 200"
 )->fetchAll();

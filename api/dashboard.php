@@ -53,7 +53,7 @@ try {
     }
     $tasks = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $tasksQuery->fetchAll());
     $projects = claimRows($pdo, (string)$_SESSION['user_id'], 'project', $projects);
-    $remindersQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.reminder_at, t.due_date, p.name AS project_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE t.reminder_at IS NOT NULL AND t.reminder_at <= NOW() AND t.status IN ('todo', 'in_progress') AND ((t.created_by = ? AND t.creator_reminder = 1) OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)) ORDER BY t.reminder_at ASC LIMIT 8");
+    $remindersQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.reminder_at, t.due_date, p.name AS project_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE t.reminder_at IS NOT NULL AND t.reminder_at <= NOW() AND t.status IN ('todo', 'in_progress', 'review') AND ((t.created_by = ? AND t.creator_reminder = 1) OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)) ORDER BY t.reminder_at ASC LIMIT 8");
     $remindersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $reminders = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $remindersQuery->fetchAll());
     foreach ($reminders as $reminder) deliverDueReminder($pdo, (string)$_SESSION['user_id'], $reminder);
