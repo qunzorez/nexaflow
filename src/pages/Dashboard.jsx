@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import ReminderModal from "../modules/tasks/ReminderModal.jsx";
 import "./task-review-status.css";
 import "./dashboard-tasks.css";
@@ -45,7 +46,11 @@ const reminderLabel = (value) =>
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [reminderTask, setReminderTask] = useState(null);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(() => {
+    const message = window.sessionStorage.getItem("nexaflow.dashboard.notice") || "";
+    window.sessionStorage.removeItem("nexaflow.dashboard.notice");
+    return message;
+  });
   const [reviewPanelOpen, setReviewPanelOpen] = useState(() => window.localStorage.getItem("nexaflow.dashboard.reviewPanelOpen") !== "false");
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");
@@ -77,8 +82,11 @@ export default function Dashboard() {
     return <div className="loading-screen">Завантаження NexaFlow…</div>;
   const canManage = data.permissions.manage;
   const isAdmin = ["admin", "owner"].includes(data.user.role);
-  const isManager = data.user.role === "manager";
-  const showProjectInsights = !isAdmin;
+  const isManager = ["manager", "project_lead"].includes(data.user.workspace_role);
+  const hasAnalytics = Boolean(data.user.subscription?.features?.analytics);
+  const taskLimitReached = isPlanLimitReached(data.user.subscription, "tasks_month");
+  const projectLimitReached = isPlanLimitReached(data.user.subscription, "projects");
+  const showProjectInsights = canManage && !isAdmin;
   const adminMetrics = isAdmin
     ? [
         { value: data.metrics.users || 0, title: "Користувачі" },
@@ -181,11 +189,11 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="dashboard-actions">
-            <Link className="primary-action" to="/tasks?create=1">
+            <Link aria-disabled={taskLimitReached} title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined} className={`primary-action${taskLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => taskLimitReached && event.preventDefault()} to="/tasks?create=1">
               <Icon name="plus" /> Створити задачу
             </Link>
             {canManage && (
-              <Link className="outline-btn" to="/projects/new">
+              <Link aria-disabled={projectLimitReached} title={projectLimitReached ? planLimitHint(data.user.subscription, "projects") : undefined} className={`outline-btn${projectLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => projectLimitReached && event.preventDefault()} to="/projects/new">
                 <Icon name="plus" /> Створити проєкт
               </Link>
             )}
@@ -221,7 +229,7 @@ export default function Dashboard() {
                     <strong>{task.title}</strong>
                     <small>{task.project_name || "Без проєкту"}</small>
                   </div>
-                  <time>{reminderLabel(task.reminder_at)}</time>
+                  <time>{task.dashboard_reminder_kind === "deadline" ? "Дедлайн завтра" : reminderLabel(task.reminder_at)}</time>
                   <span className="reminder-arrow"><Icon name="right" /></span>
                 </button>
               ))}
@@ -311,8 +319,8 @@ export default function Dashboard() {
                     : "Коли менеджер додасть вас до проєкту, він з’явиться тут."}
                 </p>
                 {canManage && (
-                  <Link className="outline-btn" to="/projects/new">
-                    <Icon name="plus" /> Створити проєкт
+                  <Link aria-disabled={projectLimitReached} title={projectLimitReached ? planLimitHint(data.user.subscription, "projects") : undefined} className={`outline-btn${projectLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => projectLimitReached && event.preventDefault()} to="/projects/new">
+                    <Icon name="plus" /> {projectLimitReached ? "Ліміт проєктів досягнуто" : "Створити проєкт"}
                   </Link>
                 )}
               </div>
@@ -378,7 +386,7 @@ export default function Dashboard() {
               <div className="dashboard-task-empty">
                 <span><Icon name="check" /></span>
                 <p>Задач за цим фільтром немає.</p>
-                <Link className="outline-btn" to="/tasks?create=1">
+                <Link aria-disabled={taskLimitReached} title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined} className={`outline-btn${taskLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => taskLimitReached && event.preventDefault()} to="/tasks?create=1">
                   Створити задачу
                 </Link>
               </div>
@@ -386,7 +394,7 @@ export default function Dashboard() {
           </article>
         </section>
         {showProjectInsights && (
-          <section className="manager-dashboard-grid">
+          <section className={`manager-dashboard-grid${hasAnalytics ? "" : " analytics-disabled"}`}>
             <article className="panel manager-attention-panel">
               <div className="panel-heading"><div><h2>Потребує уваги</h2><p>Ключові речі, які варто перевірити.</p></div><Icon name="urgent" /></div>
               <div className="attention-cards">
@@ -400,7 +408,7 @@ export default function Dashboard() {
             {isManager && <><article className="panel manager-widget"><div className="panel-heading"><div><h2>Завантаженість команди</h2><p>Активні задачі за виконавцями.</p></div></div><div className="manager-list">{(managerDashboard.team_workload || []).slice(0, 6).map(person => <div className="manager-list-row" key={person.id}><span className="member-avatar">{person.avatar_url ? <img src={person.avatar_url} alt="" /> : <Icon name="user" />}</span><div><strong>{person.name}</strong><small>{person.email}</small></div><b>{person.tasks} задач</b></div>)}</div></article><article className="panel manager-widget"><div className="panel-heading"><div><h2>Остання активність</h2><p>Останні зміни у задачах.</p></div></div><div className="manager-list">{(managerDashboard.recent_activity || []).map(item => <Link className="activity-row" to={`/tasks/${item.task_id}`} key={`${item.task_id}-${item.created_at}`}><span className="activity-dot" /><div><strong>{item.user_name || 'Користувач'} · {item.task_title}</strong><small>{item.message}</small></div></Link>)}</div></article></>}
           </section>
         )}
-        {canManage && (
+        {canManage && hasAnalytics && (
           <section className="panel team-time-panel">
             <div className="panel-heading">
               <div>

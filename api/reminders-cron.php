@@ -10,9 +10,28 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/db.php';
 require __DIR__ . '/telegram.php';
 require __DIR__ . '/mailer.php';
+require_once __DIR__ . '/task-deadline-notifications.php';
 
 $pdo = db();
 $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+// Keep support history for 60 days after a session is closed, then purge its
+// messages and private image files as part of the existing daily cron run.
+$supportTables = $pdo->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('support_sessions','support_messages','support_attachments')")->fetchAll(PDO::FETCH_COLUMN);
+if (count($supportTables) === 3) {
+    $expiredSupportSessions = $pdo->query("SELECT id FROM support_sessions WHERE status = 'closed' AND closed_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 60 DAY) ORDER BY closed_at ASC LIMIT 500")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($expiredSupportSessions as $supportSessionId) {
+        $supportFiles = $pdo->prepare('SELECT file_path FROM support_attachments WHERE session_id = ? AND file_path IS NOT NULL');
+        $supportFiles->execute([$supportSessionId]);
+        foreach ($supportFiles->fetchAll(PDO::FETCH_COLUMN) as $supportPath) {
+            if (preg_match('/^[a-f0-9]{32}\.(jpg|png|gif|webp|avif|bmp|heic|heif|tiff)$/', (string)$supportPath)) {
+                @unlink(__DIR__ . '/support-private/' . $supportPath);
+            }
+        }
+        $pdo->prepare('DELETE FROM support_attachments WHERE session_id = ?')->execute([$supportSessionId]);
+        $pdo->prepare('DELETE FROM support_messages WHERE session_id = ?')->execute([$supportSessionId]);
+        $pdo->prepare('DELETE FROM support_sessions WHERE id = ?')->execute([$supportSessionId]);
+    }
+}
 // Додаткове очищення під час cron гарантує видалення старих записів навіть
 // якщо ніхто не відкриває сторінку сповіщень.
 $pdo->exec("DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
@@ -32,7 +51,7 @@ $tasks = $pdo->query(
      LEFT JOIN projects p ON p.id = t.project_id
      WHERE t.reminder_at IS NOT NULL
        AND t.reminder_at <= NOW()
-       AND t.status IN ('todo', 'in_progress')
+       AND t.status IN ('todo', 'in_progress', 'review')
      ORDER BY t.reminder_at ASC
      LIMIT 200"
 )->fetchAll();
@@ -131,4 +150,26 @@ foreach ($tasks as $task) {
 }
 
 $log("processed=" . count($tasks) . " sent={$sent} skipped={$skipped}");
-echo "NexaFlow reminders: tasks=" . count($tasks) . " sent={$sent} skipped={$skipped}" . PHP_EOL;
+$deadlineTasks = $pdo->query(
+    "SELECT t.id, t.title, t.due_date, t.assignee_id
+     FROM tasks t
+     WHERE t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+       AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+       AND t.status IN ('todo', 'in_progress', 'review')
+     ORDER BY t.due_date ASC
+     LIMIT 2000"
+)->fetchAll();
+$deadlineAssignees = $pdo->prepare('SELECT user_id FROM task_assignees WHERE task_id = ?');
+$deadlineNotifications = 0;
+foreach ($deadlineTasks as $deadlineTask) {
+    $recipients = [];
+    if (!empty($deadlineTask['assignee_id'])) $recipients[] = (string)$deadlineTask['assignee_id'];
+    $deadlineAssignees->execute([$deadlineTask['id']]);
+    foreach ($deadlineAssignees->fetchAll(PDO::FETCH_COLUMN) as $assigneeId) $recipients[] = (string)$assigneeId;
+    $deadlineAssignees->closeCursor();
+    foreach (array_unique(array_filter($recipients)) as $assigneeId) {
+        if (deliverTaskDeadlineNotification($pdo, $assigneeId, $deadlineTask)) $deadlineNotifications++;
+    }
+}
+$log('deadline notifications=' . $deadlineNotifications);
+echo "NexaFlow reminders: tasks=" . count($tasks) . " sent={$sent} skipped={$skipped} deadlines={$deadlineNotifications}" . PHP_EOL;

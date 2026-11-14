@@ -32,6 +32,10 @@ function appConfig(): array
     if ($environment === 'develop' && !in_array($secrets['host'] ?? '', ['localhost', '127.0.0.1', '::1'], true)) {
         throw new RuntimeException('Develop mode requires a local database host.');
     }
+    if ($environment === 'develop' && is_file(__DIR__ . '/liqpay.local.php')) {
+        $liqpay = require __DIR__ . '/liqpay.local.php';
+        if (is_array($liqpay)) $secrets = array_merge($secrets, $liqpay);
+    }
     $config = array_merge($secrets, $profile, ['environment' => $environment]);
     if (empty($config['telegram_enabled'])) $config['telegram_bot_token'] = '';
     return $config;

@@ -7,16 +7,11 @@ $message = is_array($update) ? ($update['message'] ?? null) : null;
 if (!is_array($message)) { http_response_code(200); echo 'ok'; exit; }
 $chat = $message['chat'] ?? [];
 $chatId = (string)($chat['id'] ?? '');
-$username = strtolower(trim((string)($message['from']['username'] ?? '')));
 $text = trim((string)($message['text'] ?? ''));
 $connectToken = strpos($text, '/start ') === 0 ? trim(substr($text, 7)) : '';
 if ($chatId === '') { http_response_code(200); echo 'ok'; exit; }
-
-if ($text === '/start' || strpos($text, '/start ') === 0) {
-    sendTelegramMessage($chatId, "NexaFlow • Telegram підключено ✅\n\n🎉 Готово! Цей чат під’єднано до вашого профілю NexaFlow.\n\nТепер сюди надходитимуть важливі сповіщення про призначені задачі, нагадування та перевірки.\n\nКерувати сповіщеннями можна в налаштуваннях профілю.");
-} elseif ($text === '/help') {
-    sendTelegramMessage($chatId, "NexaFlow • Робочі сповіщення 🔔\n\nЦей бот надсилає повідомлення про задачі, дедлайни, нагадування та зміни статусів.\n\nКерування виконується у вашому профілі на сайті NexaFlow.");
-}
+// Do not use the public Telegram username or unverified webhook payload to
+// link accounts. Only the high-entropy, per-user connect token is authoritative.
 try {
     require __DIR__ . '/db.php';
     $pdo = db();
@@ -27,12 +22,14 @@ try {
         $query->execute([$connectToken]);
         $userId = (string)($query->fetchColumn() ?: '');
     }
-    if ($userId === '' && $username !== '') {
-        $query = $pdo->prepare('SELECT id FROM users WHERE LOWER(REPLACE(telegram_tag, "@", "")) = ? LIMIT 1');
-        $query->execute([$username]);
-        $userId = $query->fetchColumn();
+    if ($userId && ($text === '/start' || strpos($text, '/start ') === 0)) {
+        if (telegramPlanAvailable($pdo, $userId)) {
+            $pdo->prepare('UPDATE users SET telegram_chat_id = ?, telegram_notifications_enabled = 1 WHERE id = ?')->execute([$chatId, $userId]);
+            sendTelegramMessage($chatId, "NexaFlow • Telegram підключено ✅\n\n🎉 Чат під’єднано до вашого профілю. Сюди надходитимуть сповіщення про задачі, нагадування та перевірки. Керувати ними можна в налаштуваннях NexaFlow.");
+        } else {
+            sendTelegramMessage($chatId, 'Telegram-сповіщення доступні починаючи з плану «Зростання». Перегляньте тарифи в налаштуваннях NexaFlow.');
+        }
     }
-    if ($userId) $pdo->prepare('UPDATE users SET telegram_chat_id = ?, telegram_notifications_enabled = 1 WHERE id = ?')->execute([$chatId, $userId]);
 } catch (Throwable $error) {
     error_log('Telegram webhook database error: ' . $error->getMessage());
 }

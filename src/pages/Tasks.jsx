@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
 import { api, post } from "../services/api.js";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./tasks.css";
 import "./tasks-multiselect.css";
 import "./tasks-page-extra.css";
@@ -172,6 +173,7 @@ export default function Tasks() {
   const [initialDueDate, setInitialDueDate] = useState("");
   const [archivePrompt, setArchivePrompt] = useState(null);
   const navigate = useNavigate();
+  const taskLimitReached = isPlanLimitReached(data?.user?.subscription, "tasks_month");
   const openedFromQuery = useRef(false);
   async function load() {
     const [result, clients] = await Promise.all([
@@ -204,10 +206,15 @@ export default function Tasks() {
     window.localStorage.setItem("nexaflow.tasks.filter", filter);
   }, [filter]);
   function createTask(dueDate = "") {
+    if (taskLimitReached) {
+      setNotice(planLimitHint(data?.user?.subscription, "tasks_month"));
+      if (params.get("create") === "1") navigate("/tasks", { replace: true });
+      return;
+    }
     setModalError("");
     setEditing(null);
     setProjectIds([]);
-    const canManage = ["admin", "owner", "manager"].includes(data?.user?.role);
+    const canManage = ["admin", "owner", "manager", "project_lead"].includes(data?.user?.workspace_role || data?.user?.role);
     setAssigneeIds(!canManage && data?.user?.id ? [data.user.id] : []);
     setClientIds([]);
     setInitialDueDate(dueDate);
@@ -264,7 +271,7 @@ export default function Tasks() {
     if (!result.ok) return setError(result.message);
     setNotice(result.message);
     load();
-    if (status === "done" && ["admin", "owner", "manager"].includes(data?.user?.role)) setArchivePrompt(task);
+    if (status === "done" && ["admin", "owner", "manager", "project_lead"].includes(data?.user?.workspace_role || data?.user?.role)) setArchivePrompt(task);
   }
   async function archiveCompletedTask() {
     if (!archivePrompt) return;
@@ -285,7 +292,7 @@ export default function Tasks() {
   }
   if (!data) return <div className="loading-screen">Завантаження задач…</div>;
   const canArchive = (task) =>
-    ["admin", "owner"].includes(data.user?.role) ||
+    ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role) ||
     task.created_by === data.user?.id;
   const normalizedSearch = search.trim().toLowerCase();
   const filteredTasks = data.tasks
@@ -312,7 +319,7 @@ export default function Tasks() {
     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
     .map((task) => ({
       ...task,
-      canManage: ["admin", "owner", "manager"].includes(data.user?.role),
+      canManage: ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role),
     }));
   const firstRow = filteredTasks.length ? (currentPage - 1) * pageSize + 1 : 0;
   const lastRow = Math.min(currentPage * pageSize, filteredTasks.length);
@@ -331,6 +338,8 @@ export default function Tasks() {
           <button
             className="primary-action hero-create"
             type="button"
+            disabled={taskLimitReached}
+            title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined}
             onClick={createTask}
           >
             <Icon name="plus" /> Створити задачу
@@ -530,6 +539,7 @@ export default function Tasks() {
             data={data}
             editing={editing}
             error={modalError}
+            createDisabled={!editing && taskLimitReached}
             projectIds={projectIds}
             assigneeIds={assigneeIds}
             clientIds={clientIds}

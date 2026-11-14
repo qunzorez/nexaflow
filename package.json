@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
-    "build": "vite build",
+    "build": "vite build && node tools/normalize-dist.mjs",
     "dev:local": "vite --mode development",
     "dev:live": "vite --mode live",
-    "build:local": "vite build --mode development",
-    "build:live": "vite build --mode live",
+    "build:local": "vite build --mode development && node tools/normalize-dist.mjs",
+    "watch:local": "vite build --watch --mode development",
+    "build:live": "vite build --mode live && node tools/normalize-dist.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

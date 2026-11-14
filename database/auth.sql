@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(40) NULL,
   telegram_tag VARCHAR(80) NULL,
   bio TEXT NULL,
-  email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
   role VARCHAR(30) NOT NULL DEFAULT 'user',
   requested_role VARCHAR(30) NOT NULL DEFAULT 'user',
   email_verified_at DATETIME NULL,
@@ -35,4 +35,11 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   used_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+  bucket_hash CHAR(64) NOT NULL PRIMARY KEY,
+  request_count SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  INDEX idx_api_rate_limits_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

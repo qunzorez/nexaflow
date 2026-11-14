@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
 import { ClientFormModal, emptyForm, serviceTaskPayload } from "./Clients.jsx";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./clients.css";
 
 export default function ClientCreatePage() {
@@ -10,6 +11,8 @@ export default function ClientCreatePage() {
   const [user, setUser] = useState(null);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [availableUsersByClient, setAvailableUsersByClient] = useState({});
+  const [adminWorkspaces, setAdminWorkspaces] = useState([]);
+  const [workspaceOwnerId, setWorkspaceOwnerId] = useState("");
   const [servicePackages, setServicePackages] = useState([]);
   const [form, setForm] = useState({
     ...emptyForm,
@@ -24,10 +27,23 @@ export default function ClientCreatePage() {
       setUser(result.user);
       setAvailableUsers(result.available_users || []);
       setAvailableUsersByClient(result.available_users_by_client || {});
-      const packagesResult = await api("/api/services.php?module=accounting");
-      if (packagesResult.ok) setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
+      const owners = result.admin_workspaces || [];
+      setAdminWorkspaces(owners);
+      setWorkspaceOwnerId(owners.find(owner => String(owner.id) === String(result.user?.id))?.id || owners[0]?.id || "");
     });
   }, [navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    const isAdmin = ["admin", "owner"].includes(user.role);
+    if (isAdmin && !workspaceOwnerId) return;
+    const clientsUrl = isAdmin ? `/api/clients.php?workspace_owner_id=${encodeURIComponent(workspaceOwnerId)}` : "/api/clients.php";
+    const servicesUrl = isAdmin ? `/api/services.php?module=all&scope=all&owner_id=${encodeURIComponent(workspaceOwnerId)}` : "/api/services.php?module=accounting";
+    Promise.all([api(clientsUrl), api(servicesUrl)]).then(([clientsResult, packagesResult]) => {
+      if (clientsResult.ok) { setAvailableUsers(clientsResult.available_users || []); setAvailableUsersByClient(clientsResult.available_users_by_client || {}); }
+      if (packagesResult.ok) setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
+    });
+  }, [user?.id, user?.role, workspaceOwnerId]);
 
   // During creation the client does not have an id yet. Keep service additions
   // in the form locally; they will be persisted together with the client.
@@ -40,8 +56,8 @@ export default function ClientCreatePage() {
     event.preventDefault();
     setError("");
     const submittedName = new FormData(event.currentTarget).get("name");
-    const submittedForm = { ...form, name: typeof submittedName === "string" ? submittedName.trim() : form.name };
-    const result = await post("/api/clients.php", { ...submittedForm, action: "create" });
+    const submittedForm = { ...form, name: typeof submittedName === "string" ? submittedName.trim() : form.name, workspace_owner_id: workspaceOwnerId };
+    const result = await post("/api/clients.php", { ...submittedForm, workspace_owner_id: workspaceOwnerId, action: "create" });
     if (!result.ok) return setError(result.message);
     const clientId = result.id || result.data?.id;
     const services = [...(submittedForm.services || [])];
@@ -72,6 +88,7 @@ export default function ClientCreatePage() {
   }
 
   if (!user) return <div className="loading-screen">Завантаження форми клієнта…</div>;
+  const clientLimitReached = isPlanLimitReached(user.subscription, "clients");
   return (
     <Layout page="Новий клієнт" user={user}>
       <div className="content clients-page client-create-page">
@@ -80,7 +97,9 @@ export default function ClientCreatePage() {
           <div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Створити клієнта</h1><p className="subtext">Заповніть дані клієнта за полями активного модуля.</p></div>
         </section>
         {error && <div className="form-notice">{error}</div>}
-        <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
+        {user && ["admin", "owner"].includes(user.role) && <label className="admin-client-workspace-select">Простір-власник клієнта<select value={workspaceOwnerId} onChange={event => setWorkspaceOwnerId(event.target.value)} required>{adminWorkspaces.map(owner => <option key={owner.id} value={owner.id}>{owner.name} · {owner.email}</option>)}</select></label>}
+        {clientLimitReached && <div className="form-notice plan-limit-message">{planLimitHint(user.subscription, "clients")}</div>}
+        <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>
   );

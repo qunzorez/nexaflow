@@ -33,12 +33,43 @@ function userClaims(PDO $pdo, string $userId, ?array $ownerIds = null): array
 {
     $query = $pdo->prepare('SELECT role FROM users WHERE id = ?');
     $query->execute([$userId]); $role = (string)$query->fetchColumn(); $query->closeCursor();
-    $query = $pdo->prepare('SELECT pg.permissions FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
-    $query->execute([$userId]); $policies = $query->fetchAll(PDO::FETCH_COLUMN); $query->closeCursor();
-    if ($ownerIds !== null) $policies = array_filter($policies, static function ($raw) use ($ownerIds): bool {
-        $policy = groupPolicy($raw);
-        return $policy !== null && in_array($policy['owner_id'] ?? '', $ownerIds, true);
-    });
+    // A manager's global account role applies only in their own workspace.
+    // When they participate in another manager's workspace, evaluate them as
+    // a regular member and use only that workspace's assigned claims.
+    if ($role === 'manager' && $ownerIds !== null && !in_array($userId, $ownerIds, true)) $role = 'user';
+    $query = $pdo->prepare('SELECT pg.name, pg.permissions FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
+    $query->execute([$userId]); $groupRows = $query->fetchAll(); $query->closeCursor();
+    $policies = [];
+    foreach ($groupRows as $groupRow) {
+        $policy = groupPolicy($groupRow['permissions'] ?? null);
+        if ($policy === null || ($ownerIds !== null && !in_array($policy['owner_id'] ?? '', $ownerIds, true))) continue;
+        if (mb_strtolower(trim((string)$groupRow['name'])) === mb_strtolower('Керівник проєкту')) {
+            $ownerId = (string)($policy['owner_id'] ?? '');
+            $planQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+            $planQuery->execute([$ownerId]);
+            $ownerRole = (string)($planQuery->fetchColumn() ?: 'manager');
+            if (function_exists('workspacePlan')) {
+                $ownerPlan = workspacePlan($pdo, $ownerId, $ownerRole);
+                $roleLimit = (int)($ownerPlan['plan']['project_leads'] ?? 0);
+            } else {
+                $planQuery = $pdo->prepare('SELECT plan_key FROM users WHERE id = ? LIMIT 1');
+                $planQuery->execute([$ownerId]);
+                $planKey = (string)($planQuery->fetchColumn() ?: 'start');
+                $roleLimit = function_exists('planDefinitions') ? (int)(planDefinitions()[$planKey]['project_leads'] ?? 0) : 0;
+            }
+            if ($roleLimit < 1) continue;
+            $assignedCount = $pdo->prepare("SELECT COUNT(DISTINCT gm2.user_id) FROM project_groups pg2 JOIN project_group_members gm2 ON gm2.group_id = pg2.id WHERE pg2.project_id IS NULL AND LOWER(pg2.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg2.permissions) THEN pg2.permissions ELSE '{}' END, '$.owner_id')) = ?");
+            $assignedCount->execute([$ownerId]);
+            if ((int)$assignedCount->fetchColumn() > $roleLimit) continue;
+            // This plan-backed workspace role inherits manager capabilities;
+            // endpoint-level rules still forbid project/client deletion and
+            // managing members outside the lead's own invitations.
+            $policies[] = ['version' => 1, 'claims' => GROUP_CLAIMS];
+            continue;
+        }
+        $policies[] = $policy;
+    }
+    $policies = array_map(static fn(array $policy): array => ['version' => 1, 'claims' => $policy['claims']], $policies);
     return resolveClaims($role, $policies);
 }
 

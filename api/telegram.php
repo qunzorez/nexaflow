@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/runtime-config.php';
+require_once __DIR__ . '/plans.php';
 
 function sendTelegramMessage(string $chatId, string $message, string $buttonUrl = ''): bool
 {
@@ -37,6 +38,7 @@ function sendTelegramPhoto(string $chatId, string $photoUrl, string $caption, st
 function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
 {
     try {
+        if (!telegramPlanAvailable($pdo, $userId)) return;
         static $columnReady = false;
         if (!$columnReady) {
             $columns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'telegram_notifications_enabled'")->fetchColumn();
@@ -63,6 +65,7 @@ function sendTelegramToUser(PDO $pdo, string $userId, string $message): void
 function sendTelegramTaskAssignment(PDO $pdo, string $userId, string $title, string $taskUrl): void
 {
     try {
+        if (!telegramPlanAvailable($pdo, $userId)) return;
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
         $query->execute([$userId]);
         $user = $query->fetch();
@@ -83,6 +86,7 @@ function sendTelegramTaskAssignment(PDO $pdo, string $userId, string $title, str
 function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string $message, string $taskUrl, string $event = 'updated'): void
 {
     try {
+        if (!telegramPlanAvailable($pdo, $userId)) return;
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
         $query->execute([$userId]);
         $user = $query->fetch();
@@ -111,6 +115,7 @@ function sendTelegramTaskStatus(PDO $pdo, string $userId, string $title, string 
 function sendTelegramTaskReview(PDO $pdo, string $userId, string $title, string $taskUrl): void
 {
     try {
+        if (!telegramPlanAvailable($pdo, $userId)) return;
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
         $query->execute([$userId]);
         $user = $query->fetch();
@@ -131,6 +136,7 @@ function sendTelegramTaskReview(PDO $pdo, string $userId, string $title, string 
 function sendTelegramReminderToUser(PDO $pdo, string $userId, array $reminder): bool
 {
     try {
+        if (!telegramPlanAvailable($pdo, $userId)) return false;
         $query = $pdo->prepare('SELECT telegram_chat_id, telegram_notifications_enabled FROM users WHERE id = ? LIMIT 1');
         $query->execute([$userId]);
         $user = $query->fetch();
