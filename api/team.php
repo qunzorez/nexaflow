@@ -38,6 +38,19 @@ try {
             $users = $usersQuery->fetchAll();
         }
         if ($isAdmin) {
+            $pendingTeamInvites = $pdo->query("SELECT id, email, group_id, expires_at, invited_by, CASE WHEN expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'team' AS invite_type, NULL AS project_name FROM user_invitations WHERE status = 'pending' ORDER BY created_at DESC")->fetchAll();
+            $pendingProjectInvites = $pdo->query("SELECT pi.id, pi.email, pi.group_id, pi.expires_at, pi.invited_by, CASE WHEN pi.expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'project' AS invite_type, p.name AS project_name FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.status = 'pending' ORDER BY pi.created_at DESC")->fetchAll();
+        } else {
+            $pendingTeamQuery = $pdo->prepare("SELECT id, email, group_id, expires_at, invited_by, CASE WHEN expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'team' AS invite_type, NULL AS project_name FROM user_invitations WHERE invited_by = ? AND status = 'pending' ORDER BY created_at DESC");
+            $pendingTeamQuery->execute([$_SESSION['user_id']]);
+            $pendingTeamInvites = $pendingTeamQuery->fetchAll();
+            $pendingProjectQuery = $pdo->prepare("SELECT pi.id, pi.email, pi.group_id, pi.expires_at, pi.invited_by, CASE WHEN pi.expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'project' AS invite_type, p.name AS project_name FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.invited_by = ? AND pi.status = 'pending' ORDER BY pi.created_at DESC");
+            $pendingProjectQuery->execute([$_SESSION['user_id']]);
+            $pendingProjectInvites = $pendingProjectQuery->fetchAll();
+        }
+        $pendingInvites = array_merge($pendingTeamInvites, $pendingProjectInvites);
+        usort($pendingInvites, static fn(array $left, array $right): int => strcmp((string)$right['expires_at'], (string)$left['expires_at']));
+        if ($isAdmin) {
             $projects = $pdo->query('SELECT id, name FROM projects ORDER BY name')->fetchAll();
             $members = $pdo->query('SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id ORDER BY p.name, u.name')->fetchAll();
         } else {
@@ -84,7 +97,7 @@ try {
         }
         foreach ($users as &$teamUser) $teamUser['client_ids'] = $clientAssignments[(string)$teamUser['id']] ?? [];
         unset($teamUser);
-        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'clients' => $clients, 'permissions' => ['admin' => $isAdmin]]);
+        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'clients' => $clients, 'permissions' => ['admin' => $isAdmin]]);
     }
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);

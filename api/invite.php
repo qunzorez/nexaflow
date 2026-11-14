@@ -27,25 +27,82 @@ if ($action === 'details' && $method === 'GET') {
     jsonResponse(true, 'Запрошення знайдено.', ['invitation' => $invite]);
 }
 
-if ($method !== 'POST' || $action !== 'send') jsonResponse(false, 'Невірний запит.', [], 405);
+if ($method !== 'POST' || !in_array($action, ['send', 'resend'], true)) jsonResponse(false, 'Невірний запит.', [], 405);
+
+$actorRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+$actorRoleQuery->execute([$_SESSION['user_id']]);
+$actorRole = (string)$actorRoleQuery->fetchColumn();
+$actorRoleQuery->closeCursor();
+$actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
+
+if ($action === 'resend') {
+    $inviteId = trim((string)($data['invite_id'] ?? ''));
+    $inviteType = (string)($data['invite_type'] ?? '');
+    if ($inviteId === '' || !in_array($inviteType, ['team', 'project'], true)) jsonResponse(false, 'Не вказано коректне запрошення.', [], 422);
+    if ($inviteType === 'team') {
+        $inviteQuery = $pdo->prepare('SELECT i.*, g.name AS group_name FROM user_invitations i LEFT JOIN project_groups g ON g.id = i.group_id WHERE i.id = ? AND i.status = \'pending\' AND (? = 1 OR i.invited_by = ?) LIMIT 1');
+        $inviteQuery->execute([$inviteId, $actorAdmin ? 1 : 0, $_SESSION['user_id']]);
+        $invite = $inviteQuery->fetch();
+        if (!$invite) jsonResponse(false, 'Очікуване запрошення не знайдено.', [], 404);
+        $token = bin2hex(random_bytes(32));
+        $pdo->prepare('UPDATE user_invitations SET token_hash = ?, expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE id = ?')->execute([hash('sha256', $token), $inviteId]);
+        $subject = 'Повторне запрошення до NexaFlow';
+        $context = !empty($invite['group_name']) ? ' групи «' . $invite['group_name'] . '»' : ' команди';
+        $plain = "Вас запросили до{$context} NexaFlow.\n\nПрийняти запрошення: " . invitationUrl($token) . "\n\nПосилання дійсне 7 днів.";
+        $title = 'Запрошення до NexaFlow';
+        $message = 'Вас запросили приєднатися до' . $context . '.';
+        $entityType = 'invitation';
+        $entityId = $inviteId;
+        $notificationType = 'team_invite';
+    } else {
+        $inviteQuery = $pdo->prepare('SELECT i.*, p.name AS project_name, g.name AS group_name FROM project_invitations i JOIN projects p ON p.id = i.project_id LEFT JOIN project_groups g ON g.id = i.group_id WHERE i.id = ? AND i.status = \'pending\' AND (? = 1 OR i.invited_by = ?) LIMIT 1');
+        $inviteQuery->execute([$inviteId, $actorAdmin ? 1 : 0, $_SESSION['user_id']]);
+        $invite = $inviteQuery->fetch();
+        if (!$invite) jsonResponse(false, 'Очікуване запрошення не знайдено.', [], 404);
+        $token = bin2hex(random_bytes(32));
+        $pdo->prepare('UPDATE project_invitations SET token_hash = ?, expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE id = ?')->execute([hash('sha256', $token), $inviteId]);
+        $subject = 'Повторне запрошення до проєкту NexaFlow';
+        $context = !empty($invite['group_name']) ? ' групи «' . $invite['group_name'] . '» у проєкті «' . $invite['project_name'] . '»' : ' проєкту «' . $invite['project_name'] . '»';
+        $plain = "Вас запросили до{$context} у NexaFlow.\n\nПрийняти запрошення: " . invitationUrl($token) . "\n\nПосилання дійсне 7 днів.";
+        $title = 'Запрошення до проєкту «' . $invite['project_name'] . '»';
+        $message = 'Вас запросили до' . $context . '.';
+        $entityType = 'project';
+        $entityId = $invite['project_id'];
+        $notificationType = 'project_invite';
+    }
+    $url = htmlspecialchars(invitationUrl($token), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeTitle = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeMessage = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $html = '<!doctype html><html lang="uk"><body style="margin:0;padding:32px 12px;background:#f2f7f4;font-family:Arial,sans-serif;color:#17201e"><div style="max-width:560px;margin:auto;padding:32px;background:#fff;border:1px solid #dce9e1;border-radius:18px"><div style="color:#168b68;font-size:20px;font-weight:bold">NexaFlow</div><h1 style="font-size:24px;margin:24px 0 12px">' . $safeTitle . '</h1><p style="color:#718078;line-height:1.6">' . $safeMessage . '</p><a href="' . $url . '" style="display:inline-block;margin-top:12px;padding:13px 20px;background:#168b68;color:#fff;border-radius:9px;text-decoration:none;font-weight:bold">Прийняти запрошення →</a><p style="margin-top:22px;color:#98a59e;font-size:12px">Посилання дійсне 7 днів.</p></div></body></html>';
+    $existingUserQuery = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+    $existingUserQuery->execute([$invite['email']]);
+    $existingUserId = (string)($existingUserQuery->fetchColumn() ?: '');
+    $sent = $existingUserId !== ''
+        ? sendUserNotificationEmail($pdo, $existingUserId, (string)$invite['email'], $subject, $plain, $html)
+        : sendProjectEmail((string)$invite['email'], $subject, $plain, $html);
+    if ($existingUserId !== '' && $existingUserId !== (string)$_SESSION['user_id']) {
+        $pdo->prepare('INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([bin2hex(random_bytes(16)), $existingUserId, $_SESSION['user_id'], $notificationType, $title, $message, $entityType, $entityId]);
+    }
+    jsonResponse(true, $sent ? 'Запрошення повторно надіслано. Термін дії посилання — 7 днів.' : 'Посилання оновлено, але поштовий сервер не підтвердив надсилання.', ['sent' => $sent]);
+}
 
 $email = strtolower(trim((string)($data['email'] ?? '')));
 $projectId = trim((string)($data['project_id'] ?? ''));
 $role = trim((string)($data['role'] ?? 'member'));
 $groupId = trim((string)($data['group_id'] ?? ''));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) jsonResponse(false, 'Введіть коректний email і роль.', [], 422);
-$actorRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
-$actorRoleQuery->execute([$_SESSION['user_id']]);
-$actorRole = (string)$actorRoleQuery->fetchColumn();
-$actorRoleQuery->closeCursor();
-$actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
 $planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], $actorRole);
+$emailUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+$emailUser->execute([$email]);
+$existingId = (string)($emailUser->fetchColumn() ?: '');
+$alreadyMember = false;
+if ($existingId !== '') {
+    $teamMembership = $pdo->prepare("SELECT 1 WHERE EXISTS (SELECT 1 FROM user_invitations WHERE email = ? AND invited_by = ? AND status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations WHERE email = ? AND invited_by = ? AND status = 'accepted') LIMIT 1");
+    $teamMembership->execute([$email, $_SESSION['user_id'], $email, $_SESSION['user_id']]);
+    $alreadyMember = (bool)$teamMembership->fetchColumn();
+}
 if (!$actorAdmin) {
-    $alreadyMember = false;
-    $emailUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-    $emailUser->execute([$email]);
-    $existingId = (string)($emailUser->fetchColumn() ?: '');
-    if ($existingId !== '') $alreadyMember = in_array($existingId, $planContext['member_ids'], true);
     if (!$alreadyMember) requirePlanCapacity($planContext, 'participants');
     if ($role === 'manager') {
         $managerLimit = (int)($planContext['plan']['project_leads'] ?? 0);
@@ -73,8 +130,12 @@ if ($projectId === '') {
         if (!$groupCheck->fetch()) jsonResponse(false, 'Обрана група не є глобальною.', [], 422);
         if (!$actorAdmin) manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
     }
+    if ($existingId !== '' && $alreadyMember) jsonResponse(false, 'Цей користувач уже приєднався до вашої команди.', ['code' => 'already_team_member'], 409);
+    $pendingDuplicate = $pdo->prepare("SELECT id FROM user_invitations WHERE invited_by = ? AND email = ? AND status = 'pending' LIMIT 1");
+    $pendingDuplicate->execute([$_SESSION['user_id'], $email]);
+    if ($pendingId = $pendingDuplicate->fetchColumn()) jsonResponse(false, 'Для цього користувача вже є очікуване запрошення. Повторно надішліть його зі списку нижче.', ['code' => 'invite_pending', 'invite_id' => $pendingId], 409);
     try {
-        $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE email = ? AND status = 'pending'")->execute([$email]);
+        $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE invited_by = ? AND email = ? AND status = 'pending'")->execute([$_SESSION['user_id'], $email]);
         $token = bin2hex(random_bytes(32));
         $invitationId = bin2hex(random_bytes(16));
         $insert = $pdo->prepare('INSERT INTO user_invitations (id, invited_by, email, role, group_id, token_hash, expires_at) VALUES (?, ?, ?, \'user\', ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
@@ -112,6 +173,12 @@ $access = $pdo->prepare("SELECT p.name FROM projects p LEFT JOIN project_members
 $access->execute([$_SESSION['user_id'], $_SESSION['user_id'], $projectId, $_SESSION['user_id']]);
 $project = $access->fetch();
 if (!$project) jsonResponse(false, 'У вас немає прав запрошувати людей у цей проєкт.', [], 403);
+$existingProjectMember = $pdo->prepare("SELECT 1 FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND u.email = ? LIMIT 1");
+$existingProjectMember->execute([$projectId, $email]);
+if ($existingProjectMember->fetchColumn()) jsonResponse(false, 'Цей користувач уже є учасником проєкту.', ['code' => 'already_project_member'], 409);
+$pendingProjectDuplicate = $pdo->prepare("SELECT id FROM project_invitations WHERE project_id = ? AND invited_by = ? AND email = ? AND status = 'pending' LIMIT 1");
+$pendingProjectDuplicate->execute([$projectId, $_SESSION['user_id'], $email]);
+if ($pendingProjectId = $pendingProjectDuplicate->fetchColumn()) jsonResponse(false, 'Для цього користувача вже є очікуване запрошення. Повторно надішліть його зі списку нижче.', ['code' => 'invite_pending', 'invite_id' => $pendingProjectId], 409);
 if ($groupId !== '') {
     $groupCheck = $pdo->prepare('SELECT id, project_id FROM project_groups WHERE id = ? AND (project_id = ? OR project_id IS NULL) LIMIT 1');
     $groupCheck->execute([$groupId, $projectId]);
@@ -121,7 +188,7 @@ if ($groupId !== '') {
 }
 
 try {
-    $pdo->prepare("UPDATE project_invitations SET status = 'revoked' WHERE project_id = ? AND email = ? AND status = 'pending'")->execute([$projectId, $email]);
+    $pdo->prepare("UPDATE project_invitations SET status = 'revoked' WHERE project_id = ? AND invited_by = ? AND email = ? AND status = 'pending'")->execute([$projectId, $_SESSION['user_id'], $email]);
     $token = bin2hex(random_bytes(32));
     $id = bin2hex(random_bytes(16));
     $insert = $pdo->prepare('INSERT INTO project_invitations (id, project_id, invited_by, email, role, group_id, token_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
