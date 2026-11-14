@@ -115,9 +115,13 @@ if ($method === 'POST' && in_array($action, ['add_member', 'remove_member', 'cre
 if ($method === 'GET') {
     $membersQuery = $pdo->prepare("SELECT pm.user_id, pm.role, u.name, u.email, u.avatar_url, GROUP_CONCAT(DISTINCT pg.id) AS group_ids, GROUP_CONCAT(DISTINCT pg.name SEPARATOR ', ') AS group_names FROM project_members pm JOIN users u ON u.id = pm.user_id LEFT JOIN project_group_members pgm ON pgm.user_id = pm.user_id LEFT JOIN project_groups pg ON pg.id = pgm.group_id AND pg.project_id IS NULL AND (? = 1 OR JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?) WHERE pm.project_id = ? AND pm.user_id <> ? GROUP BY pm.user_id, pm.role, u.name, u.email, u.avatar_url ORDER BY u.name");
     $membersQuery->execute([$actorAdmin ? 1 : 0, $userId, $projectId, $project['owner_id']]);
-    $groupsQuery = $pdo->prepare('SELECT id, name, role_name, permissions FROM project_groups WHERE project_id = ? OR project_id IS NULL ORDER BY name');
+    $groupsQuery = $pdo->prepare('SELECT id, project_id, name, role_name, permissions FROM project_groups WHERE project_id = ? OR project_id IS NULL ORDER BY name');
     $groupsQuery->execute([$projectId]);
     $groups = $groupsQuery->fetchAll();
+    $groups = array_values(array_filter($groups, static function (array $group) use ($project, $isAdmin): bool {
+        if ($group['project_id'] !== null || $isAdmin) return true;
+        return (groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') === (string)$project['owner_id'];
+    }));
     foreach ($groups as &$group) $group = exposeGroupPolicy($group);
     unset($group);
     if (in_array($project['user_role'], ['admin', 'owner'], true)) {
@@ -133,7 +137,7 @@ if ($method === 'GET') {
     $taskParams = [$projectId, $projectId];
     $projectTasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at FROM tasks t WHERE {$taskWhere} ORDER BY t.created_at DESC, t.due_date IS NULL, t.due_date");
     $projectTasksQuery->execute($taskParams);
-    $projectTasks = $projectTasksQuery->fetchAll();
+    $projectTasks = claimRows($pdo, $userId, 'task', $projectTasksQuery->fetchAll());
     jsonResponse(true, 'Проєкт завантажено.', ['project' => $project, 'members' => $members, 'groups' => $groups, 'project_tasks' => $projectTasks, 'available_users' => $usersQuery->fetchAll(), 'permissions' => ['edit' => $canEdit, 'update' => $canUpdate, 'delete' => $canDelete, 'manage_team' => $canManageTeam, 'settings' => $isProjectOwner, 'admin' => $isAdmin]]);
 }
 if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);

@@ -45,7 +45,7 @@ if ($claimTaskId !== '') {
     }
 }
 
-function taskAccessSql(array $user, string $userId): array { global $planContext; if (in_array($user['role'], ['admin', 'owner'], true)) return ['', []]; $members = array_values(array_unique(array_map('strval', $planContext['member_ids'] ?? [$userId]))); $marks = implode(',', array_fill(0, count($members), '?')); return [" AND t.created_by IN ({$marks}) AND (t.created_by = ? OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta0 WHERE ta0.task_id = t.id AND ta0.user_id = ?))", array_merge($members, [$userId, $userId, $userId])]; }
+function taskAccessSql(array $user, string $userId): array { global $planContext, $canManage; if (in_array($user['role'], ['admin', 'owner'], true)) return ['', []]; $members = array_values(array_unique(array_map('strval', $planContext['member_ids'] ?? [$userId]))); $marks = implode(',', array_fill(0, count($members), '?')); if ($canManage) return [" AND t.created_by IN ({$marks})", $members]; return [" AND t.created_by IN ({$marks}) AND (t.created_by = ? OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta0 WHERE ta0.task_id = t.id AND ta0.user_id = ?))", array_merge($members, [$userId, $userId, $userId])]; }
 function idList($value): array { $values = is_array($value) ? $value : ($value === null || $value === '' ? [] : [$value]); return array_values(array_unique(array_filter(array_map(static fn($item): string => trim((string)$item), $values)))); }
 function normalizeTaskDateTime($value): ?string {
     $raw = trim((string)$value);
@@ -111,6 +111,8 @@ if ($action === 'set_status') { $taskId = trim((string)($data['id'] ?? '')); $ne
 if ($action === 'create' || $action === 'update') {
     $title = trim((string)($data['title'] ?? '')); if ($title === '') jsonResponse(false, 'Введіть назву задачі.', [], 422); $statuses = ['todo', 'in_progress', 'review', 'done', 'cancelled']; $priorities = ['low', 'normal', 'high', 'urgent']; $requestedStatus = trim((string)($data['status'] ?? 'todo')); $requestedPriority = trim((string)($data['priority'] ?? 'normal')); $status = in_array($requestedStatus, $statuses, true) ? $requestedStatus : 'todo'; $priority = in_array($requestedPriority, $priorities, true) ? $requestedPriority : 'normal'; $projectIds = idList($data['project_ids'] ?? ($data['project_id'] ?? [])); $assigneeIds = idList($data['assignee_ids'] ?? ($data['assignee_id'] ?? [])); $clientIds = idList($data['client_ids'] ?? []); $dueDate = normalizeTaskDateTime($data['due_date'] ?? null); $reminderAt = trim((string)($data['reminder_at'] ?? '')) ?: null; $creatorReminder = $canManage && !empty($data['creator_reminder']) ? 1 : 0; $description = trim((string)($data['description'] ?? '')); $clientName = trim((string)($data['client_name'] ?? '')) ?: null;
     $recurrenceRules = ['none', 'hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']; $requestedRecurrence = trim((string)($data['recurrence_rule'] ?? 'none')); $recurrenceRule = in_array($requestedRecurrence, $recurrenceRules, true) ? $requestedRecurrence : 'none';
+    if ($action === 'create' && ($data['status'] ?? '') === 'archived') jsonResponse(false, 'Нову задачу не можна одразу створити в архіві.', [], 422);
+    if ($action === 'update' && ($data['status'] ?? '') === 'archived' && !$canManage) jsonResponse(false, 'Архівувати задачу може лише менеджер або адміністратор.', [], 403);
     $reviewNotificationNeeded = false; if (!$canManage && $status === 'done') { $status = 'review'; $reviewNotificationNeeded = true; }
     if (!$canManage && in_array($status, ['cancelled', 'archived'], true)) jsonResponse(false, 'Скасувати або архівувати задачу може лише менеджер чи адміністратор.', [], 403);
     if ($recurrenceRule !== 'none' && !$dueDate) jsonResponse(false, 'Для повторюваної задачі вкажіть дедлайн.', [], 422);
@@ -121,23 +123,26 @@ if ($action === 'create' || $action === 'update') {
         // Client IDs are supplied by the browser, so existence alone is not
         // enough. A regular user may only attach clients visible to them;
         // managers/admins can use the clients they are allowed to manage.
-        if ($canManage) {
+        if ($canManage && $isAdmin) {
             $clientCheck = $pdo->prepare('SELECT id FROM clients WHERE id = ? LIMIT 1');
+        } elseif ($canManage) {
+            $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+            $clientCheck = $pdo->prepare("SELECT id FROM clients WHERE id = ? AND created_by IN ({$memberMarks}) LIMIT 1");
         } else {
-            $clientCheck = $pdo->prepare('SELECT c.id FROM clients c LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.id = ? AND (c.created_by = ? OR cm.user_id IS NOT NULL) LIMIT 1');
+            $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+            $clientCheck = $pdo->prepare("SELECT c.id FROM clients c LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.id = ? AND c.created_by IN ({$memberMarks}) AND (c.created_by = ? OR cm.user_id IS NOT NULL) LIMIT 1");
         }
         foreach ($clientIds as $clientId) {
-            if ($canManage) {
+            if ($canManage && $isAdmin) {
                 $clientCheck->execute([$clientId]);
                 $hasClientAccess = (bool)$clientCheck->fetchColumn();
+            } elseif ($canManage) {
+                $clientCheck->execute(array_merge([$clientId], $planContext['member_ids']));
+                $hasClientAccess = (bool)$clientCheck->fetchColumn();
             } else {
-                $clientCheck->execute([$userId, $clientId, $userId]);
+                $clientCheck->execute(array_merge([$userId, $clientId], $planContext['member_ids'], [$userId]));
                 $hasClientAccess = (bool)$clientCheck->fetchColumn();
                 $clientCheck->closeCursor();
-                if (!$hasClientAccess) {
-                    $clientClaims = resourceClaims($pdo, $userId, 'client', $clientId);
-                    $hasClientAccess = hasClaim($clientClaims, 'read');
-                }
             }
             $clientCheck->closeCursor();
             if (!$hasClientAccess) jsonResponse(false, 'У вас немає доступу до одного з вибраних клієнтів.', [], 403);
@@ -158,6 +163,6 @@ if ($action === 'create' || $action === 'update') {
     jsonResponse(true, $action === 'create' ? 'Задачу створено.' : 'Задачу оновлено.', ['task_id' => $taskId]);
 }
 if ($action === 'delete') $action = 'archive';
-if ($action === 'archive') { $taskId = trim((string)($data['id'] ?? '')); if (!$taskId) jsonResponse(false, 'Задачу не вказано.', [], 422); if ($isAdmin) { $query = $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ?"); $query->execute([$taskId]); } else { $query = $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ? AND created_by = ?"); $query->execute([$taskId, $userId]); } if ($query->rowCount() === 0) jsonResponse(false, 'Ви можете архівувати лише власні задачі.', [], 403); addHistory($pdo, $taskId, $userId, 'archived', 'Задачу переміщено до архіву.'); jsonResponse(true, 'Задачу переміщено до архіву.'); }
-if ($action === 'delete') { $taskId = trim((string)($data['id'] ?? '')); if (!$taskId) jsonResponse(false, 'Задачу не вказано.', [], 422); if ($isAdmin) { $query = $pdo->prepare('DELETE FROM tasks WHERE id = ?'); $query->execute([$taskId]); } else { $query = $pdo->prepare('DELETE FROM tasks WHERE id = ? AND created_by = ?'); $query->execute([$taskId, $userId]); } if ($query->rowCount() === 0) jsonResponse(false, 'Ви можете видаляти лише власні задачі.', [], 403); jsonResponse(true, 'Задачу видалено.'); }
+if ($action === 'archive') { $taskId = trim((string)($data['id'] ?? '')); if (!$taskId) jsonResponse(false, 'Задачу не вказано.', [], 422); if (!canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до задачі.', [], 403); if (!$canManage) { $createdBy = $pdo->prepare('SELECT created_by FROM tasks WHERE id = ? LIMIT 1'); $createdBy->execute([$taskId]); if ((string)$createdBy->fetchColumn() !== $userId) jsonResponse(false, 'Архівувати власні задачі може лише їх автор або менеджер.', [], 403); } $query = $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ? AND status <> 'archived'"); $query->execute([$taskId]); if ($query->rowCount() > 0) addHistory($pdo, $taskId, $userId, 'archived', 'Задачу переміщено до архіву.'); jsonResponse(true, 'Задачу переміщено до архіву.'); }
+if ($action === 'delete') { $taskId = trim((string)($data['id'] ?? '')); if (!$taskId) jsonResponse(false, 'Задачу не вказано.', [], 422); if (!canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до задачі.', [], 403); if (!$canManage) { $createdBy = $pdo->prepare('SELECT created_by FROM tasks WHERE id = ? LIMIT 1'); $createdBy->execute([$taskId]); if ((string)$createdBy->fetchColumn() !== $userId) jsonResponse(false, 'Видаляти власні задачі може лише їх автор або менеджер.', [], 403); } $query = $pdo->prepare('DELETE FROM tasks WHERE id = ?'); $query->execute([$taskId]); if ($query->rowCount() === 0) jsonResponse(false, 'Не вдалося видалити задачу.', [], 404); jsonResponse(true, 'Задачу видалено.'); }
 jsonResponse(false, 'Невідома дія.', [], 422);

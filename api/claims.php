@@ -33,6 +33,10 @@ function userClaims(PDO $pdo, string $userId, ?array $ownerIds = null): array
 {
     $query = $pdo->prepare('SELECT role FROM users WHERE id = ?');
     $query->execute([$userId]); $role = (string)$query->fetchColumn(); $query->closeCursor();
+    // A manager's global account role applies only in their own workspace.
+    // When they participate in another manager's workspace, evaluate them as
+    // a regular member and use only that workspace's assigned claims.
+    if ($role === 'manager' && $ownerIds !== null && !in_array($userId, $ownerIds, true)) $role = 'user';
     $query = $pdo->prepare('SELECT pg.permissions FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
     $query->execute([$userId]); $policies = $query->fetchAll(PDO::FETCH_COLUMN); $query->closeCursor();
     if ($ownerIds !== null) $policies = array_filter($policies, static function ($raw) use ($ownerIds): bool {

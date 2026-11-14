@@ -54,9 +54,13 @@ try {
     }
     if ($isAdmin) {
         $tasksQuery = $pdo->query("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
+    } elseif ($canManage) {
+        $tasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE t.created_by IN ({$memberMarks}) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
+        $params = $planContext['member_ids'];
+        $tasksQuery->execute($params);
     } else {
-        $tasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE (t.created_by IN ({$memberMarks}) OR (t.assignee_id = ? AND t.created_by IN ({$memberMarks})) OR (EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?) AND t.created_by IN ({$memberMarks}))) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
-        $params = array_merge($planContext['member_ids'], [$_SESSION['user_id']], $planContext['member_ids'], [$_SESSION['user_id']], $planContext['member_ids']);
+        $tasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.created_at, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN task_assignees ta0 ON ta0.task_id = t.id LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE t.created_by IN ({$memberMarks}) AND (t.created_by = ? OR t.assignee_id = ? OR ta0.user_id = ?) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
+        $params = array_merge($planContext['member_ids'], [$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
         $tasksQuery->execute($params);
     }
     $tasks = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $tasksQuery->fetchAll());
@@ -113,13 +117,13 @@ try {
         usort($upcomingDeadlines, static fn(array $a, array $b): int => strcmp((string)($a['due_date'] ?? ''), (string)($b['due_date'] ?? '')));
 
         $projectProgress = [];
-        foreach ($hasAnalytics ? $projects : [] as $project) {
+        foreach (($canManage && $hasAnalytics) ? $projects : [] as $project) {
             $projectTaskQuery = $pdo->prepare("SELECT COUNT(DISTINCT t.id) AS total, SUM(t.status = 'done') AS done, SUM(t.status = 'in_progress') AS in_progress FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id WHERE (t.project_id = ? OR tp.project_id = ?) AND t.status <> 'archived'");
             $projectTaskQuery->execute([$project['id'], $project['id']]);
             $progress = $projectTaskQuery->fetch() ?: ['total' => 0, 'done' => 0, 'in_progress' => 0];
             $projectProgress[] = ['id' => $project['id'], 'name' => $project['name'], 'total' => (int)$progress['total'], 'done' => (int)$progress['done'], 'in_progress' => (int)$progress['in_progress'], 'status' => $project['status'] ?? 'active'];
         }
-        if ($hasAnalytics) {
+        if ($canManage && $hasAnalytics) {
         $workloadQuery = $isAdmin
             ? $pdo->query("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12")
             : $pdo->prepare("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') AND t.created_by IN ({$workspaceMarks}) WHERE u.id IN ({$workspaceMarks}) GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12");
