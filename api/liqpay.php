@@ -117,6 +117,51 @@ $user = $userQuery->fetch();
 if (!$user || !in_array($user['role'], ['manager'], true)) jsonResponse(false, 'Тариф робочого простору може змінювати лише менеджер.', [], 403);
 [$publicKey, $privateKey] = liqpayCredentials();
 ensurePlanSchema($pdo);
+if (($data['action'] ?? '') === 'verify') {
+    $pendingQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
+    $pendingQuery->execute([(string)$user['id']]);
+    $pending = $pendingQuery->fetch();
+    if (!$pending) jsonResponse(true, 'Немає платежу, що очікує підтвердження.', ['status' => 'none']);
+    try {
+        $payment = liqpayApiRequest(['public_key' => $publicKey, 'version' => 7, 'action' => 'status', 'order_id' => $pending['order_id']], $privateKey);
+    } catch (Throwable $error) {
+        error_log('LiqPay status verification failed: ' . $error->getMessage());
+        jsonResponse(false, 'Не вдалося перевірити платіж у LiqPay. Спробуйте оновити сторінку трохи пізніше.', ['status' => 'pending'], 502);
+    }
+    if (($payment['public_key'] ?? '') !== $publicKey || ($payment['order_id'] ?? '') !== $pending['order_id'] || ($payment['currency'] ?? '') !== $pending['currency'] || !is_numeric($payment['amount'] ?? null) || abs((float)$payment['amount'] - (float)$pending['amount']) > 0.001) {
+        error_log('LiqPay status response did not match pending order.');
+        jsonResponse(false, 'Відповідь LiqPay не збігається із замовленням.', ['status' => 'pending'], 502);
+    }
+    $paymentStatus = (string)($payment['status'] ?? '');
+    $paymentId = trim((string)($payment['payment_id'] ?? ''));
+    if (in_array($paymentStatus, ['sandbox', 'success', 'subscribed'], true) && $paymentId !== '') {
+        $pdo->beginTransaction();
+        try {
+            $lock = $pdo->prepare('SELECT status, plan_key FROM plan_subscriptions WHERE id = ? AND owner_id = ? FOR UPDATE');
+            $lock->execute([$pending['id'], (string)$user['id']]);
+            $lockedOrder = $lock->fetch();
+            if ($lockedOrder && $lockedOrder['status'] === 'pending') {
+                $pdo->prepare("UPDATE plan_subscriptions SET status = 'active', liqpay_payment_id = ?, liqpay_subscription_id = ?, current_period_end = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 MONTH) WHERE id = ?")
+                    ->execute([$paymentId, (string)($payment['liqpay_order_id'] ?? ''), $pending['id']]);
+                $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$lockedOrder['plan_key'], (string)$user['id']]);
+            }
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('LiqPay verified payment activation failed: ' . $error->getMessage());
+            jsonResponse(false, 'Платіж підтверджений, але тариф не вдалося активувати. Зверніться до підтримки.', ['status' => 'pending'], 500);
+        }
+        jsonResponse(true, 'Платіж підтверджено. Тариф активовано.', ['status' => 'active']);
+    }
+    if (in_array($paymentStatus, ['error', 'failure', 'reversed', 'try_again'], true)) {
+        $pdo->prepare("UPDATE plan_subscriptions SET status = 'failed', liqpay_payment_id = ? WHERE id = ? AND owner_id = ? AND status = 'pending'")->execute([$paymentId ?: null, $pending['id'], (string)$user['id']]);
+        jsonResponse(true, 'LiqPay повідомив, що платіж не пройшов.', ['status' => 'failed']);
+    }
+    if (in_array($paymentStatus, ['p24_verify', 'otp_verify', '3ds_verify', 'cvv_verify', 'phone_verify', 'pin_verify', 'senderapp_verify'], true)) {
+        jsonResponse(true, 'Платіж очікує підтвердження у LiqPay або Privat24. Завершіть підтвердження, потім натисніть «Перевірити оплату».', ['status' => 'pending', 'gateway_status' => $paymentStatus]);
+    }
+    jsonResponse(true, 'LiqPay ще обробляє платіж. Оновіть сторінку трохи пізніше.', ['status' => 'pending', 'gateway_status' => $paymentStatus]);
+}
 if (($data['action'] ?? '') === 'cancel') {
     $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
     $currentQuery->execute([(string)$user['id']]);

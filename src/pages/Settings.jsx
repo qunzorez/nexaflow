@@ -34,6 +34,7 @@ export default function Settings() {
   const [error, setError] = useState("");
   const [payingPlan, setPayingPlan] = useState("");
   const [cancelingPlan, setCancelingPlan] = useState(false);
+  const [verifyingPlan, setVerifyingPlan] = useState(false);
   const requestedPlan = new URLSearchParams(window.location.search).get("plan") || "";
   async function startPlanCheckout(planKey) {
     if (payingPlan) return;
@@ -78,9 +79,37 @@ export default function Settings() {
       setCancelingPlan(false);
     }
   }
+  async function verifyPlanPayment() {
+    if (verifyingPlan) return;
+    setVerifyingPlan(true);
+    setError("");
+    try {
+      const result = await post("/api/liqpay.php", { action: "verify" });
+      const profile = await api("/api/profile.php");
+      if (profile.ok) setSubscription(profile.subscription || null);
+      setNotice(result.message || "Перевірку платежу завершено.");
+    } catch (verificationError) {
+      setError(verificationError.message || "Не вдалося перевірити платіж.");
+    } finally {
+      setVerifyingPlan(false);
+    }
+  }
   useEffect(() => {
-    api("/api/profile.php").then((result) => {
+    api("/api/profile.php").then(async (result) => {
       if (!result.ok) return;
+      const isPaymentReturn = new URLSearchParams(window.location.search).get("payment") === "return";
+      let paymentCheck = null;
+      if (isPaymentReturn && result.user?.role === "manager" && result.subscription?.billing?.status === "pending") {
+        try {
+          paymentCheck = await post("/api/liqpay.php", { action: "verify" });
+          if (paymentCheck.status === "active" || paymentCheck.status === "failed") {
+            const refreshed = await api("/api/profile.php");
+            if (refreshed.ok) result = refreshed;
+          }
+        } catch (verificationError) {
+          paymentCheck = { ok: false, message: verificationError.message };
+        }
+      }
       setUser(result.user);
       setSubscription(result.subscription || null);
       setName(result.user.name);
@@ -93,9 +122,10 @@ export default function Settings() {
       setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
       setBio(result.user.bio || "");
       const billing = result.subscription?.billing;
-      if (new URLSearchParams(window.location.search).get("payment") === "return") {
+      if (isPaymentReturn) {
         if (billing?.status === "active") setNotice("Платіж підтверджено. Тариф «" + (result.subscription?.name || "") + "» активний.");
-        else setNotice("Повернулися з LiqPay. Чекаємо серверне підтвердження платежу — тариф оновиться автоматично.");
+        else if (billing?.status === "failed") setNotice("Платіж не пройшов. Можете повторити спробу, обравши план нижче.");
+        else setNotice(paymentCheck?.message || "Повернулися з LiqPay. Платіж ще обробляється; оновіть сторінку трохи пізніше.");
       } else if (billing?.status === "pending") setNotice("Очікуємо завершення оплати тарифу.");
     });
   }, []);
@@ -364,9 +394,14 @@ export default function Settings() {
                   <small>{subscription?.price || "Безкоштовно"}{subscription?.billing?.status === "active" ? " · щомісячна підписка" : ""}</small>
                 </div>
                 <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
-                  {subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "pending" ? "Очікує оплати" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : "Безкоштовний план"}
+                  {subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : subscription?.key === "start" ? "Безкоштовний план" : "Потрібна оплата"}
                 </span>
               </div>
+              {subscription?.pending_plan && <div className="subscription-pending-plan">
+                <span><Icon name="subscription" /></span>
+                <div><strong>Очікує активації: {subscription.pending_plan.name}</strong><small>{subscription.pending_plan.price} · тариф увімкнеться після остаточного підтвердження LiqPay</small></div>
+                {user?.role === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
+              </div>}
               <div className="subscription-module-select">
                 <div className="subscription-module-label">
                   <span><Icon name="sparkle" /></span>
