@@ -72,6 +72,8 @@ function liqpayFinishCallback(PDO $pdo, array $payload, string $publicKey): void
                 $pdo->prepare("UPDATE plan_subscriptions SET liqpay_payment_id = ?, current_period_end = DATE_ADD(GREATEST(COALESCE(current_period_end, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP), INTERVAL 1 MONTH), status = 'active' WHERE id = ?")
                     ->execute([$paymentId ?: null, $subscription['id']]);
             } elseif ($subscription['status'] === 'pending') {
+                $ownerContext = workspacePlan($pdo, (string)$subscription['owner_id'], 'manager');
+                normalizeProjectLeadAssignmentsForPlan($pdo, $ownerContext, (string)$subscription['plan_key']);
             $pdo->prepare("UPDATE plan_subscriptions SET status = 'active', liqpay_payment_id = ?, liqpay_subscription_id = ?, current_period_end = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 MONTH) WHERE id = ?")
                     ->execute([$paymentId, (string)($payload['liqpay_order_id'] ?? ''), $subscription['id']]);
             }
@@ -123,6 +125,7 @@ ensurePlanSchema($pdo);
 $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if (in_array($requestAction, ['', 'select_plan'], true) && !$billingEnabled) {
     requirePlanRoleCapacity($pdo, $planContext, $planKey);
+    normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
     $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, $workspaceOwnerId]);
     jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату наразі вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
 }
@@ -153,6 +156,7 @@ if ($requestAction === 'verify') {
             $lock->execute([$pending['id'], $workspaceOwnerId]);
             $lockedOrder = $lock->fetch();
             if ($lockedOrder && $lockedOrder['status'] === 'pending') {
+                normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, (string)$lockedOrder['plan_key']);
                 $pdo->prepare("UPDATE plan_subscriptions SET status = 'active', liqpay_payment_id = ?, liqpay_subscription_id = ?, current_period_end = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 MONTH) WHERE id = ?")
                     ->execute([$paymentId, (string)($payment['liqpay_order_id'] ?? ''), $pending['id']]);
                 $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$lockedOrder['plan_key'], $workspaceOwnerId]);

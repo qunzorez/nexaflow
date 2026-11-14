@@ -247,7 +247,6 @@ function planRoleLimitOverages(PDO $pdo, array $context, string $targetPlanKey):
     if (!isset($plans[$targetPlanKey])) return [];
     $counts = [
         'managers' => (int)($context['counts']['managers'] ?? 1),
-        'project_leads' => planProjectLeadCount($pdo, $context),
         'moderators' => planClaimRoleCount($pdo, $context, 'Модератор'),
     ];
     $overages = [];
@@ -256,6 +255,57 @@ function planRoleLimitOverages(PDO $pdo, array $context, string $targetPlanKey):
         if ($limit !== null && $used > (int)$limit) $overages[] = ['metric' => $metric, 'used' => $used, 'limit' => (int)$limit];
     }
     return $overages;
+}
+
+function normalizeProjectLeadAssignmentsForPlan(PDO $pdo, array $context, string $targetPlanKey): void
+{
+    $plans = $context['plans'] ?? planDefinitions();
+    if (!isset($plans[$targetPlanKey])) return;
+    $limit = $plans[$targetPlanKey]['project_leads'] ?? null;
+    if ($limit === null) return;
+
+    $ownerId = (string)$context['owner_id'];
+    $principals = [];
+    $groupQuery = $pdo->prepare("SELECT DISTINCT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?");
+    $groupQuery->execute([$ownerId]);
+    foreach ($groupQuery->fetchAll(PDO::FETCH_COLUMN) as $userId) $principals['user:' . (string)$userId] = ['user_id' => (string)$userId, 'email' => null];
+
+    $projectQuery = $pdo->prepare("SELECT DISTINCT pm.user_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id = ? AND pm.role = 'manager'");
+    $projectQuery->execute([$ownerId]);
+    foreach ($projectQuery->fetchAll(PDO::FETCH_COLUMN) as $userId) $principals['user:' . (string)$userId] = ['user_id' => (string)$userId, 'email' => null];
+
+    $inviteQuery = $pdo->prepare("SELECT DISTINCT LOWER(pi.email) AS email, u.id AS user_id FROM project_invitations pi JOIN projects p ON p.id = pi.project_id LEFT JOIN users u ON LOWER(u.email) = LOWER(pi.email) WHERE p.owner_id = ? AND pi.status = 'pending' AND pi.role = 'manager'");
+    $inviteQuery->execute([$ownerId]);
+    foreach ($inviteQuery->fetchAll() as $invitation) {
+        $userId = (string)($invitation['user_id'] ?? '');
+        $email = strtolower((string)$invitation['email']);
+        $key = $userId !== '' ? 'user:' . $userId : 'email:' . $email;
+        $principals[$key] = ['user_id' => $userId !== '' ? $userId : null, 'email' => $email];
+    }
+    ksort($principals, SORT_STRING);
+    if (count($principals) <= (int)$limit) return;
+
+    $demotePrincipals = array_slice($principals, (int)$limit, null, true);
+    $demoteIds = array_values(array_unique(array_filter(array_column($demotePrincipals, 'user_id'))));
+    $demoteEmails = array_values(array_unique(array_filter(array_column($demotePrincipals, 'email'))));
+    $ownedGroupQuery = $pdo->prepare("SELECT pg.id FROM project_groups pg WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?");
+    $ownedGroupQuery->execute([$ownerId]);
+    $groupIds = array_map('strval', $ownedGroupQuery->fetchAll(PDO::FETCH_COLUMN));
+    if ($groupIds) {
+        $groupMarks = implode(',', array_fill(0, count($groupIds), '?'));
+        if ($demoteIds) {
+            $userMarks = implode(',', array_fill(0, count($demoteIds), '?'));
+            $pdo->prepare("DELETE FROM project_group_members WHERE user_id IN ({$userMarks}) AND group_id IN ({$groupMarks})")->execute(array_merge($demoteIds, $groupIds));
+        }
+    }
+    if ($demoteIds) {
+        $userMarks = implode(',', array_fill(0, count($demoteIds), '?'));
+        $pdo->prepare("UPDATE project_members pm JOIN projects p ON p.id = pm.project_id SET pm.role = 'member' WHERE p.owner_id = ? AND pm.role = 'manager' AND pm.user_id IN ({$userMarks})")->execute(array_merge([$ownerId], $demoteIds));
+    }
+    if ($demoteEmails) {
+        $emailMarks = implode(',', array_fill(0, count($demoteEmails), '?'));
+        $pdo->prepare("UPDATE project_invitations pi JOIN projects p ON p.id = pi.project_id SET pi.role = 'member' WHERE p.owner_id = ? AND pi.status = 'pending' AND pi.role = 'manager' AND LOWER(pi.email) IN ({$emailMarks})")->execute(array_merge([$ownerId], $demoteEmails));
+    }
 }
 
 function requirePlanRoleCapacity(PDO $pdo, array $context, string $targetPlanKey): void
