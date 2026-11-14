@@ -78,6 +78,7 @@ export default function Dashboard() {
   const canManage = data.permissions.manage;
   const isAdmin = ["admin", "owner"].includes(data.user.role);
   const isManager = data.user.role === "manager";
+  const hasAnalytics = Boolean(data.user.subscription?.features?.analytics);
   const showProjectInsights = !isAdmin;
   const adminMetrics = isAdmin
     ? [
@@ -386,7 +387,7 @@ export default function Dashboard() {
           </article>
         </section>
         {showProjectInsights && (
-          <section className="manager-dashboard-grid">
+          <section className={`manager-dashboard-grid${hasAnalytics ? "" : " analytics-disabled"}`}>
             <article className="panel manager-attention-panel">
               <div className="panel-heading"><div><h2>Потребує уваги</h2><p>Ключові речі, які варто перевірити.</p></div><Icon name="urgent" /></div>
               <div className="attention-cards">
@@ -400,7 +401,7 @@ export default function Dashboard() {
             {isManager && <><article className="panel manager-widget"><div className="panel-heading"><div><h2>Завантаженість команди</h2><p>Активні задачі за виконавцями.</p></div></div><div className="manager-list">{(managerDashboard.team_workload || []).slice(0, 6).map(person => <div className="manager-list-row" key={person.id}><span className="member-avatar">{person.avatar_url ? <img src={person.avatar_url} alt="" /> : <Icon name="user" />}</span><div><strong>{person.name}</strong><small>{person.email}</small></div><b>{person.tasks} задач</b></div>)}</div></article><article className="panel manager-widget"><div className="panel-heading"><div><h2>Остання активність</h2><p>Останні зміни у задачах.</p></div></div><div className="manager-list">{(managerDashboard.recent_activity || []).map(item => <Link className="activity-row" to={`/tasks/${item.task_id}`} key={`${item.task_id}-${item.created_at}`}><span className="activity-dot" /><div><strong>{item.user_name || 'Користувач'} · {item.task_title}</strong><small>{item.message}</small></div></Link>)}</div></article></>}
           </section>
         )}
-        {canManage && (
+        {canManage && hasAnalytics && (
           <section className="panel team-time-panel">
             <div className="panel-heading">
               <div>

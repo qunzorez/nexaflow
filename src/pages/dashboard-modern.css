@@ -172,3 +172,4 @@
   .dashboard-page *, .dashboard-page *::before, .dashboard-page *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 .manager-deadlines-widget .manager-list{padding-right:10px;scrollbar-gutter:stable}
+.manager-dashboard-grid.analytics-disabled>article:nth-of-type(n+3){display:none}

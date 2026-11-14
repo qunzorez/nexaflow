@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/plans.php';
 require __DIR__ . '/telegram.php';
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
@@ -12,6 +13,9 @@ $userQuery = $pdo->prepare('SELECT id, name, email, role, avatar_url FROM users 
 $userQuery->execute([$_SESSION['user_id']]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
+$planContext = workspacePlan($pdo, (string)$user['id'], (string)$user['role']);
+$hasAnalytics = !empty($planContext['plan']['analytics']);
+$user['subscription'] = planSettingsPayload($planContext);
 function deliverDueReminder(PDO $pdo, string $userId, array $reminder): void
 {
     $check = $pdo->prepare("SELECT id FROM notifications WHERE user_id = ? AND type = 'task_reminder' AND entity_type = 'task' AND entity_id = ? AND created_at >= ? LIMIT 1");
@@ -57,7 +61,7 @@ try {
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $taskCountQuery->fetchColumn(); $taskCount = count(array_filter($tasks, static function ($task): bool { return in_array($task['status'], ['todo', 'in_progress', 'review'], true); }));
     $timeQuery = $pdo->prepare('SELECT COALESCE(SUM(minutes), 0) FROM time_entries WHERE user_id = ?'); $timeQuery->execute([$_SESSION['user_id']]); $myMinutes = (int)$timeQuery->fetchColumn(); $teamTime = [];
-    if ($canManage) {
+    if ($canManage && $hasAnalytics) {
         if ($isAdmin) {
             $teamTimeQuery = $pdo->query('SELECT u.id, u.name, u.email, COALESCE(SUM(te.minutes), 0) AS minutes FROM users u LEFT JOIN time_entries te ON te.user_id = u.id GROUP BY u.id, u.name, u.email ORDER BY minutes DESC, u.name');
         } else {
@@ -98,12 +102,13 @@ try {
         usort($upcomingDeadlines, static fn(array $a, array $b): int => strcmp((string)($a['due_date'] ?? ''), (string)($b['due_date'] ?? '')));
 
         $projectProgress = [];
-        foreach ($projects as $project) {
+        foreach ($hasAnalytics ? $projects : [] as $project) {
             $projectTaskQuery = $pdo->prepare("SELECT COUNT(DISTINCT t.id) AS total, SUM(t.status = 'done') AS done, SUM(t.status = 'in_progress') AS in_progress FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id WHERE (t.project_id = ? OR tp.project_id = ?) AND t.status <> 'archived'");
             $projectTaskQuery->execute([$project['id'], $project['id']]);
             $progress = $projectTaskQuery->fetch() ?: ['total' => 0, 'done' => 0, 'in_progress' => 0];
             $projectProgress[] = ['id' => $project['id'], 'name' => $project['name'], 'total' => (int)$progress['total'], 'done' => (int)$progress['done'], 'in_progress' => (int)$progress['in_progress'], 'status' => $project['status'] ?? 'active'];
         }
+        if ($hasAnalytics) {
         $workloadQuery = $isAdmin
             ? $pdo->query("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12")
             : $pdo->prepare("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') WHERE u.id IN (SELECT DISTINCT pm.user_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id = ? OR pm.user_id = ?) OR u.id = ? GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12");
@@ -113,6 +118,9 @@ try {
             : $pdo->prepare("SELECT h.message, h.created_at, u.name AS user_name, t.id AS task_id, t.title AS task_title FROM task_history h JOIN tasks t ON t.id = h.task_id LEFT JOIN users u ON u.id = h.user_id WHERE t.created_by = ? OR EXISTS (SELECT 1 FROM projects p WHERE p.id = t.project_id AND p.owner_id = ?) ORDER BY h.created_at DESC LIMIT 8");
         if (!$isAdmin) $recentQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
         $managerDashboard = ['attention' => $attention, 'upcoming_deadlines' => array_slice($upcomingDeadlines, 0, 6), 'project_progress' => $projectProgress, 'team_workload' => $workloadQuery->fetchAll(), 'recent_activity' => $recentQuery->fetchAll()];
+        } else {
+            $managerDashboard = ['attention' => $attention, 'upcoming_deadlines' => array_slice($upcomingDeadlines, 0, 6), 'project_progress' => [], 'team_workload' => [], 'recent_activity' => []];
+        }
     }
     jsonResponse(true, 'Dashboard завантажено.', ['user' => $user, 'users' => $users, 'projects' => $projects, 'tasks' => $tasks, 'reminders' => $reminders, 'time_by_user' => $teamTime, 'manager_dashboard' => $managerDashboard, 'metrics' => array_merge(['projects' => count($projects), 'clients' => 0, 'tasks' => $taskCount, 'hours' => round($myMinutes / 60, 2)], $userMetrics), 'permissions' => ['manage' => $canManage, 'can_create_project' => $canManage]]);
 } catch (Throwable $error) {
