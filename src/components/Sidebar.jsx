@@ -14,10 +14,13 @@ export default function Sidebar({ user, open }) {
       return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0 };
     }
   });
+  const [planFeatures, setPlanFeatures] = useState(() => user?.subscription?.features || {});
   const userRole = String(user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
-  const planFeatures = user?.subscription?.features || {};
+  useEffect(() => {
+    if (user?.subscription?.features) setPlanFeatures(user.subscription.features);
+  }, [user?.id, user?.subscription?.features]);
   useEffect(() => {
     let active = true;
     const loadCounts = async () => {
@@ -27,6 +30,9 @@ export default function Sidebar({ user, open }) {
         api("/api/clients.php"),
       ]);
       if (!active) return;
+      if (dashboard.user?.subscription?.features) {
+        setPlanFeatures(dashboard.user.subscription.features);
+      }
       const nextCounts = {
         clients: Number(clients.clients?.length || 0),
         projects: Number(
