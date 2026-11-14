@@ -5,10 +5,10 @@ declare(strict_types=1);
 function planDefinitions(): array
 {
     return [
-        'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'services' => false, 'calendar' => false, 'analytics' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'services' => true, 'calendar' => false, 'analytics' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'services' => true, 'calendar' => true, 'analytics' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'services' => true, 'calendar' => true, 'analytics' => true, 'managers' => 5, 'project_leads' => 5, 'moderators' => 5],
+        'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'services' => false, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'services' => true, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'services' => true, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'services' => true, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'managers' => 5, 'project_leads' => 5, 'moderators' => 5],
     ];
 }
 
@@ -54,7 +54,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     ];
     if (in_array($role, ['admin', 'owner'], true)) {
         foreach (['projects', 'clients', 'tasks_month', 'participants'] as $metric) $plan[$metric] = null;
-        foreach (['services', 'calendar', 'analytics'] as $feature) $plan[$feature] = true;
+        foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
     return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans];
@@ -64,6 +64,29 @@ function requirePlanFeature(array $context, string $feature): void
 {
     if (!empty($context['plan'][$feature])) return;
     jsonResponse(false, 'Ця можливість недоступна у вашому поточному плані. Перегляньте ліміти в Налаштуваннях.', ['code' => 'plan_feature_locked', 'feature' => $feature, 'plan' => $context['key']], 403);
+}
+
+function telegramPlanAvailable(PDO $pdo, string $userId): bool
+{
+    static $cache = [];
+    if (array_key_exists($userId, $cache)) return $cache[$userId];
+    ensurePlanSchema($pdo);
+    $userQuery = $pdo->prepare('SELECT id, email, role FROM users WHERE id = ? LIMIT 1');
+    $userQuery->execute([$userId]);
+    $user = $userQuery->fetch();
+    if (!$user) return $cache[$userId] = false;
+    if (in_array($user['role'], ['admin', 'owner'], true)) return $cache[$userId] = true;
+    $ownerId = $userId;
+    if ($user['role'] !== 'manager') {
+        $ownerQuery = $pdo->prepare("SELECT inviter.id FROM users inviter WHERE inviter.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = inviter.id AND i.email = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = inviter.id AND i.email = ? AND i.status = 'accepted')) ORDER BY inviter.created_at ASC LIMIT 1");
+        $ownerQuery->execute([$user['email'], $user['email']]);
+        $ownerId = (string)($ownerQuery->fetchColumn() ?: $userId);
+    }
+    $planQuery = $pdo->prepare('SELECT plan_key FROM users WHERE id = ? LIMIT 1');
+    $planQuery->execute([$ownerId]);
+    $key = (string)($planQuery->fetchColumn() ?: 'start');
+    $plans = planDefinitions();
+    return $cache[$userId] = !empty($plans[$key]['telegram']);
 }
 
 function requirePlanCapacity(array $context, string $metric, int $add = 1): void
@@ -80,5 +103,5 @@ function planSettingsPayload(array $context): array
     $labels = ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники'];
     $limits = [];
     foreach ($labels as $key => $label) $limits[] = ['key' => $key, 'label' => $label, 'limit' => $context['plan'][$key], 'used' => $context['counts'][$key]];
-    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics']]], $context['plans'], array_keys($context['plans']))];
+    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
 }

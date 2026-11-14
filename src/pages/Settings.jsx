@@ -198,14 +198,14 @@ export default function Settings() {
             <div className="telegram-connect-box">
               <div>
                 <strong>Telegram-сповіщення</strong>
-                <small>Отримуйте задачі та повідомлення прямо в Telegram.</small>
+                <small>{subscription?.features.telegram ? "Отримуйте задачі та повідомлення прямо в Telegram." : "Telegram-сповіщення доступні починаючи з плану «Зростання»."}</small>
               </div>
               <label className="telegram-toggle">
-                <input type="checkbox" checked={telegramEnabled} onChange={(event) => setTelegramEnabled(event.target.checked)} />
+                <input type="checkbox" checked={telegramEnabled} disabled={!subscription?.features.telegram} onChange={(event) => setTelegramEnabled(event.target.checked)} />
                 <span />
                 <b>{telegramEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
-              <a className="outline-btn telegram-bot-link" href={telegramConnectUrl} target="_blank" rel="noreferrer">Підключити Telegram <Icon name="forward" /></a>
+              <a className={`outline-btn telegram-bot-link${subscription?.features.telegram ? "" : " is-disabled"}`} href={subscription?.features.telegram ? telegramConnectUrl : undefined} aria-disabled={!subscription?.features.telegram} tabIndex={subscription?.features.telegram ? 0 : -1} target="_blank" rel="noreferrer">Підключити Telegram <Icon name="forward" /></a>
             </div>
             <div className="telegram-connect-box email-notification-box">
               <div>
@@ -355,13 +355,14 @@ export default function Settings() {
               <span className={subscription?.features.calendar ? "enabled" : "locked"}>{subscription?.features.calendar ? "✓" : "×"} Календар</span>
               <span className={subscription?.features.analytics ? "enabled" : "locked"}>{subscription?.features.analytics ? "✓" : "×"} Аналітика</span>
               <span className={subscription?.features.services ? "enabled" : "locked"}>{subscription?.features.services ? "✓" : "×"} Створення послуг і пакетів</span>
+              <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
             </div>
             <div className="plan-comparison-grid">
               {(subscription?.available_plans || []).map((plan) => <article className={plan.key === subscription?.key ? "current" : ""} key={plan.key}>
                 <header><strong>{plan.name}</strong><span>{plan.price}</span></header>
                 <p>{plan.limits.participants === 49 ? "До 50 учасників загалом · до 5 менеджерів" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
                 <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
-                <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : "Без керування послугами"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
+                <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
                 {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
               </article>)}
             </div>
