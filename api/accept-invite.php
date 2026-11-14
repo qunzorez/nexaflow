@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off', 'samesite' => 'Lax']);
 session_start();
 $data = body();
 $token = trim((string)($data['token'] ?? ($_GET['token'] ?? '')));
@@ -41,7 +42,6 @@ if (!$invite && $generalInvite) {
         $done = $pdo->prepare("UPDATE user_invitations SET status = 'accepted', accepted_at = NOW() WHERE id = ?");
         $done->execute([$generalInvite['id']]);
         $pdo->commit();
-        session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
         session_regenerate_id(true); $_SESSION['user_id'] = $userId; $_SESSION['user_name'] = $user['name'] ?? $name; $_SESSION['user_role'] = 'user';
         jsonResponse(true, 'Акаунт створено. Ласкаво просимо до NexaFlow.');
     } catch (Throwable $error) {
@@ -92,7 +92,6 @@ try {
     $done = $pdo->prepare("UPDATE project_invitations SET status = 'accepted', accepted_at = NOW() WHERE id = ?");
     $done->execute([$invite['id']]);
     $pdo->commit();
-    session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
     session_regenerate_id(true);
     $_SESSION['user_id'] = $userId;
     $_SESSION['user_name'] = $user['name'] ?? $name;
