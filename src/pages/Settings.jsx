@@ -42,8 +42,17 @@ export default function Settings() {
     setError("");
     setNotice("");
     try {
-      const result = await post("/api/liqpay.php", { plan: planKey });
-      if (!result.ok || !result.checkout) throw new Error(result.message || "Не вдалося створити оплату.");
+      const result = await post("/api/liqpay.php", { action: "select_plan", plan: planKey });
+      if (!result.ok) throw new Error(result.message || "Не вдалося обрати план.");
+      if (result.plan_selected) {
+        window.localStorage.removeItem("nexaflow.pending-plan");
+        const profile = await api("/api/profile.php");
+        if (profile.ok) setSubscription(profile.subscription || null);
+        setNotice(result.message || "План підключено без списання коштів.");
+        setPayingPlan("");
+        return;
+      }
+      if (!result.checkout) throw new Error(result.message || "Не вдалося створити оплату.");
       window.localStorage.removeItem("nexaflow.pending-plan");
       const form = document.createElement("form");
       form.method = "POST";
@@ -394,7 +403,7 @@ export default function Settings() {
                   <small>{subscription?.price || "Безкоштовно"}{subscription?.billing?.status === "active" ? " · щомісячна підписка" : ""}</small>
                 </div>
                 <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
-                  {subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : subscription?.key === "start" ? "Безкоштовний план" : "Потрібна оплата"}
+                  {subscription?.billing_enabled === false ? (subscription?.key === "start" ? "Безкоштовний план" : "Активний · без списань") : subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : subscription?.key === "start" ? "Безкоштовний план" : "Потрібна оплата"}
                 </span>
               </div>
               {subscription?.pending_plan && <div className="subscription-pending-plan">
@@ -433,11 +442,11 @@ export default function Settings() {
             <div className="subscription-meta">
               <div>
                 <span>{subscription?.billing?.status === "cancelled" ? "Доступ до" : "Наступне оновлення"}</span>
-                <strong>{["active", "cancelled"].includes(subscription?.billing?.status) && subscription?.billing?.current_period_end ? new Date(String(subscription.billing.current_period_end).replace(" ", "T") + "Z").toLocaleDateString("uk-UA") : subscription?.billing?.status === "pending" ? "Після підтвердження платежу" : subscription?.billing?.status === "failed" ? "Спробуйте оплатити ще раз" : "Немає активних оплат"}</strong>
+                <strong>{subscription?.billing_enabled === false ? (subscription?.key === "start" ? "Не застосовується" : "Щомісячне списання вимкнено") : ["active", "cancelled"].includes(subscription?.billing?.status) && subscription?.billing?.current_period_end ? new Date(String(subscription.billing.current_period_end).replace(" ", "T") + "Z").toLocaleDateString("uk-UA") : subscription?.billing?.status === "pending" ? "Після підтвердження платежу" : subscription?.billing?.status === "failed" ? "Спробуйте оплатити ще раз" : "Немає активних оплат"}</strong>
               </div>
               <div>
                 <span>Спосіб оплати</span>
-                <b>{["active", "cancelled"].includes(subscription?.billing?.status) ? "LiqPay · щомісяця" : subscription?.billing?.status === "pending" ? "LiqPay · очікується" : "Не потрібна"}</b>
+                <b>{subscription?.billing_enabled === false ? "Онлайн-оплата поки не підключена" : ["active", "cancelled"].includes(subscription?.billing?.status) ? "LiqPay · щомісяця" : subscription?.billing?.status === "pending" ? "LiqPay · очікується" : "Не потрібна"}</b>
               </div>
             </div>
             <div className="plan-usage-grid">
@@ -455,6 +464,7 @@ export default function Settings() {
               <span className={subscription?.features.services ? "enabled" : "locked"}>{subscription?.features.services ? "✓" : "×"} Створення послуг і пакетів</span>
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
             </div>
+            {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план — ми відкриємо його можливості без списання коштів.</span></div>}
             <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
             <div className="plan-comparison-grid">
               {(subscription?.available_plans || []).map((plan) => <article className={plan.key === subscription?.key ? "current" : ""} key={plan.key}>
@@ -463,10 +473,10 @@ export default function Settings() {
                 <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
                 <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
                 {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
-                {plan.key !== "start" && user?.role === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && subscription?.billing?.status === "active")} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? "Готуємо оплату…" : plan.key === subscription?.key && subscription?.billing?.status === "active" ? "Поточний план" : "Обрати план"}</button>}
+                {plan.key !== "start" && user?.role === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
               </article>)}
             </div>
-            {user?.role === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
+            {subscription?.billing_enabled && user?.role === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
             {user?.role !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
           </section>
           <div className="settings-actions">

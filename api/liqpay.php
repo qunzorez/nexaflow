@@ -92,6 +92,7 @@ function liqpayFinishCallback(PDO $pdo, array $payload, string $publicKey): void
 $action = (string)($_GET['action'] ?? '');
 if ($action === 'callback') {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
+    if (!filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN)) { http_response_code(200); echo 'OK'; exit; }
     [$publicKey, $privateKey] = liqpayCredentials();
     $data = (string)($_POST['data'] ?? '');
     $signature = (string)($_POST['signature'] ?? '');
@@ -110,15 +111,22 @@ $data = body();
 $requestAction = (string)($data['action'] ?? '');
 $planKey = trim((string)($data['plan'] ?? ''));
 $plans = planDefinitions();
-if ($requestAction === '' && (!isset($plans[$planKey]) || $planKey === 'start')) jsonResponse(false, 'Оберіть платний тариф.', [], 422);
+if (in_array($requestAction, ['', 'select_plan'], true) && (!isset($plans[$planKey]) || $planKey === 'start')) jsonResponse(false, 'Оберіть платний тариф.', [], 422);
 $pdo = db();
 $userQuery = $pdo->prepare('SELECT id, role, email FROM users WHERE id = ? LIMIT 1');
 $userQuery->execute([(string)$_SESSION['user_id']]);
 $user = $userQuery->fetch();
 if (!$user || !in_array($user['role'], ['manager'], true)) jsonResponse(false, 'Тариф робочого простору може змінювати лише менеджер.', [], 403);
-[$publicKey, $privateKey] = liqpayCredentials();
 ensurePlanSchema($pdo);
-if (($data['action'] ?? '') === 'verify') {
+$billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+if (in_array($requestAction, ['', 'select_plan'], true) && !$billingEnabled) {
+    $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, (string)$user['id']]);
+    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату наразі вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
+}
+if ($requestAction === 'select_plan') $requestAction = '';
+if (in_array($requestAction, ['verify', 'cancel'], true) && !$billingEnabled) jsonResponse(false, 'Онлайн-оплата наразі вимкнена. Оберіть тариф без списання коштів.', ['code' => 'billing_disabled'], 409);
+[$publicKey, $privateKey] = liqpayCredentials();
+if ($requestAction === 'verify') {
     $pendingQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
     $pendingQuery->execute([(string)$user['id']]);
     $pending = $pendingQuery->fetch();
@@ -163,7 +171,7 @@ if (($data['action'] ?? '') === 'verify') {
     }
     jsonResponse(true, 'LiqPay ще обробляє платіж. Оновіть сторінку трохи пізніше.', ['status' => 'pending', 'gateway_status' => $paymentStatus]);
 }
-if (($data['action'] ?? '') === 'cancel') {
+if ($requestAction === 'cancel') {
     $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
     $currentQuery->execute([(string)$user['id']]);
     $current = $currentQuery->fetch();
@@ -178,7 +186,7 @@ if (($data['action'] ?? '') === 'cancel') {
         jsonResponse(false, $error->getMessage(), [], 502);
     }
 }
-if (($data['action'] ?? '') !== '') jsonResponse(false, 'Невідома дія.', [], 422);
+if ($requestAction !== '') jsonResponse(false, 'Невідома дія.', [], 422);
 $amount = (string)$plans[$planKey]['amount'];
 $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
 $currentQuery->execute([(string)$user['id']]);

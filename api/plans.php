@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-/** NexaFlow workspace plan rules. Paid plans stay locked until billing is connected. */
+/** NexaFlow workspace plan limits and billing entitlements. */
 function planDefinitions(): array
 {
     return [
@@ -49,7 +49,9 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     $plans = planDefinitions();
     $subscription = null;
     $pendingSubscription = null;
-    try {
+    $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    if ($billingEnabled) {
+      try {
         $subscriptionQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1");
         $subscriptionQuery->execute([$ownerId]);
         $latestSubscription = $subscriptionQuery->fetch() ?: null;
@@ -74,6 +76,8 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         }
     } catch (Throwable $ignored) {
         $subscription = null;
+        $pendingSubscription = null;
+      }
     }
     if (!isset($plans[$planKey])) $planKey = 'start';
     $plan = $plans[$planKey];
@@ -101,7 +105,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
-    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription];
+    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
 }
 
 function requirePlanFeature(array $context, string $feature): void
@@ -150,5 +154,5 @@ function planSettingsPayload(array $context): array
     $subscription = $context['subscription'] ?? null;
     $pending = $context['pending_subscription'] ?? null;
     $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
-    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
+    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
 }

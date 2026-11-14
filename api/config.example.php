@@ -14,4 +14,5 @@ return [
     'mail_transport' => 'mail',
     'liqpay_public_key' => '',
     'liqpay_private_key' => '',
+    'billing_enabled' => false,
 ];
