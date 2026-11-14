@@ -30,7 +30,7 @@ export default function Team() {
 
   return <Layout page="Команда" user={currentUser}>
     <div className="content">
-    <ManagerTeamView data={data} onReload={load} isAdmin={Boolean(data.permissions?.admin)} currentUserId={currentUser?.id} />
+      <ManagerTeamView data={data} onReload={load} isAdmin={Boolean(data.permissions?.admin)} currentUserId={currentUser?.id} subscription={currentUser?.subscription} />
     </div>
   </Layout>;
 }

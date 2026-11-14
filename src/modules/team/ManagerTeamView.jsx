@@ -30,7 +30,7 @@ function GroupSummary({ item, onEdit, onDelete }) {
   </div>;
 }
 
-export default function ManagerTeamView({ data, onReload, isAdmin = false, currentUserId = '' }) {
+export default function ManagerTeamView({ data, onReload, isAdmin = false, currentUserId = '', subscription = null }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -44,6 +44,8 @@ export default function ManagerTeamView({ data, onReload, isAdmin = false, curre
   const users = useMemo(() => data.users.filter(user => `${user.name} ${user.email}`.toLowerCase().includes(search.toLowerCase().trim())), [data.users, search]);
   const ownRoleNames = useMemo(() => new Set(data.groups.filter(item => item.project_id == null && String(item.group_owner_id || '') === String(currentUserId)).map(item => String(item.name).trim().toLocaleLowerCase('uk'))), [data.groups, currentUserId]);
   const selectedRoleExists = ownRoleNames.has(group.name.trim().toLocaleLowerCase('uk'));
+  const participantLimit = subscription?.limits?.find(item => item.key === 'participants');
+  const participantLimitReached = participantLimit?.limit != null && Number(participantLimit.used) >= Number(participantLimit.limit);
 
   async function submitInvite(event) {
     event.preventDefault();
@@ -107,7 +109,7 @@ export default function ManagerTeamView({ data, onReload, isAdmin = false, curre
     <div className="welcome-row"><div><p className="eyebrow">КЕРУВАННЯ КОМАНДОЮ</p><h1>{isAdmin ? 'Команда та доступи' : 'Моя команда'}</h1><p className="subtext">{isAdmin ? 'Повне керування користувачами, claims, клієнтами та проєктами.' : 'Запрошуйте користувачів, призначайте клієнтів і визначайте claims.'}</p></div></div>
     {notice && <div className="team-notice success">{notice}</div>}{error && <div className="form-notice">{error}</div>}{adminRolePanel}
     <div className="manager-team-grid">
-      <section className="panel"><div className="panel-heading"><div><h2>Запросити користувача</h2><p>Користувач з’явиться у вашій команді після прийняття запрошення.</p></div></div><form className="invite-form" onSubmit={submitInvite}><label>Email користувача<input name="email" type="email" required placeholder="name@company.com" /></label><label>Проєкт<SearchableSelect name="project_id" options={[{ id: '', name: 'Без проєкту — загальне запрошення' }, ...data.projects]} value={inviteProject} onChange={setInviteProject} placeholder="Без проєкту — загальне запрошення" /></label><label>Група claims — можна змінити після прийняття<SearchableSelect name="group_id" options={[{ id: '', name: 'Без групи' }, ...data.groups]} value={inviteGroup} onChange={setInviteGroup} placeholder="Без групи" /></label><button className="primary-action">Відправити запрошення</button></form></section>
+      <section className="panel"><div className="panel-heading"><div><h2>Запросити користувача</h2><p>Користувач з’явиться у вашій команді після прийняття запрошення.</p></div></div><form className="invite-form" onSubmit={submitInvite}><label>Email користувача<input name="email" type="email" required placeholder="name@company.com" /></label><label>Проєкт<SearchableSelect name="project_id" options={[{ id: '', name: 'Без проєкту — загальне запрошення' }, ...data.projects]} value={inviteProject} onChange={setInviteProject} placeholder="Без проєкту — загальне запрошення" /></label><label>Група claims — можна змінити після прийняття<SearchableSelect name="group_id" options={[{ id: '', name: 'Без групи' }, ...data.groups]} value={inviteGroup} onChange={setInviteGroup} placeholder="Без групи" /></label><button className={`primary-action${participantLimitReached ? ' invite-limit-button' : ''}`} disabled={participantLimitReached}>{participantLimitReached ? 'Досягнуто ліміту учасників' : 'Відправити запрошення'}</button>{participantLimitReached && <p className="invite-limit-note">Досягнуто ліміту плану «{subscription.name}»: {participantLimit.used} з {participantLimit.limit} учасників. Щоб запросити ще, змініть план у налаштуваннях.</p>}</form></section>
       <section className="panel manager-group-builder"><div className="panel-heading"><div><h2>Створити групу claims</h2><p>Кожну готову роль можна створити один раз. Наявні групи можна відредагувати вище.</p></div><span className="count-pill">{data.groups.length}</span></div><form onSubmit={createGroup}><div className="group-create-grid group-claims-name"><label>Готова роль<select value={group.name} onChange={event => selectRolePreset(event.target.value)} required><option value="">Оберіть роль</option>{claimRolePresets.map(item => { const exists = ownRoleNames.has(item.name.toLocaleLowerCase('uk')); return <option value={item.name} key={item.name} disabled={exists}>{item.name}{exists ? ' — вже створена' : ''}</option>; })}</select></label></div>{selectedRoleExists && <small className="form-notice">Цю роль уже створено. Відредагуйте наявну групу claims.</small>}{claimOptions(group.permissions, togglePermission)}<button className="primary-action" disabled={!group.name.trim() || selectedRoleExists}>Створити групу</button></form></section>
     </div>
     {pendingInvitesPanel}
