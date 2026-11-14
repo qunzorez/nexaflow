@@ -335,11 +335,11 @@ export default function Settings() {
             <div className="subscription-meta">
               <div>
                 <span>Статус</span>
-                <strong><Icon name="check" /> Активна</strong>
+                <strong><Icon name="check" />{subscription?.price === "Безкоштовно" ? " Активна" : " Очікує оплати"}</strong>
               </div>
               <div>
                 <span>Оплата</span>
-                <b>{subscription?.price === "Безкоштовно" ? "Без оплати" : "План активний"}</b>
+                <b>{subscription?.price === "Безкоштовно" ? "Без оплати" : "Оплата не підключена"}</b>
               </div>
             </div>
             <div className="plan-usage-grid">
