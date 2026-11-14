@@ -214,7 +214,7 @@ try {
                 $leadCount = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($ownerMarks) AND pm.role = 'manager'");
                 $leadCount->execute($planContext['member_ids']);
                 $currentLeads = (int)$leadCount->fetchColumn();
-                if ($currentLeads >= (int)$planContext['plan']['project_leads']) jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => (int)$planContext['plan']['project_leads'], 'current' => $currentLeads, 'plan' => $planContext['key']], 403);
+                if ($currentLeads >= (int)$planContext['plan']['project_leads']) { notifyPlanCapacityReached($planContext, 'project_leads', $currentLeads, (int)$planContext['plan']['project_leads']); jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => (int)$planContext['plan']['project_leads'], 'current' => $currentLeads, 'plan' => $planContext['key']], 403); }
             }
         }
 
@@ -298,7 +298,7 @@ try {
                 $managerCount = $pdo->prepare("SELECT COUNT(*) FROM users u WHERE u.role = 'manager' AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = ? AND i.email = u.email AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = ? AND i.email = u.email AND i.status = 'accepted'))");
                 $managerCount->execute([$planContext['owner_id'], $planContext['owner_id']]);
                 $currentManagers = (int)$managerCount->fetchColumn() + 1;
-                if ($currentManagers >= (int)$planContext['plan']['managers']) jsonResponse(false, 'Ліміт менеджерів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'managers', 'limit' => (int)$planContext['plan']['managers'], 'current' => $currentManagers, 'plan' => $planContext['key']], 403);
+                if ($currentManagers >= (int)$planContext['plan']['managers']) { notifyPlanCapacityReached($planContext, 'managers', $currentManagers, (int)$planContext['plan']['managers']); jsonResponse(false, 'Ліміт менеджерів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'managers', 'limit' => (int)$planContext['plan']['managers'], 'current' => $currentManagers, 'plan' => $planContext['key']], 403); }
             }
         }
         $update = $pdo->prepare('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');

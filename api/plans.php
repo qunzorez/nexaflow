@@ -147,7 +147,7 @@ function telegramPlanAvailable(PDO $pdo, string $userId): bool
 function notifyPlanCapacityReached(array $context, string $metric, int $current, int $limit): void
 {
     global $pdo;
-    $labels = ['projects' => 'проєктів', 'clients' => 'клієнтів', 'tasks_month' => 'задач цього місяця', 'participants' => 'учасників', 'services_per_client' => 'окремих послуг на клієнта'];
+    $labels = ['projects' => 'проєктів', 'clients' => 'клієнтів', 'tasks_month' => 'задач цього місяця', 'participants' => 'учасників', 'services_per_client' => 'окремих послуг на клієнта', 'managers' => 'менеджерів', 'project_leads' => 'керівників проєктів', 'moderators' => 'модераторів'];
     $title = 'Досягнуто ліміту плану';
     $message = 'У плані «' . $context['plan']['name'] . '» вичерпано ліміт ' . ($labels[$metric] ?? $metric) . ' (' . $current . ' з ' . $limit . '). Перегляньте доступні плани в Налаштуваннях.';
     try {

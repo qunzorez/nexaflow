@@ -110,7 +110,7 @@ if (!$actorAdmin) {
         $managerQuery = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($memberMarks) AND pm.role = 'manager'");
         $managerQuery->execute($planContext['member_ids']);
         $managerCount = max(1, (int)$managerQuery->fetchColumn());
-        if (!$alreadyMember && $managerCount >= $managerLimit) jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $managerLimit, 'current' => $managerCount, 'plan' => $planContext['key']], 403);
+        if (!$alreadyMember && $managerCount >= $managerLimit) { notifyPlanCapacityReached($planContext, 'project_leads', $managerCount, $managerLimit); jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $managerLimit, 'current' => $managerCount, 'plan' => $planContext['key']], 403); }
     }
 }
 
