@@ -23,6 +23,9 @@ $data = $method === 'POST' ? body() : [];
 $action = (string)($data['action'] ?? '');
 $currentUser = $current->fetch();
 $planContext = $currentUser ? workspacePlan($pdo, (string)$_SESSION['user_id'], (string)$currentUser['role']) : null;
+if ($planContext && ($planContext['workspace_role'] ?? '') === 'manager') {
+    normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, (string)$planContext['key']);
+}
 $canManage = $currentUser && in_array($planContext['workspace_role'] ?? '', ['admin', 'owner', 'manager', 'project_lead'], true);
 $isProjectLead = ($planContext['workspace_role'] ?? '') === 'project_lead';
 $isAdmin = $currentUser && in_array($currentUser['role'], ['admin', 'owner'], true);
