@@ -15,6 +15,7 @@ const roleNames = {
 };
 export default function Settings() {
   const [user, setUser] = useState(null);
+  const [subscription, setSubscription] = useState(null);
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const [phone, setPhone] = useState("");
@@ -35,6 +36,7 @@ export default function Settings() {
     api("/api/profile.php").then((result) => {
       if (!result.ok) return;
       setUser(result.user);
+      setSubscription(result.subscription || null);
       setName(result.user.name);
       setAvatar(result.user.avatar_url || "");
       setPhone(result.user.phone || "");
@@ -75,6 +77,7 @@ export default function Settings() {
     });
     if (!result.ok) return setError(result.message);
     setUser(result.user);
+    setSubscription(result.subscription || subscription);
     setAvatar(result.user.avatar_url || "");
     setPhone(result.user.phone || "");
     setTelegramTag(result.user.telegram_tag || "");
@@ -298,8 +301,8 @@ export default function Settings() {
                 </div>
               </div>
               <div className="subscription-plan">
-                <strong>Стартовий план</strong>
-                <span>Поточний план</span>
+                <strong>{subscription?.name || "Старт"}</strong>
+                <span>Поточний план · {subscription?.price || "Безкоштовно"}</span>
               </div>
               <div className="subscription-module-select">
                 <div className="subscription-module-label">
@@ -336,8 +339,31 @@ export default function Settings() {
               </div>
               <div>
                 <span>Оплата</span>
-                <b>Поки без оплати</b>
+                <b>{subscription?.price === "Безкоштовно" ? "Без оплати" : "План активний"}</b>
               </div>
+            </div>
+            <div className="plan-usage-grid">
+              {(subscription?.limits || []).map((item) => {
+                const ratio = item.limit ? Math.min(100, Math.round(item.used / item.limit * 100)) : 0;
+                return <div className="plan-usage" key={item.key}>
+                  <div><span>{item.label}</span><strong>{item.used} / {item.limit ?? "∞"}</strong></div>
+                  <i><b style={{ width: `${item.limit ? ratio : 0}%` }} /></i>
+                </div>;
+              })}
+            </div>
+            <div className="plan-feature-list">
+              <span className={subscription?.features.calendar ? "enabled" : "locked"}>{subscription?.features.calendar ? "✓" : "×"} Календар</span>
+              <span className={subscription?.features.analytics ? "enabled" : "locked"}>{subscription?.features.analytics ? "✓" : "×"} Аналітика</span>
+              <span className={subscription?.features.services ? "enabled" : "locked"}>{subscription?.features.services ? "✓" : "×"} Створення послуг і пакетів</span>
+            </div>
+            <div className="plan-comparison-grid">
+              {(subscription?.available_plans || []).map((plan) => <article className={plan.key === subscription?.key ? "current" : ""} key={plan.key}>
+                <header><strong>{plan.name}</strong><span>{plan.price}</span></header>
+                <p>{plan.limits.participants === 49 ? "До 50 учасників загалом · до 5 менеджерів" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
+                <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
+                <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : "Без керування послугами"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
+                {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
+              </article>)}
             </div>
             <button
               type="button"

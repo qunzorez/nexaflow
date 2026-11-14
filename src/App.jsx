@@ -17,6 +17,7 @@ import ClientCreatePage from "./pages/ClientCreatePage.jsx";
 import ClientEditPage from "./pages/ClientEditPage.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Services from "./pages/Services.jsx";
+import PlanFeatureRoute from "./components/PlanFeatureRoute.jsx";
 
 export default function App() {
   return (
@@ -28,8 +29,8 @@ export default function App() {
       <Route path="/clients" element={<Clients />} />
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
-      <Route path="/calendar" element={<Calendar />} />
-      <Route path="/services" element={<Services />} />
+      <Route path="/calendar" element={<PlanFeatureRoute feature="calendar"><Calendar /></PlanFeatureRoute>} />
+      <Route path="/services" element={<PlanFeatureRoute feature="services"><Services /></PlanFeatureRoute>} />
       <Route path="/projects" element={<Projects />} />
       <Route path="/projects/new" element={<ProjectCreatePage />} />
       <Route path="/projects/:id" element={<ProjectEditPage />} />

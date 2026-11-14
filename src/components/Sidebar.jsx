@@ -17,6 +17,7 @@ export default function Sidebar({ user, open }) {
   const userRole = String(user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
+  const planFeatures = user?.subscription?.features || {};
   useEffect(() => {
     let active = true;
     const loadCounts = async () => {
@@ -82,7 +83,7 @@ export default function Sidebar({ user, open }) {
             Команда <b>{counts.team}</b>
           </Link>
         )}
-        {canManage && <Link className="nav-item" to="/services">
+        {canManage && planFeatures.services && <Link className="nav-item" to="/services">
           <span><Icon name="subscription" /></span> Послуги
         </Link>}
         {isAdmin && (
@@ -94,9 +95,9 @@ export default function Sidebar({ user, open }) {
           </Link>
         )}
         <p className="nav-label">РОБОЧІ ІНСТРУМЕНТИ</p>
-        <Link className="nav-item" to="/calendar">
+        {planFeatures.calendar && <Link className="nav-item" to="/calendar">
           <span><Icon name="calendar" /></span> Календар <b>0</b>
-        </Link>
+        </Link>}
         <span className="nav-item disabled" aria-disabled="true">
           <span><Icon name="document" /></span> Документи <b>0</b>
         </span>
