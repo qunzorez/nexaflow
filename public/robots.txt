@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /team
+Disallow: /notifications
+Disallow: /clients
+Disallow: /calendar
+Disallow: /support
+Disallow: /services
+Disallow: /projects
+Disallow: /tasks
+Disallow: /settings
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /accept-invite
+
+Sitemap: https://nexaflow.top/sitemap.xml
