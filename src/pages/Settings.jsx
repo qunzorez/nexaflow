@@ -47,7 +47,10 @@ export default function Settings() {
       if (result.plan_selected) {
         window.localStorage.removeItem("nexaflow.pending-plan");
         const profile = await api("/api/profile.php");
-        if (profile.ok) setSubscription(profile.subscription || null);
+        if (profile.ok) {
+          setSubscription(profile.subscription || null);
+          setUser(current => current ? { ...current, subscription: profile.subscription || null } : current);
+        }
         setNotice(result.message || "План підключено без списання коштів.");
         setPayingPlan("");
         return;
@@ -80,7 +83,10 @@ export default function Settings() {
       const result = await post("/api/liqpay.php", { action: "cancel", plan: subscription.key });
       if (!result.ok) throw new Error(result.message || "Не вдалося скасувати підписку.");
       const profile = await api("/api/profile.php");
-      if (profile.ok) setSubscription(profile.subscription || null);
+      if (profile.ok) {
+        setSubscription(profile.subscription || null);
+        setUser(current => current ? { ...current, subscription: profile.subscription || null } : current);
+      }
       setNotice(result.message);
     } catch (cancelError) {
       setError(cancelError.message || "Не вдалося скасувати підписку.");
@@ -95,7 +101,10 @@ export default function Settings() {
     try {
       const result = await post("/api/liqpay.php", { action: "verify" });
       const profile = await api("/api/profile.php");
-      if (profile.ok) setSubscription(profile.subscription || null);
+      if (profile.ok) {
+        setSubscription(profile.subscription || null);
+        setUser(current => current ? { ...current, subscription: profile.subscription || null } : current);
+      }
       setNotice(result.message || "Перевірку платежу завершено.");
     } catch (verificationError) {
       setError(verificationError.message || "Не вдалося перевірити платіж.");
@@ -119,7 +128,7 @@ export default function Settings() {
           paymentCheck = { ok: false, message: verificationError.message };
         }
       }
-      setUser(result.user);
+      setUser({ ...result.user, subscription: result.subscription || null });
       setSubscription(result.subscription || null);
       setName(result.user.name);
       setAvatar(result.user.avatar_url || "");
@@ -171,8 +180,9 @@ export default function Settings() {
       new_password: form.get("new_password"),
     });
     if (!result.ok) return setError(result.message);
-    setUser(result.user);
-    setSubscription(result.subscription || subscription);
+    const nextSubscription = result.subscription || subscription;
+    setUser({ ...result.user, subscription: nextSubscription });
+    setSubscription(nextSubscription);
     setAvatar(result.user.avatar_url || "");
     setPhone(result.user.phone || "");
     setTelegramTag(result.user.telegram_tag || "");
