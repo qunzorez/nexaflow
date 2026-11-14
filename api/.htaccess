@@ -1,0 +1,7 @@
+Options -Indexes
+
+# These files contain secrets or implementation-only helpers and must never
+# be requested directly over HTTP.
+<FilesMatch "^(config(?:\.[^.]+)?|liqpay\.local|db|mailer|plans|claims|runtime-config|verification|rate-limit|task-deadline-notifications)\.php$">
+  Require all denied
+</FilesMatch>
