@@ -135,7 +135,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
-    return ['key' => $planKey, 'owner_id' => $ownerId, 'workspace_role' => ($ownerId === $userId ? $role : 'user'), 'member_ids' => $ids, 'workspaces' => $workspaces, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
+    return ['key' => $planKey, 'owner_id' => $ownerId, 'user_id' => $userId, 'role' => $role, 'workspace_role' => ($ownerId === $userId ? $role : 'user'), 'member_ids' => $ids, 'workspaces' => $workspaces, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
 }
 
 function requirePlanFeature(array $context, string $feature): void
@@ -183,14 +183,63 @@ function notifyPlanCapacityReached(array $context, string $metric, int $current,
     }
 }
 
+function planProjectLeadCount(PDO $pdo, array $context): int
+{
+    $ownerIds = array_values(array_unique(array_map('strval', $context['member_ids'] ?? [$context['owner_id']])));
+    $marks = implode(',', array_fill(0, count($ownerIds), '?'));
+    $existing = $pdo->prepare("SELECT DISTINCT pm.user_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ({$marks}) AND pm.role = 'manager'");
+    $existing->execute($ownerIds);
+    $principals = array_fill_keys(array_map('strval', $existing->fetchAll(PDO::FETCH_COLUMN)), true);
+    $pending = $pdo->prepare("SELECT DISTINCT pi.email, u.id AS user_id FROM project_invitations pi JOIN projects p ON p.id = pi.project_id LEFT JOIN users u ON LOWER(u.email) = LOWER(pi.email) WHERE p.owner_id IN ({$marks}) AND pi.status = 'pending' AND pi.role = 'manager'");
+    $pending->execute($ownerIds);
+    foreach ($pending->fetchAll() as $invitation) {
+        $principal = !empty($invitation['user_id']) ? (string)$invitation['user_id'] : 'email:' . strtolower((string)$invitation['email']);
+        $principals[$principal] = true;
+    }
+    return count($principals);
+}
+
+function acquirePlanCapacityLock(array $context, string $metric): void
+{
+    global $pdo, $heldPlanCapacityLocks;
+    if (!isset($heldPlanCapacityLocks) || !is_array($heldPlanCapacityLocks)) $heldPlanCapacityLocks = [];
+    $lockKey = (string)$context['owner_id'] . ':' . $metric;
+    if (isset($heldPlanCapacityLocks[$lockKey])) return;
+    $lockName = 'nexaflow-cap-' . substr(hash('sha256', $lockKey), 0, 50);
+    $lock = $pdo->prepare('SELECT GET_LOCK(?, 10)');
+    $lock->execute([$lockName]);
+    if ((int)$lock->fetchColumn() !== 1) jsonResponse(false, 'Не вдалося перевірити ліміт. Спробуйте ще раз.', ['code' => 'plan_capacity_busy'], 503);
+    $heldPlanCapacityLocks[$lockKey] = $lockName;
+}
+
+function releasePlanCapacityLocks(?string $ownerId = null): void
+{
+    global $pdo, $heldPlanCapacityLocks;
+    if (empty($heldPlanCapacityLocks) || !is_array($heldPlanCapacityLocks)) return;
+    foreach ($heldPlanCapacityLocks as $key => $lockName) {
+        if ($ownerId !== null && !str_starts_with($key, $ownerId . ':')) continue;
+        try { $release = $pdo->prepare('SELECT RELEASE_LOCK(?)'); $release->execute([$lockName]); } catch (Throwable $ignored) {}
+        unset($heldPlanCapacityLocks[$key]);
+    }
+}
+
 function requirePlanCapacity(array $context, string $metric, int $add = 1): void
 {
-    $limit = $context['plan'][$metric] ?? null;
+    global $pdo;
+    $fresh = $context;
+    // Serialize checks for the same workspace and refresh usage only after the
+    // lock is held; concurrent requests therefore cannot pass on stale counts.
+    if (($context['plan'][$metric] ?? null) !== null) {
+        acquirePlanCapacityLock($context, $metric);
+        $fresh = workspacePlan($pdo, (string)$context['user_id'], (string)$context['role']);
+        if ((string)$fresh['owner_id'] !== (string)$context['owner_id']) jsonResponse(false, 'Робочий простір змінився. Повторіть дію.', ['code' => 'workspace_changed'], 409);
+    }
+    $limit = $fresh['plan'][$metric] ?? null;
     if ($limit === null) return;
-    $current = (int)($context['counts'][$metric] ?? 0);
+    $current = (int)($fresh['counts'][$metric] ?? 0);
     if ($current + $add <= (int)$limit) return;
-    notifyPlanCapacityReached($context, $metric, max($current, (int)$limit), (int)$limit);
-    jsonResponse(false, 'Досягнуто ліміту плану «' . $context['plan']['name'] . '». Перегляньте доступні плани в Налаштуваннях.', ['code' => 'plan_limit_reached', 'metric' => $metric, 'limit' => (int)$limit, 'current' => $current, 'plan' => $context['key']], 403);
+    notifyPlanCapacityReached($fresh, $metric, max($current, (int)$limit), (int)$limit);
+    jsonResponse(false, 'Досягнуто ліміту плану «' . $fresh['plan']['name'] . '». Перегляньте доступні плани в Налаштуваннях.', ['code' => 'plan_limit_reached', 'metric' => $metric, 'limit' => (int)$limit, 'current' => $current, 'plan' => $fresh['key']], 403);
 }
 
 function planSettingsPayload(array $context): array

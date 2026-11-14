@@ -106,11 +106,9 @@ try {
             $emailsToInvite = array_unique(array_filter(array_map(static fn($value): string => strtolower(trim((string)$value)), $data['invite_emails']), static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL)));
             if ($emailsToInvite) requirePlanCapacity($planContext, 'participants', count($emailsToInvite));
             if (!$isAdmin && ($data['invite_role'] ?? 'member') === 'manager') {
+                acquirePlanCapacityLock($planContext, 'project_leads');
                 $leadLimit = (int)$planContext['plan']['project_leads'];
-                $ownerMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
-                $leadCount = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($ownerMarks) AND pm.role = 'manager'");
-                $leadCount->execute($planContext['member_ids']);
-                $currentLeads = (int)$leadCount->fetchColumn();
+                $currentLeads = planProjectLeadCount($pdo, $planContext);
                 if ($currentLeads + count($emailsToInvite) > $leadLimit) jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $leadLimit, 'current' => $currentLeads, 'plan' => $planContext['key']], 403);
             }
         }
@@ -183,6 +181,7 @@ try {
             }
         }
         $pdo->commit();
+        releasePlanCapacityLocks((string)$planContext['owner_id']);
         $notificationUsersQuery = $pdo->prepare('SELECT user_id AS id FROM project_members WHERE project_id = ? UNION SELECT pgm.user_id AS id FROM project_group_members pgm JOIN project_groups pg ON pg.id = pgm.group_id WHERE pg.project_id = ?');
         $notificationUsersQuery->execute([$id, $id]);
         $notificationUsers = $notificationUsersQuery->fetchAll();
@@ -208,14 +207,12 @@ try {
             jsonResponse(false, 'Оберіть проєкт, користувача та коректну роль.', [], 422);
         }
         if (!$isAdmin && $role === 'manager' && $planContext['plan']['project_leads'] !== null) {
+            acquirePlanCapacityLock($planContext, 'project_leads');
             $oldProjectRole = $pdo->prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
             $oldProjectRole->execute([$projectId, $targetUserId]);
             $wasProjectLead = $oldProjectRole->fetchColumn() === 'manager';
             if (!$wasProjectLead) {
-                $ownerMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
-                $leadCount = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($ownerMarks) AND pm.role = 'manager'");
-                $leadCount->execute($planContext['member_ids']);
-                $currentLeads = (int)$leadCount->fetchColumn();
+                $currentLeads = planProjectLeadCount($pdo, $planContext);
                 if ($currentLeads >= (int)$planContext['plan']['project_leads']) { notifyPlanCapacityReached($planContext, 'project_leads', $currentLeads, (int)$planContext['plan']['project_leads']); jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => (int)$planContext['plan']['project_leads'], 'current' => $currentLeads, 'plan' => $planContext['key']], 403); }
             }
         }
@@ -240,6 +237,7 @@ try {
         $previousRole = $previousRoleQuery->fetchColumn();
         $upsert = $pdo->prepare('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), updated_at = CURRENT_TIMESTAMP');
         $upsert->execute([$projectId, $targetUserId, $role]);
+        releasePlanCapacityLocks((string)$planContext['owner_id']);
         if ($targetUserId !== (string)$_SESSION['user_id'] && ($previousRole === false || $previousRole !== $role)) {
             $projectNameQuery = $pdo->prepare('SELECT name FROM projects WHERE id = ?');
             $projectNameQuery->execute([$projectId]);

@@ -247,6 +247,11 @@ if ($requestedAccountantIds) {
     }
 }
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
+if ($action === 'update' && ($planContext['plan']['services_per_client'] ?? null) !== null && $addedStandalone > 0) {
+    acquirePlanCapacityLock($planContext, 'services_per_client');
+    $standaloneCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
+    if ($standaloneCount > (int)$planContext['plan']['services_per_client']) jsonResponse(false, 'У плані «' . $planContext['plan']['name'] . '» можна додати не більше ' . (int)$planContext['plan']['services_per_client'] . ' послуг на одного клієнта.', ['code' => 'plan_limit_reached', 'metric' => 'services_per_client', 'limit' => (int)$planContext['plan']['services_per_client'], 'current' => (int)$planContext['plan']['services_per_client'], 'plan' => $planContext['key']], 403);
+}
 if (empty($planContext['plan']['services'])) {
     $serviceKey = static fn(array $service): string => (string)($service['name'] ?? '') . '|' . (string)($service['package_id'] ?? '');
     $previousKeys = array_fill_keys(array_map($serviceKey, $previousServices), true);
@@ -274,6 +279,7 @@ if ($action === 'update' && $id !== '') {
     if (!$existingClientQuery->fetchColumn()) jsonResponse(false, 'Клієнта не знайдено.', [], 404);
     $update = $pdo->prepare('UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ? WHERE id = ?');
     $update->execute([$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $id]);
+    releasePlanCapacityLocks((string)$planContext['owner_id']);
     $savedClientQuery = $pdo->prepare('SELECT id, name FROM clients WHERE id = ? LIMIT 1');
     $savedClientQuery->execute([$id]);
     $savedClient = $savedClientQuery->fetch();
@@ -283,6 +289,7 @@ if ($action === 'update' && $id !== '') {
 requirePlanCapacity($planContext, 'clients');
 $newId = bin2hex(random_bytes(16));
 $pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $userId]);
+releasePlanCapacityLocks((string)$planContext['owner_id']);
     $clientPlanLimit = $planContext['plan']['clients'] ?? null;
     if ($clientPlanLimit !== null && (int)$planContext['counts']['clients'] + 1 >= (int)$clientPlanLimit) notifyPlanCapacityReached($planContext, 'clients', (int)$clientPlanLimit, (int)$clientPlanLimit);
     $clientServiceLimit = $planContext['plan']['services_per_client'] ?? null;

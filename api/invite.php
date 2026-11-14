@@ -107,11 +107,16 @@ if (!$actorAdmin) {
     if (!$alreadyMember) requirePlanCapacity($planContext, 'participants');
     if ($role === 'manager') {
         $managerLimit = (int)($planContext['plan']['project_leads'] ?? 0);
-        $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
-        $managerQuery = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($memberMarks) AND pm.role = 'manager'");
-        $managerQuery->execute($planContext['member_ids']);
-        $managerCount = max(1, (int)$managerQuery->fetchColumn());
-        if (!$alreadyMember && $managerCount >= $managerLimit) { notifyPlanCapacityReached($planContext, 'project_leads', $managerCount, $managerLimit); jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $managerLimit, 'current' => $managerCount, 'plan' => $planContext['key']], 403); }
+        acquirePlanCapacityLock($planContext, 'project_leads');
+        $managerCount = planProjectLeadCount($pdo, $planContext);
+        $knownManager = false;
+        if ($existingId !== '') {
+            $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+            $known = $pdo->prepare("SELECT 1 FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($memberMarks) AND pm.user_id = ? AND pm.role = 'manager' LIMIT 1");
+            $known->execute(array_merge($planContext['member_ids'], [$existingId]));
+            $knownManager = (bool)$known->fetchColumn();
+        }
+        if (!$knownManager && $managerCount >= $managerLimit) { notifyPlanCapacityReached($planContext, 'project_leads', $managerCount, $managerLimit); jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $managerLimit, 'current' => $managerCount, 'plan' => $planContext['key']], 403); }
     }
 }
 
@@ -141,6 +146,7 @@ if ($projectId === '') {
         $invitationId = bin2hex(random_bytes(16));
         $insert = $pdo->prepare('INSERT INTO user_invitations (id, invited_by, email, role, group_id, token_hash, expires_at) VALUES (?, ?, ?, \'user\', ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
         $insert->execute([$invitationId, $_SESSION['user_id'], $email, $groupId !== '' ? $groupId : null, hash('sha256', $token)]);
+        releasePlanCapacityLocks((string)$planContext['owner_id']);
         $existingInviteUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
         $existingInviteUser->execute([$email]);
         $existingInviteUser = $existingInviteUser->fetch();
@@ -196,6 +202,7 @@ try {
     $id = bin2hex(random_bytes(16));
     $insert = $pdo->prepare('INSERT INTO project_invitations (id, project_id, invited_by, email, role, group_id, token_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
     $insert->execute([$id, $projectId, $_SESSION['user_id'], $email, $role, $groupId !== '' ? $groupId : null, hash('sha256', $token)]);
+    releasePlanCapacityLocks((string)$planContext['owner_id']);
     $url = invitationUrl($token);
     $subject = 'Вас запросили до проєкту NexaFlow';
     $message = "Вас запросили до проєкту «{$project['name']}» у NexaFlow.\n\nРоль: {$role}\n\nПрийняти запрошення: {$url}\n\nПосилання дійсне 7 днів.";
