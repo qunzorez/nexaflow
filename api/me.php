@@ -18,4 +18,7 @@ $user = $query->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, (string)$user['id'], (string)$user['role']);
 $user['subscription'] = planSettingsPayload($planContext);
+$user['workspaces'] = $planContext['workspaces'];
+$user['active_workspace_id'] = $planContext['owner_id'];
+$user['workspace_role'] = $planContext['workspace_role'];
 jsonResponse(true, 'Користувач авторизований.', ['user' => $user]);

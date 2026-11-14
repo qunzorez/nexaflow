@@ -15,8 +15,13 @@ $userQuery->execute([$_SESSION['user_id']]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, (string)$user['id'], (string)$user['role']);
+$memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+$workspaceMarks = $memberMarks;
 $hasAnalytics = !empty($planContext['plan']['analytics']);
 $user['subscription'] = planSettingsPayload($planContext);
+$user['workspaces'] = $planContext['workspaces'];
+$user['active_workspace_id'] = $planContext['owner_id'];
+$user['workspace_role'] = $planContext['workspace_role'];
 function deliverDueReminder(PDO $pdo, string $userId, array $reminder): void
 {
     $check = $pdo->prepare("SELECT id FROM notifications WHERE user_id = ? AND type = 'task_reminder' AND entity_type = 'task' AND entity_id = ? AND created_at >= ? LIMIT 1");
@@ -28,20 +33,21 @@ function deliverDueReminder(PDO $pdo, string $userId, array $reminder): void
     sendTelegramReminderToUser($pdo, $userId, $reminder);
 }
 try {
-    $canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
+    $canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true);
     $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
     if ($isAdmin) {
         $projects = $pdo->query('SELECT p.id, p.name, p.description, p.owner_id, p.status, p.created_at, u.name AS owner_name, (SELECT COUNT(DISTINCT t.id) FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id WHERE (t.project_id = p.id OR tp.project_id = p.id)) AS task_count FROM projects p JOIN users u ON u.id = p.owner_id ORDER BY p.created_at DESC')->fetchAll();
     } else {
-        $query = $pdo->prepare('SELECT DISTINCT p.id, p.name, p.description, p.owner_id, p.status, p.created_at, u.name AS owner_name, (SELECT COUNT(DISTINCT t.id) FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id WHERE (t.project_id = p.id OR tp.project_id = p.id)) AS task_count, CASE WHEN p.owner_id = ? THEN \'owner\' ELSE pm.role END AS project_role FROM projects p JOIN users u ON u.id = p.owner_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR pm.user_id IS NOT NULL ORDER BY p.created_at DESC');
-        $query->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+        $query = $pdo->prepare('SELECT DISTINCT p.id, p.name, p.description, p.owner_id, p.status, p.created_at, u.name AS owner_name, (SELECT COUNT(DISTINCT t.id) FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id WHERE (t.project_id = p.id OR tp.project_id = p.id)) AS task_count, CASE WHEN p.owner_id = ? THEN \'owner\' ELSE pm.role END AS project_role FROM projects p JOIN users u ON u.id = p.owner_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR (pm.user_id = ? AND p.owner_id = ?) ORDER BY p.created_at DESC');
+        $query->execute([$planContext['owner_id'], $_SESSION['user_id'], $planContext['owner_id'], $_SESSION['user_id'], $planContext['owner_id']]);
         $projects = $query->fetchAll();
     }
     if ($isAdmin) {
         $users = $pdo->query('SELECT id, name, email, role FROM users ORDER BY name')->fetchAll();
-    } elseif ($user['role'] === 'manager') {
-        $usersQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, u.role FROM users u LEFT JOIN project_invitations pi ON pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted' LEFT JOIN user_invitations ui ON ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted' WHERE pi.id IS NOT NULL OR ui.id IS NOT NULL ORDER BY u.name");
-        $usersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+    } elseif ($planContext['workspace_role'] === 'manager') {
+        $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+        $usersQuery = $pdo->prepare("SELECT id, name, email, role FROM users WHERE id IN ({$memberMarks}) ORDER BY name");
+        $usersQuery->execute($planContext['member_ids']);
         $users = $usersQuery->fetchAll();
     } else {
         $users = [];
@@ -49,13 +55,14 @@ try {
     if ($isAdmin) {
         $tasksQuery = $pdo->query("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
     } else {
-        $tasksQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE t.created_by = ? OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
-        $tasksQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+        $tasksQuery = $pdo->prepare("SELECT DISTINCT t.id, t.title, t.status, t.priority, t.due_date, t.project_id, p.name AS project_name, a.name AS assignee_name FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN users a ON a.id = t.assignee_id WHERE (t.created_by IN ({$memberMarks}) OR (t.assignee_id = ? AND t.created_by IN ({$memberMarks})) OR (EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?) AND t.created_by IN ({$memberMarks}))) ORDER BY t.due_date IS NULL, t.due_date, t.created_at DESC");
+        $params = array_merge($planContext['member_ids'], [$_SESSION['user_id']], $planContext['member_ids'], [$_SESSION['user_id']], $planContext['member_ids']);
+        $tasksQuery->execute($params);
     }
     $tasks = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $tasksQuery->fetchAll());
     $projects = claimRows($pdo, (string)$_SESSION['user_id'], 'project', $projects);
-    $remindersQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.reminder_at, t.due_date, p.name AS project_name, CASE WHEN t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY) AND (t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees deadline_assignee WHERE deadline_assignee.task_id = t.id AND deadline_assignee.user_id = ?)) THEN 'deadline' ELSE NULL END AS dashboard_reminder_kind FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE t.status IN ('todo', 'in_progress', 'review') AND ((t.reminder_at IS NOT NULL AND t.reminder_at <= NOW() AND ((t.created_by = ? AND t.creator_reminder = 1) OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?))) OR (t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY) AND (t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees due_assignee WHERE due_assignee.task_id = t.id AND due_assignee.user_id = ?)))) ORDER BY COALESCE(t.reminder_at, DATE_SUB(t.due_date, INTERVAL 1 DAY)) ASC LIMIT 8");
-    $remindersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+    $remindersQuery = $pdo->prepare("SELECT t.id, t.title, t.status, t.priority, t.reminder_at, t.due_date, p.name AS project_name, CASE WHEN t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY) AND (t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees deadline_assignee WHERE deadline_assignee.task_id = t.id AND deadline_assignee.user_id = ?)) THEN 'deadline' ELSE NULL END AS dashboard_reminder_kind FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE t.created_by IN ({$memberMarks}) AND t.status IN ('todo', 'in_progress', 'review') AND ((t.reminder_at IS NOT NULL AND t.reminder_at <= NOW() AND ((t.created_by = ? AND t.creator_reminder = 1) OR t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?))) OR (t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY) AND (t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees due_assignee WHERE due_assignee.task_id = t.id AND due_assignee.user_id = ?)))) ORDER BY COALESCE(t.reminder_at, DATE_SUB(t.due_date, INTERVAL 1 DAY)) ASC LIMIT 8");
+    $remindersQuery->execute(array_merge(array_fill(0, 2, $_SESSION['user_id']), $planContext['member_ids'], array_fill(0, 5, $_SESSION['user_id'])));
     $reminders = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $remindersQuery->fetchAll());
     foreach ($reminders as $reminder) if (!empty($reminder['reminder_at']) && $reminder['reminder_at'] <= date('Y-m-d H:i:s')) deliverDueReminder($pdo, (string)$_SESSION['user_id'], $reminder);
     $deadlineTasksQuery = $pdo->prepare("SELECT t.id, t.title, t.due_date FROM tasks t WHERE t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY) AND t.status IN ('todo', 'in_progress', 'review') AND (t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)) ORDER BY t.due_date ASC LIMIT 200");
@@ -64,13 +71,13 @@ try {
     $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress', 'review')") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress', 'review') AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $taskCountQuery->fetchColumn(); $taskCount = count(array_filter($tasks, static function ($task): bool { return in_array($task['status'], ['todo', 'in_progress', 'review'], true); }));
-    $timeQuery = $pdo->prepare('SELECT COALESCE(SUM(minutes), 0) FROM time_entries WHERE user_id = ?'); $timeQuery->execute([$_SESSION['user_id']]); $myMinutes = (int)$timeQuery->fetchColumn(); $teamTime = [];
+    $timeQuery = $isAdmin ? $pdo->prepare('SELECT COALESCE(SUM(minutes), 0) FROM time_entries WHERE user_id = ?') : $pdo->prepare("SELECT COALESCE(SUM(te.minutes), 0) FROM time_entries te JOIN tasks t ON t.id = te.task_id WHERE te.user_id = ? AND t.created_by IN ({$workspaceMarks})"); $timeQuery->execute($isAdmin ? [$_SESSION['user_id']] : array_merge([$_SESSION['user_id']], $planContext['member_ids'])); $myMinutes = (int)$timeQuery->fetchColumn(); $teamTime = [];
     if ($canManage && $hasAnalytics) {
         if ($isAdmin) {
             $teamTimeQuery = $pdo->query('SELECT u.id, u.name, u.email, COALESCE(SUM(te.minutes), 0) AS minutes FROM users u LEFT JOIN time_entries te ON te.user_id = u.id GROUP BY u.id, u.name, u.email ORDER BY minutes DESC, u.name');
         } else {
-            $teamTimeQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, COALESCE((SELECT SUM(te.minutes) FROM time_entries te WHERE te.user_id = u.id), 0) AS minutes FROM users u WHERE u.id = ? OR EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted') ORDER BY minutes DESC, u.name");
-            $teamTimeQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+            $teamTimeQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, COALESCE((SELECT SUM(te.minutes) FROM time_entries te JOIN tasks t ON t.id = te.task_id WHERE te.user_id = u.id AND t.created_by IN ({$workspaceMarks})), 0) AS minutes FROM users u WHERE u.id IN ({$memberMarks}) ORDER BY minutes DESC, u.name");
+            $teamTimeQuery->execute(array_merge($planContext['member_ids'], $planContext['member_ids']));
         }
         $teamTime = $teamTimeQuery->fetchAll();
     }
@@ -115,12 +122,12 @@ try {
         if ($hasAnalytics) {
         $workloadQuery = $isAdmin
             ? $pdo->query("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12")
-            : $pdo->prepare("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') WHERE u.id IN (SELECT DISTINCT pm.user_id FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id = ? OR pm.user_id = ?) OR u.id = ? GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12");
-        if (!$isAdmin) $workloadQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+            : $pdo->prepare("SELECT u.id, u.name, u.email, u.avatar_url, COUNT(DISTINCT t.id) AS tasks FROM users u LEFT JOIN tasks t ON t.assignee_id = u.id AND t.status NOT IN ('done', 'cancelled', 'archived') AND t.created_by IN ({$workspaceMarks}) WHERE u.id IN ({$workspaceMarks}) GROUP BY u.id, u.name, u.email, u.avatar_url ORDER BY tasks DESC, u.name LIMIT 12");
+        if (!$isAdmin) $workloadQuery->execute(array_merge($planContext['member_ids'], $planContext['member_ids']));
         $recentQuery = $isAdmin
             ? $pdo->query("SELECT h.message, h.created_at, u.name AS user_name, t.id AS task_id, t.title AS task_title FROM task_history h JOIN tasks t ON t.id = h.task_id LEFT JOIN users u ON u.id = h.user_id ORDER BY h.created_at DESC LIMIT 8")
-            : $pdo->prepare("SELECT h.message, h.created_at, u.name AS user_name, t.id AS task_id, t.title AS task_title FROM task_history h JOIN tasks t ON t.id = h.task_id LEFT JOIN users u ON u.id = h.user_id WHERE t.created_by = ? OR EXISTS (SELECT 1 FROM projects p WHERE p.id = t.project_id AND p.owner_id = ?) ORDER BY h.created_at DESC LIMIT 8");
-        if (!$isAdmin) $recentQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            : $pdo->prepare("SELECT h.message, h.created_at, u.name AS user_name, t.id AS task_id, t.title AS task_title FROM task_history h JOIN tasks t ON t.id = h.task_id LEFT JOIN users u ON u.id = h.user_id WHERE t.created_by IN ({$workspaceMarks}) OR EXISTS (SELECT 1 FROM projects p WHERE p.id = t.project_id AND p.owner_id = ?) ORDER BY h.created_at DESC LIMIT 8");
+        if (!$isAdmin) $recentQuery->execute(array_merge($planContext['member_ids'], [$planContext['owner_id']]));
         $managerDashboard = ['attention' => $attention, 'upcoming_deadlines' => array_slice($upcomingDeadlines, 0, 6), 'project_progress' => $projectProgress, 'team_workload' => $workloadQuery->fetchAll(), 'recent_activity' => $recentQuery->fetchAll()];
         } else {
             $managerDashboard = ['attention' => $attention, 'upcoming_deadlines' => array_slice($upcomingDeadlines, 0, 6), 'project_progress' => [], 'team_workload' => [], 'recent_activity' => []];

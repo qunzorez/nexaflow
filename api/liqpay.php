@@ -116,11 +116,13 @@ $pdo = db();
 $userQuery = $pdo->prepare('SELECT id, role, email FROM users WHERE id = ? LIMIT 1');
 $userQuery->execute([(string)$_SESSION['user_id']]);
 $user = $userQuery->fetch();
-if (!$user || !in_array($user['role'], ['manager'], true)) jsonResponse(false, 'Тариф робочого простору може змінювати лише менеджер.', [], 403);
+$planContext = $user ? workspacePlan($pdo, (string)$user['id'], (string)$user['role']) : null;
+if (!$user || ($planContext['workspace_role'] ?? '') !== 'manager') jsonResponse(false, 'Тариф цього робочого простору може змінювати лише його менеджер.', [], 403);
+$workspaceOwnerId = (string)$planContext['owner_id'];
 ensurePlanSchema($pdo);
 $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if (in_array($requestAction, ['', 'select_plan'], true) && !$billingEnabled) {
-    $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, (string)$user['id']]);
+    $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, $workspaceOwnerId]);
     jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату наразі вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
 }
 if ($requestAction === 'select_plan') $requestAction = '';
@@ -128,7 +130,7 @@ if (in_array($requestAction, ['verify', 'cancel'], true) && !$billingEnabled) js
 [$publicKey, $privateKey] = liqpayCredentials();
 if ($requestAction === 'verify') {
     $pendingQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
-    $pendingQuery->execute([(string)$user['id']]);
+    $pendingQuery->execute([$workspaceOwnerId]);
     $pending = $pendingQuery->fetch();
     if (!$pending) jsonResponse(true, 'Немає платежу, що очікує підтвердження.', ['status' => 'none']);
     try {
@@ -147,12 +149,12 @@ if ($requestAction === 'verify') {
         $pdo->beginTransaction();
         try {
             $lock = $pdo->prepare('SELECT status, plan_key FROM plan_subscriptions WHERE id = ? AND owner_id = ? FOR UPDATE');
-            $lock->execute([$pending['id'], (string)$user['id']]);
+            $lock->execute([$pending['id'], $workspaceOwnerId]);
             $lockedOrder = $lock->fetch();
             if ($lockedOrder && $lockedOrder['status'] === 'pending') {
                 $pdo->prepare("UPDATE plan_subscriptions SET status = 'active', liqpay_payment_id = ?, liqpay_subscription_id = ?, current_period_end = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 MONTH) WHERE id = ?")
                     ->execute([$paymentId, (string)($payment['liqpay_order_id'] ?? ''), $pending['id']]);
-                $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$lockedOrder['plan_key'], (string)$user['id']]);
+                $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$lockedOrder['plan_key'], $workspaceOwnerId]);
             }
             $pdo->commit();
         } catch (Throwable $error) {
@@ -163,7 +165,7 @@ if ($requestAction === 'verify') {
         jsonResponse(true, 'Платіж підтверджено. Тариф активовано.', ['status' => 'active']);
     }
     if (in_array($paymentStatus, ['error', 'failure', 'reversed', 'try_again'], true)) {
-        $pdo->prepare("UPDATE plan_subscriptions SET status = 'failed', liqpay_payment_id = ? WHERE id = ? AND owner_id = ? AND status = 'pending'")->execute([$paymentId ?: null, $pending['id'], (string)$user['id']]);
+        $pdo->prepare("UPDATE plan_subscriptions SET status = 'failed', liqpay_payment_id = ? WHERE id = ? AND owner_id = ? AND status = 'pending'")->execute([$paymentId ?: null, $pending['id'], $workspaceOwnerId]);
         jsonResponse(true, 'LiqPay повідомив, що платіж не пройшов.', ['status' => 'failed']);
     }
     if (in_array($paymentStatus, ['p24_verify', 'otp_verify', '3ds_verify', 'cvv_verify', 'phone_verify', 'pin_verify', 'senderapp_verify'], true)) {
@@ -173,7 +175,7 @@ if ($requestAction === 'verify') {
 }
 if ($requestAction === 'cancel') {
     $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
-    $currentQuery->execute([(string)$user['id']]);
+    $currentQuery->execute([$workspaceOwnerId]);
     $current = $currentQuery->fetch();
     if (!$current) jsonResponse(false, 'Активну підписку не знайдено.', [], 404);
     try {
@@ -189,7 +191,7 @@ if ($requestAction === 'cancel') {
 if ($requestAction !== '') jsonResponse(false, 'Невідома дія.', [], 422);
 $amount = (string)$plans[$planKey]['amount'];
 $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
-$currentQuery->execute([(string)$user['id']]);
+$currentQuery->execute([$workspaceOwnerId]);
 $current = $currentQuery->fetch();
 if ($current) {
     if ($current['plan_key'] === $planKey) jsonResponse(false, 'Цей тариф уже активний.', ['code' => 'plan_already_active'], 409);
@@ -205,7 +207,7 @@ if ($current) {
 $orderId = 'nxf_' . bin2hex(random_bytes(20));
 $subscriptionId = bin2hex(random_bytes(16));
 $pdo->prepare("INSERT INTO plan_subscriptions (id, owner_id, plan_key, order_id, amount, currency, status) VALUES (?, ?, ?, ?, ?, 'USD', 'pending')")
-    ->execute([$subscriptionId, (string)$user['id'], $planKey, $orderId, $amount]);
+    ->execute([$subscriptionId, $workspaceOwnerId, $planKey, $orderId, $amount]);
 $baseUrl = rtrim((string)appConfig()['base_url'], '/');
 $params = [
     'public_key' => $publicKey,

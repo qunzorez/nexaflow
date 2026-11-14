@@ -33,7 +33,9 @@ $actorRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
 $actorRoleQuery->execute([$_SESSION['user_id']]);
 $actorRole = (string)$actorRoleQuery->fetchColumn();
 $actorRoleQuery->closeCursor();
+$planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], $actorRole);
 $actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
+if (!in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true)) jsonResponse(false, 'Керувати запрошеннями може лише менеджер активного простору.', [], 403);
 
 if ($action === 'resend') {
     $inviteId = trim((string)($data['invite_id'] ?? ''));
@@ -92,7 +94,6 @@ $projectId = trim((string)($data['project_id'] ?? ''));
 $role = trim((string)($data['role'] ?? 'member'));
 $groupId = trim((string)($data['group_id'] ?? ''));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) jsonResponse(false, 'Введіть коректний email і роль.', [], 422);
-$planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], $actorRole);
 $emailUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
 $emailUser->execute([$email]);
 $existingId = (string)($emailUser->fetchColumn() ?: '');

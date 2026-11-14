@@ -117,7 +117,7 @@ export default function Settings() {
       if (!result.ok) return;
       const isPaymentReturn = new URLSearchParams(window.location.search).get("payment") === "return";
       let paymentCheck = null;
-      if (isPaymentReturn && result.user?.role === "manager" && result.subscription?.billing?.status === "pending") {
+      if (isPaymentReturn && (result.user?.workspace_role || result.user?.role) === "manager" && result.subscription?.billing?.status === "pending") {
         try {
           paymentCheck = await post("/api/liqpay.php", { action: "verify" });
           if (paymentCheck.status === "active" || paymentCheck.status === "failed") {
@@ -419,7 +419,7 @@ export default function Settings() {
               {subscription?.pending_plan && <div className="subscription-pending-plan">
                 <span><Icon name="subscription" /></span>
                 <div><strong>Очікує активації: {subscription.pending_plan.name}</strong><small>{subscription.pending_plan.price} · тариф увімкнеться після остаточного підтвердження LiqPay</small></div>
-                {user?.role === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
+                {(user?.workspace_role || user?.role) === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
               </div>}
               {user?.role === "admin" && <div className="subscription-module-select">
                 <div className="subscription-module-label">
@@ -483,11 +483,11 @@ export default function Settings() {
                 <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
                 <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : plan.limits.services_per_client ? `До ${plan.limits.services_per_client} послуг на клієнта · без пакетів` : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
                 {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
-                {plan.key !== "start" && user?.role === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
+                {plan.key !== "start" && (user?.workspace_role || user?.role) === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
               </article>)}
             </div>
-            {subscription?.billing_enabled && user?.role === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
-            {user?.role !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
+            {subscription?.billing_enabled && (user?.workspace_role || user?.role) === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
+            {(user?.workspace_role || user?.role) !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
           </section>
           <div className="settings-actions">
             <button className="primary-action" disabled={emailSaving}>Зберегти зміни</button>

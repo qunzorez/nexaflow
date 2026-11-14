@@ -21,13 +21,12 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
 $action = (string)($data['action'] ?? '');
 $currentUser = $current->fetch();
-$canManage = $currentUser && in_array($currentUser['role'], ['admin', 'owner', 'manager'], true);
+$planContext = $currentUser ? workspacePlan($pdo, (string)$_SESSION['user_id'], (string)$currentUser['role']) : null;
+$canManage = $currentUser && in_array($planContext['workspace_role'] ?? '', ['admin', 'owner', 'manager'], true);
 $isAdmin = $currentUser && in_array($currentUser['role'], ['admin', 'owner'], true);
 if (!$currentUser || !$canManage) {
     jsonResponse(false, 'Недостатньо прав для керування командою.', [], 403);
 }
-$planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], (string)$currentUser['role']);
-
 try {
     if ($method === 'GET') {
         if ($isAdmin) {
@@ -64,8 +63,8 @@ try {
         if ($isAdmin) {
             $groups = $pdo->query("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name")->fetchAll();
         } else {
-            $groupsQuery = $pdo->prepare("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE pg.project_id IS NULL OR p.owner_id = ? OR pm.user_id IS NOT NULL GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name");
-            $groupsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            $groupsQuery = $pdo->prepare("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE (pg.project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?) OR p.owner_id = ? GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name");
+            $groupsQuery->execute([$_SESSION['user_id'], $planContext['owner_id'], $planContext['owner_id']]);
             $groups = $groupsQuery->fetchAll();
         }
         foreach ($groups as &$group) $group = exposeGroupPolicy($group);

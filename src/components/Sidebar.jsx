@@ -6,8 +6,11 @@ import "./sidebar-icons.css";
 
 export default function Sidebar({ user, open }) {
   const navigate = useNavigate();
-  const countsStorageKey = `nexaflow.sidebar.counts.${user?.id || "guest"}`;
-  const featuresStorageKey = `nexaflow.sidebar.features.${user?.id || "guest"}`;
+  const workspaces = user?.workspaces || [];
+  const activeWorkspaceId = user?.active_workspace_id || user?.subscription?.workspace_id || "";
+  const workspaceCacheKey = `${user?.id || "guest"}.${activeWorkspaceId || "default"}`;
+  const countsStorageKey = `nexaflow.sidebar.counts.${workspaceCacheKey}`;
+  const featuresStorageKey = `nexaflow.sidebar.features.${workspaceCacheKey}`;
   const [counts, setCounts] = useState(() => {
     try {
       return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, ...JSON.parse(window.localStorage.getItem(countsStorageKey) || "{}") };
@@ -23,7 +26,9 @@ export default function Sidebar({ user, open }) {
       return user?.subscription?.features || {};
     }
   });
-  const userRole = String(user?.role || "").toLowerCase();
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
+  const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
   useEffect(() => {
@@ -68,6 +73,18 @@ export default function Sidebar({ user, open }) {
     await post("/api/logout.php", {});
     navigate("/");
   }
+  async function switchWorkspace(workspaceId) {
+    if (!workspaceId || workspaceId === activeWorkspaceId || switchingWorkspace) return;
+    setSwitchingWorkspace(true);
+    setWorkspaceError("");
+    const result = await post("/api/workspaces.php", { workspace_id: workspaceId });
+    if (!result.ok) {
+      setWorkspaceError(result.message || "Не вдалося переключити простір.");
+      setSwitchingWorkspace(false);
+      return;
+    }
+    window.location.reload();
+  }
   return (
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <Link className="side-brand" to="/dashboard">
@@ -79,6 +96,18 @@ export default function Sidebar({ user, open }) {
           <small>SRM SYSTEM</small>
         </div>
       </Link>
+      {workspaces.length > 0 && <section className="my-workspaces" aria-label="Мої простори">
+        <p className="nav-label">МОЇ ПРОСТОРИ</p>
+        <div className="workspace-list">
+          {workspaces.map(workspace => <button key={workspace.id} type="button" className={`workspace-option${workspace.id === activeWorkspaceId ? " active" : ""}`} aria-current={workspace.id === activeWorkspaceId ? "true" : undefined} title={`${workspace.name}${workspace.is_own ? " · мій простір" : ""}`} disabled={switchingWorkspace} onClick={() => switchWorkspace(workspace.id)}>
+            <span className="workspace-switcher-icon"><Icon name="project" /></span>
+            <span className="workspace-option-copy"><strong>{workspace.name}</strong><small>{workspace.is_own ? "Мій простір" : "Команда"}</small></span>
+            {workspace.id === activeWorkspaceId && <span className="workspace-active-dot" aria-label="Активний" />}
+          </button>)}
+        </div>
+        {workspaceError && <small className="workspace-switcher-error" role="alert">{workspaceError}</small>}
+        {switchingWorkspace && <small className="workspace-switcher-loading">Перемикаємо простір…</small>}
+      </section>}
       <nav>
         <p className="nav-label">ОСНОВНЕ</p>
         <Link className="nav-item" to="/dashboard">

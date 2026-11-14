@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/plans.php';
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db();
@@ -12,6 +13,7 @@ if ($method === 'POST') $projectId = trim((string)($data['id'] ?? $projectId));
 $action = (string)($data['action'] ?? 'update');
 $actorQuery = $pdo->prepare('SELECT role FROM users WHERE id = ?');
 $actorQuery->execute([$userId]); $actorRole = (string)$actorQuery->fetchColumn(); $actorQuery->closeCursor();
+$planContext = workspacePlan($pdo, $userId, $actorRole);
 $actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
 if ($method === 'POST' && in_array($action, ['update_global_group', 'delete_global_group'], true)) {
     $managedGroup = manageableGroup($pdo, trim((string)($data['group_id'] ?? '')), $userId, $actorAdmin);
@@ -92,8 +94,8 @@ if ($method === 'POST' && $action === 'assign_global_group') {
 }
 if ($projectId === '') jsonResponse(false, 'Проєкт не знайдено.', [], 422);
 
-$access = $pdo->prepare("SELECT p.id, p.name, p.description, p.owner_id, p.status, p.visibility, p.created_at, p.updated_at, u.name AS owner_name, cu.role AS user_role, pm.role AS project_role FROM projects p JOIN users u ON u.id = p.owner_id JOIN users cu ON cu.id = ? LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.id = ? AND (cu.role IN ('admin', 'owner') OR p.owner_id = ? OR pm.user_id = ?) LIMIT 1");
-$access->execute([$userId, $userId, $projectId, $userId, $userId]);
+$access = $pdo->prepare("SELECT p.id, p.name, p.description, p.owner_id, p.status, p.visibility, p.created_at, p.updated_at, u.name AS owner_name, cu.role AS user_role, pm.role AS project_role FROM projects p JOIN users u ON u.id = p.owner_id JOIN users cu ON cu.id = ? LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.id = ? AND (cu.role IN ('admin', 'owner') OR (p.owner_id = ? AND (p.owner_id = ? OR pm.user_id = ?))) LIMIT 1");
+$access->execute([$userId, $userId, $projectId, $planContext['owner_id'], $userId, $userId]);
 $project = $access->fetch();
 if (!$project) jsonResponse(false, 'У вас немає доступу до цього проєкту.', [], 403);
 $canEdit = in_array($project['user_role'], ['admin', 'owner'], true) || $project['owner_id'] === $userId || in_array($project['project_role'], ['admin', 'manager'], true);

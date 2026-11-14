@@ -12,29 +12,39 @@ $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
 $user['subscription'] = planSettingsPayload($planContext);
+$user['workspaces'] = $planContext['workspaces']; $user['active_workspace_id'] = $planContext['owner_id']; $user['workspace_role'] = $planContext['workspace_role'];
 $pdo->exec("CREATE TABLE IF NOT EXISTS clients (id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, legal_form VARCHAR(40) NOT NULL, tax_system VARCHAR(80) NOT NULL, has_vat TINYINT(1) NOT NULL DEFAULT 0, has_excise TINYINT(1) NOT NULL DEFAULT 0, has_employees TINYINT(1) NOT NULL DEFAULT 0, employee_count INT NULL, special_taxes TEXT NULL, services TEXT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting', module_data TEXT NULL, created_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_clients_created_by (created_by)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS client_members (client_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, assigned_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (client_id, user_id), INDEX idx_client_members_user (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $columns = $pdo->query("SHOW COLUMNS FROM clients")->fetchAll(); $columnNames = array_column($columns, 'Field'); if (!in_array('module', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD module VARCHAR(40) NOT NULL DEFAULT 'accounting'"); if (!in_array('module_data', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD module_data TEXT NULL"); if (!in_array('services', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD services TEXT NULL");
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
-$canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
+$canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true);
 $clientAction = (string)($data['action'] ?? 'create');
 if ($method === 'POST' && in_array($clientAction, ['update', 'delete'], true)) {
     if (!$canManage) jsonResponse(false, 'Звичайний користувач може лише переглядати клієнтів.', [], 403);
     $clientId = trim((string)($data['id'] ?? ''));
+    if (!in_array($user['role'], ['admin', 'owner'], true)) {
+        $ownerMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+        $scope = $pdo->prepare("SELECT id FROM clients WHERE id = ? AND created_by IN ({$ownerMarks}) LIMIT 1");
+        $scope->execute(array_merge([$clientId], $planContext['member_ids']));
+        if (!$scope->fetchColumn()) jsonResponse(false, 'Клієнта не знайдено в активному просторі.', [], 404);
+    }
     $claims = resourceClaims($pdo, $userId, 'client', $clientId);
     requireClaim($claims, $clientAction === 'delete' ? 'delete' : 'edit');
 }
 
 if ($method === 'GET') {
+    $workspaceIds = array_values(array_unique(array_map('strval', $planContext['member_ids'] ?? [$userId])));
+    if (!$workspaceIds) $workspaceIds = [$userId];
+    $workspaceMarks = implode(',', array_fill(0, count($workspaceIds), '?'));
     if (in_array($user['role'], ['admin', 'owner'], true)) {
         $clientQuery = $pdo->query('SELECT c.*, u.name AS creator_name FROM clients c JOIN users u ON u.id = c.created_by ORDER BY c.name');
     } elseif ($canManage) {
-        $clientQuery = $pdo->prepare('SELECT DISTINCT c.*, u.name AS creator_name FROM clients c JOIN users u ON u.id = c.created_by LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.created_by = ? OR cm.user_id IS NOT NULL ORDER BY c.name');
-        $clientQuery->execute([$userId, $userId]);
+        $clientQuery = $pdo->prepare("SELECT DISTINCT c.*, u.name AS creator_name FROM clients c JOIN users u ON u.id = c.created_by LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.created_by IN ({$workspaceMarks}) OR (cm.user_id IS NOT NULL AND c.created_by IN ({$workspaceMarks})) ORDER BY c.name");
+        $clientQuery->execute(array_merge([$userId], $workspaceIds, $workspaceIds));
     } else {
-        $clientQuery = $pdo->prepare('SELECT c.*, u.name AS creator_name FROM clients c JOIN users u ON u.id = c.created_by JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? ORDER BY c.name');
-        $clientQuery->execute([$userId]);
+        $clientQuery = $pdo->prepare("SELECT c.*, u.name AS creator_name FROM clients c JOIN users u ON u.id = c.created_by JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.created_by IN ({$workspaceMarks}) ORDER BY c.name");
+        $clientQuery->execute(array_merge([$userId], $workspaceIds));
     }
     $clients = $clientQuery->fetchAll();
     $clients = claimRows($pdo, $userId, 'client', $clients);
@@ -42,7 +52,9 @@ if ($method === 'GET') {
     foreach ($pdo->query('SELECT id, name, email, role FROM users')->fetchAll() as $serviceUser) $serviceUsers[(string)$serviceUser['id']] = $serviceUser;
     $catalogResponsibleAmounts = [];
     try {
-        foreach ($pdo->query('SELECT name, responsible_amount FROM service_catalog WHERE active = 1')->fetchAll() as $catalogService) {
+        $catalogQuery = $pdo->prepare('SELECT name, responsible_amount FROM service_catalog WHERE active = 1 AND created_by = ?');
+        $catalogQuery->execute([$planContext['owner_id']]);
+        foreach ($catalogQuery->fetchAll() as $catalogService) {
             $catalogResponsibleAmounts[mb_strtolower(trim((string)$catalogService['name']))] = (float)$catalogService['responsible_amount'];
         }
     } catch (Throwable $exception) {
@@ -66,15 +78,11 @@ if ($method === 'GET') {
     // Match accounting groups in PHP: older production tables can use different
     // collations for group names and user IDs, making the joined SQL query fail.
     $availableUsers = [];
-    $managerTeamIds = [];
-    if ($user['role'] === 'manager') {
-        $teamUsersQuery = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE u.id = ? OR EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted')");
-        $teamUsersQuery->execute([$userId, $userId, $userId]);
-        foreach ($teamUsersQuery->fetchAll(PDO::FETCH_COLUMN) as $teamUserId) $managerTeamIds[(string)$teamUserId] = true;
-    }
+    $managerTeamIds = array_fill_keys($workspaceIds, true);
     if ($canManage) {
         $accountingGroupIds = [];
-        foreach ($pdo->query('SELECT id, name FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+        foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+            if (!in_array($user['role'], ['admin', 'owner'], true) && (groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $planContext['owner_id']) continue;
             $name = (string)$group['name'];
             $nameHex = strtoupper(bin2hex($name));
             if (preg_match('/(?:бухгалт|бугалт|account)/iu', $name)
@@ -89,7 +97,7 @@ if ($method === 'GET') {
             $membershipQuery->execute(array_keys($accountingGroupIds));
             foreach ($membershipQuery->fetchAll() as $membership) {
                 $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-                $isAllowedManagerMember = $user['role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
+                $isAllowedManagerMember = $planContext['workspace_role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
                 if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
                     $availableUsers[(string)$person['id']] = $person;
                 }
@@ -111,7 +119,7 @@ if ($method === 'GET') {
         $clientMembersQuery->execute($clientIds);
         foreach ($clientMembersQuery->fetchAll() as $membership) {
             $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-            $isAllowedManagerMember = $user['role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
+            $isAllowedManagerMember = $planContext['workspace_role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
             if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
                 $availableByClient[(string)$membership['client_id']][] = $person;
             }
@@ -211,7 +219,8 @@ if ($packageIds) {
 $requestedAccountantIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['accountant_id'] ?? ''), $services))));
 if ($requestedAccountantIds) {
     $accountingGroupIds = [];
-    foreach ($pdo->query('SELECT id, name FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+    foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+        if (!in_array($user['role'], ['admin', 'owner'], true) && (groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $planContext['owner_id']) continue;
         $groupName = (string)$group['name'];
         $nameHex = strtoupper(bin2hex($groupName));
         if (preg_match('/(?:бухгалт|бугалт|account)/iu', $groupName)
@@ -227,10 +236,8 @@ if ($requestedAccountantIds) {
         $membershipQuery->execute(array_keys($accountingGroupIds));
         $allowedAccountantIds = array_fill_keys(array_map('strval', $membershipQuery->fetchAll(PDO::FETCH_COLUMN)), true);
     }
-    if ($user['role'] === 'manager' && $allowedAccountantIds) {
-        $teamUsersQuery = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE u.id = ? OR EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted')");
-        $teamUsersQuery->execute([$userId, $userId, $userId]);
-        $managerTeamIds = array_fill_keys(array_map('strval', $teamUsersQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+    if ($planContext['workspace_role'] === 'manager' && $allowedAccountantIds) {
+        $managerTeamIds = array_fill_keys(array_map('strval', $planContext['member_ids']), true);
         $allowedAccountantIds = array_filter($allowedAccountantIds, static fn($_, $id): bool => isset($managerTeamIds[(string)$id]), ARRAY_FILTER_USE_BOTH);
     }
     foreach ($requestedAccountantIds as $accountantId) {

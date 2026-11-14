@@ -12,6 +12,7 @@ $userQuery->execute([$userId]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
+$user['subscription'] = planSettingsPayload($planContext); $user['workspaces'] = $planContext['workspaces']; $user['active_workspace_id'] = $planContext['owner_id']; $user['workspace_role'] = $planContext['workspace_role'];
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS service_packages (
   id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting',
@@ -37,7 +38,7 @@ if ($addedPackagePrices) {
   $pdo->exec("UPDATE service_packages p SET client_price = COALESCE((SELECT SUM(s.client_price) FROM service_catalog s WHERE s.package_id = p.id AND s.active = 1), 0), responsible_amount = COALESCE((SELECT SUM(s.responsible_amount) FROM service_catalog s WHERE s.package_id = p.id AND s.active = 1), 0)");
 }
 
-$canManage = in_array($user['role'], ['admin', 'owner', 'manager'], true);
+$canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true);
 $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
@@ -53,10 +54,9 @@ $moduleLabel = static fn(string $module): string => [
 if ($method === 'GET') {
     if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише менеджерам і адміністраторам.', [], 403);
     requirePlanFeature($planContext, 'services');
-    // Package ownership is scoped to the signed-in creator throughout the app,
-    // including client create/edit forms that consume this endpoint.
+    // Packages belong to the active team's manager account and are shared by that workspace.
     $packageQuery = $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages WHERE created_by = ? AND module IN (?, 'all') ORDER BY name");
-    $packageQuery->execute([$userId, $activeModule]);
+    $packageQuery->execute([$planContext['owner_id'], $activeModule]);
     $packages = $packageQuery->fetchAll();
     $packageIds = array_column($packages, 'id');
     $items = [];
@@ -66,7 +66,10 @@ if ($method === 'GET') {
         $itemsQuery->execute($packageIds);
         $items = $itemsQuery->fetchAll();
     }
-    $users = $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('admin','owner','manager','user') ORDER BY name, email")->fetchAll();
+    $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+    $usersQuery = $pdo->prepare("SELECT id, name, email, role FROM users WHERE role IN ('admin','owner','manager','user') AND id IN ({$memberMarks}) ORDER BY name, email");
+    $usersQuery->execute($planContext['member_ids']);
+    $users = $usersQuery->fetchAll();
     foreach ($packages as &$package) {
         $package['module_label'] = $moduleLabel((string)$package['module']);
         $package['services'] = array_values(array_filter($items, static fn(array $item): bool => (string)$item['package_id'] === (string)$package['id']));
@@ -97,17 +100,17 @@ if (in_array($action, ['create_package', 'update_package'], true)) {
         if ($packageId === '') jsonResponse(false, 'Пакет не знайдено.', [], 422);
         $ownedPackage = $pdo->prepare('SELECT id FROM service_packages WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?') . ' LIMIT 1');
         $ownedValues = [$packageId];
-        if (!$isAdmin) $ownedValues[] = $userId;
+        if (!$isAdmin) $ownedValues[] = $planContext['owner_id'];
         $ownedPackage->execute($ownedValues);
         if (!$ownedPackage->fetchColumn()) jsonResponse(false, 'Пакет не знайдено або його створив інший користувач.', [], 404);
         $query = $pdo->prepare('UPDATE service_packages SET name = ?, module = ?, description = ?, client_price = ?, responsible_amount = ? WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?'));
         $updateValues = [$name, $module, $description ?: null, $clientPrice, $responsibleAmount, $packageId];
-        if (!$isAdmin) $updateValues[] = $userId;
+        if (!$isAdmin) $updateValues[] = $planContext['owner_id'];
         $query->execute($updateValues);
         jsonResponse(true, 'Пакет оновлено.');
     }
     $query = $pdo->prepare('INSERT INTO service_packages (id, name, module, description, client_price, responsible_amount, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    $query->execute([$newId(), $name, $module, $description ?: null, $clientPrice, $responsibleAmount, $userId]);
+    $query->execute([$newId(), $name, $module, $description ?: null, $clientPrice, $responsibleAmount, $planContext['owner_id']]);
     jsonResponse(true, 'Пакет створено.');
 }
 
@@ -115,13 +118,13 @@ if ($action === 'toggle_package') {
     if ($packageId === '') jsonResponse(false, 'Пакет не знайдено.', [], 422);
     $ownedPackage = $pdo->prepare('SELECT id FROM service_packages WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?') . ' LIMIT 1');
     $ownedValues = [$packageId];
-    if (!$isAdmin) $ownedValues[] = $userId;
+    if (!$isAdmin) $ownedValues[] = $planContext['owner_id'];
     $ownedPackage->execute($ownedValues);
     if (!$ownedPackage->fetchColumn()) jsonResponse(false, 'Пакет не знайдено або його створив інший користувач.', [], 404);
     $active = !empty($data['active']) ? 1 : 0;
     $query = $pdo->prepare('UPDATE service_packages SET active = ? WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?'));
     $values = [$active, $packageId];
-    if (!$isAdmin) $values[] = $userId;
+    if (!$isAdmin) $values[] = $planContext['owner_id'];
     $query->execute($values);
     jsonResponse(true, $active ? 'Пакет активовано.' : 'Пакет деактивовано.');
 }
@@ -130,7 +133,7 @@ if ($action === 'delete_package') {
     if ($packageId === '') jsonResponse(false, 'Пакет не знайдено.', [], 422);
     $ownedPackage = $pdo->prepare('SELECT id FROM service_packages WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?') . ' LIMIT 1');
     $ownedValues = [$packageId];
-    if (!$isAdmin) $ownedValues[] = $userId;
+    if (!$isAdmin) $ownedValues[] = $planContext['owner_id'];
     $ownedPackage->execute($ownedValues);
     if (!$ownedPackage->fetchColumn()) jsonResponse(false, 'Пакет не знайдено або його створив інший користувач.', [], 404);
     $pdo->prepare('DELETE FROM service_catalog WHERE package_id = ?')->execute([$packageId]);
@@ -147,7 +150,7 @@ if (in_array($action, ['create_service', 'update_service'], true)) {
     if ($name === '' || $packageId === '') jsonResponse(false, 'Вкажіть назву послуги та пакет.', [], 422);
     $packageCheck = $pdo->prepare('SELECT id FROM service_packages WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?') . ' LIMIT 1');
     $packageValues = [$packageId];
-    if (!$isAdmin) $packageValues[] = $userId;
+    if (!$isAdmin) $packageValues[] = $planContext['owner_id'];
     $packageCheck->execute($packageValues);
     if (!$packageCheck->fetch()) jsonResponse(false, 'Пакет не знайдено.', [], 422);
     $duplicateCheck = $pdo->prepare('SELECT id FROM service_catalog WHERE package_id = ? AND name = ? AND active = 1 LIMIT 1');
@@ -162,7 +165,7 @@ if (in_array($action, ['create_service', 'update_service'], true)) {
         if ($serviceId === '') jsonResponse(false, 'Послугу не знайдено.', [], 422);
         $serviceOwned = $pdo->prepare('SELECT s.id FROM service_catalog s JOIN service_packages p ON p.id = s.package_id WHERE s.id = ? AND s.package_id = ?' . ($isAdmin ? '' : ' AND p.created_by = ?') . ' LIMIT 1');
         $serviceValues = [$serviceId, $packageId];
-        if (!$isAdmin) $serviceValues[] = $userId;
+        if (!$isAdmin) $serviceValues[] = $planContext['owner_id'];
         $serviceOwned->execute($serviceValues);
         if (!$serviceOwned->fetchColumn()) jsonResponse(false, 'Послугу не знайдено в цьому пакеті.', [], 404);
         $query = $pdo->prepare('UPDATE service_catalog SET package_id = ?, name = ?, client_price = ?, responsible_amount = ?, responsible_user_id = ? WHERE id = ?');
@@ -170,7 +173,7 @@ if (in_array($action, ['create_service', 'update_service'], true)) {
         jsonResponse(true, 'Послугу оновлено.');
     }
     $query = $pdo->prepare('INSERT INTO service_catalog (id, package_id, name, client_price, responsible_amount, responsible_user_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    $query->execute([$newId(), $packageId, $name, $clientPrice, $responsibleAmount, $responsibleUserId, $userId]);
+    $query->execute([$newId(), $packageId, $name, $clientPrice, $responsibleAmount, $responsibleUserId, $planContext['owner_id']]);
     jsonResponse(true, 'Послугу створено.');
 }
 
@@ -178,7 +181,7 @@ if ($action === 'delete_service') {
     if ($serviceId === '') jsonResponse(false, 'Послугу не знайдено.', [], 422);
     $delete = $pdo->prepare('DELETE s FROM service_catalog s JOIN service_packages p ON p.id = s.package_id WHERE s.id = ?' . ($isAdmin ? '' : ' AND p.created_by = ?'));
     $deleteValues = [$serviceId];
-    if (!$isAdmin) $deleteValues[] = $userId;
+    if (!$isAdmin) $deleteValues[] = $planContext['owner_id'];
     $delete->execute($deleteValues);
     if ($delete->rowCount() === 0) jsonResponse(false, 'Послугу не знайдено або її пакет створив інший користувач.', [], 404);
     jsonResponse(true, 'Послугу видалено.');

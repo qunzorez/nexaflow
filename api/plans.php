@@ -34,18 +34,45 @@ function ensurePlanSchema(PDO $pdo): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 }
 
+/** Return the teams this account has actually joined. A team is identified by its manager/owner account. */
+function availableWorkspaces(PDO $pdo, string $userId, string $role): array
+{
+    if (in_array($role, ['admin', 'owner'], true)) return [];
+    $query = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.role FROM users u WHERE u.id <> ? AND u.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = u.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = u.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted')) ORDER BY u.created_at ASC");
+    $query->execute([$userId, $userId, $userId]);
+    $workspaces = [];
+    if (in_array($role, ['manager', 'owner'], true)) {
+        $self = $pdo->prepare('SELECT id, name FROM users WHERE id = ? LIMIT 1');
+        $self->execute([$userId]);
+        if ($row = $self->fetch()) $workspaces[] = ['id' => (string)$row['id'], 'name' => (string)$row['name'], 'is_own' => true];
+    }
+    foreach ($query->fetchAll() as $row) $workspaces[] = ['id' => (string)$row['id'], 'name' => (string)$row['name'], 'is_own' => false];
+    if (!$workspaces) {
+        $self = $pdo->prepare('SELECT id, name FROM users WHERE id = ? LIMIT 1');
+        $self->execute([$userId]);
+        if ($row = $self->fetch()) $workspaces[] = ['id' => (string)$row['id'], 'name' => (string)$row['name'], 'is_own' => true];
+    }
+    return $workspaces;
+}
+
+function activeWorkspaceId(PDO $pdo, string $userId, string $role): string
+{
+    $workspaces = availableWorkspaces($pdo, $userId, $role);
+    $allowed = array_column($workspaces, 'id');
+    $requested = (string)($_SESSION['active_workspace_id'] ?? '');
+    if ($requested !== '' && in_array($requested, $allowed, true)) return $requested;
+    // Keep the previous default for members while managers start in their own workspace.
+    $default = (string)($workspaces[0]['id'] ?? $userId);
+    $_SESSION['active_workspace_id'] = $default;
+    return $default;
+}
+
 function workspacePlan(PDO $pdo, string $userId, string $role): array
 {
     ensurePlanSchema($pdo);
-    $ownerId = $userId;
-    $standaloneParticipant = false;
-    if (!in_array($role, ['admin', 'owner', 'manager'], true)) {
-        $ownerQuery = $pdo->prepare("SELECT inviter.id FROM users inviter WHERE inviter.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = inviter.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = inviter.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted')) ORDER BY inviter.created_at ASC LIMIT 1");
-        $ownerQuery->execute([$userId, $userId]);
-        $invitedOwnerId = $ownerQuery->fetchColumn();
-        $standaloneParticipant = !$invitedOwnerId;
-        $ownerId = (string)($invitedOwnerId ?: $userId);
-    }
+    $workspaces = availableWorkspaces($pdo, $userId, $role);
+    $ownerId = activeWorkspaceId($pdo, $userId, $role);
+    $standaloneParticipant = $ownerId === $userId && !in_array($role, ['admin', 'owner', 'manager'], true);
     $planQuery = $pdo->prepare('SELECT plan_key FROM users WHERE id = ? LIMIT 1');
     $planQuery->execute([$ownerId]);
     $planKey = $standaloneParticipant ? 'start' : (string)($planQuery->fetchColumn() ?: 'start');
@@ -108,7 +135,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
-    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
+    return ['key' => $planKey, 'owner_id' => $ownerId, 'workspace_role' => ($ownerId === $userId ? $role : 'user'), 'member_ids' => $ids, 'workspaces' => $workspaces, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
 }
 
 function requirePlanFeature(array $context, string $feature): void
@@ -120,28 +147,15 @@ function requirePlanFeature(array $context, string $feature): void
 function telegramPlanAvailable(PDO $pdo, string $userId): bool
 {
     static $cache = [];
-    if (array_key_exists($userId, $cache)) return $cache[$userId];
     ensurePlanSchema($pdo);
     $userQuery = $pdo->prepare('SELECT id, email, role FROM users WHERE id = ? LIMIT 1');
     $userQuery->execute([$userId]);
     $user = $userQuery->fetch();
     if (!$user) return $cache[$userId] = false;
-    if (in_array($user['role'], ['admin', 'owner'], true)) return $cache[$userId] = true;
-    $ownerId = $userId;
-    $standaloneParticipant = false;
-    if ($user['role'] !== 'manager') {
-        $ownerQuery = $pdo->prepare("SELECT inviter.id FROM users inviter WHERE inviter.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = inviter.id AND i.email = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = inviter.id AND i.email = ? AND i.status = 'accepted')) ORDER BY inviter.created_at ASC LIMIT 1");
-        $ownerQuery->execute([$user['email'], $user['email']]);
-        $invitedOwnerId = $ownerQuery->fetchColumn();
-        $standaloneParticipant = !$invitedOwnerId;
-        $ownerId = (string)($invitedOwnerId ?: $userId);
-    }
-    if ($standaloneParticipant) return $cache[$userId] = false;
-    $planQuery = $pdo->prepare('SELECT plan_key FROM users WHERE id = ? LIMIT 1');
-    $planQuery->execute([$ownerId]);
-    $key = (string)($planQuery->fetchColumn() ?: 'start');
-    $plans = planDefinitions();
-    return $cache[$userId] = !empty($plans[$key]['telegram']);
+    $context = workspacePlan($pdo, $userId, (string)$user['role']);
+    $cacheKey = $userId . ':' . $context['owner_id'];
+    if (array_key_exists($cacheKey, $cache)) return $cache[$cacheKey];
+    return $cache[$cacheKey] = !empty($context['plan']['telegram']);
 }
 
 function notifyPlanCapacityReached(array $context, string $metric, int $current, int $limit): void
@@ -187,5 +201,5 @@ function planSettingsPayload(array $context): array
     $subscription = $context['subscription'] ?? null;
     $pending = $context['pending_subscription'] ?? null;
     $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
-    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'services_per_client' => $plan['services_per_client'] ?? null, 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
+    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'services_per_client' => $plan['services_per_client'] ?? null, 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
 }

@@ -9,7 +9,7 @@ import './project-create.css';
 
 export default function ProjectCreatePage() {
   const [user, setUser] = useState(null); const [users, setUsers] = useState([]); const navigate = useNavigate();
-  useEffect(() => { Promise.all([api('/api/me.php'), api('/api/team.php')]).then(([me, team]) => { if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.role)) return navigate('/projects', { replace: true }); setUser(me.user); setUsers(team.ok ? team.users : []); }); }, [navigate]);
+  useEffect(() => { Promise.all([api('/api/me.php'), api('/api/team.php')]).then(([me, team]) => { if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.workspace_role || me.user.role)) return navigate('/projects', { replace: true }); setUser(me.user); setUsers(team.ok ? team.users : []); }); }, [navigate]);
   if (!user) return <div className="loading-screen">Перевірка прав доступу…</div>;
   const isAdmin = ['admin', 'owner'].includes(user.role);
   const projectLimitReached = isPlanLimitReached(user.subscription, 'projects');
