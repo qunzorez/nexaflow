@@ -49,7 +49,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     $counts = [
         'projects' => $count("SELECT COUNT(*) FROM projects WHERE owner_id IN ($marks)"),
         'clients' => $count("SELECT COUNT(*) FROM clients WHERE created_by IN ($marks)"),
-        'tasks_month' => $count("SELECT COUNT(*) FROM tasks WHERE created_by IN ($marks) AND created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AND created_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)"),
+        'tasks_month' => $count("SELECT COUNT(DISTINCT t.id) FROM tasks t WHERE t.created_by IN ($marks) AND t.status <> 'archived' AND ((t.created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AND t.created_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)) OR EXISTS (SELECT 1 FROM task_history h WHERE h.task_id = t.id AND h.action = 'restored_from_archive' AND h.created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AND h.created_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)))"),
         'participants' => max(0, count($ids) - 1) + $pendingCount,
     ];
     if (in_array($role, ['admin', 'owner'], true)) {
