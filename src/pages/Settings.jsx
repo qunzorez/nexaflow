@@ -411,7 +411,7 @@ export default function Settings() {
                 <div><strong>Очікує активації: {subscription.pending_plan.name}</strong><small>{subscription.pending_plan.price} · тариф увімкнеться після остаточного підтвердження LiqPay</small></div>
                 {user?.role === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
               </div>}
-              <div className="subscription-module-select">
+              {user?.role === "admin" && <div className="subscription-module-select">
                 <div className="subscription-module-label">
                   <span><Icon name="sparkle" /></span>
                   <div>
@@ -437,7 +437,7 @@ export default function Settings() {
                   </select>
                   <span><Icon name="down" /></span>
                 </label>
-              </div>
+              </div>}
             </div>
             <div className="subscription-meta">
               <div>

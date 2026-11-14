@@ -38,14 +38,17 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
 {
     ensurePlanSchema($pdo);
     $ownerId = $userId;
+    $standaloneParticipant = false;
     if (!in_array($role, ['admin', 'owner', 'manager'], true)) {
         $ownerQuery = $pdo->prepare("SELECT inviter.id FROM users inviter WHERE inviter.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = inviter.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = inviter.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted')) ORDER BY inviter.created_at ASC LIMIT 1");
         $ownerQuery->execute([$userId, $userId]);
-        $ownerId = (string)($ownerQuery->fetchColumn() ?: $userId);
+        $invitedOwnerId = $ownerQuery->fetchColumn();
+        $standaloneParticipant = !$invitedOwnerId;
+        $ownerId = (string)($invitedOwnerId ?: $userId);
     }
     $planQuery = $pdo->prepare('SELECT plan_key FROM users WHERE id = ? LIMIT 1');
     $planQuery->execute([$ownerId]);
-    $planKey = (string)($planQuery->fetchColumn() ?: 'start');
+    $planKey = $standaloneParticipant ? 'start' : (string)($planQuery->fetchColumn() ?: 'start');
     $plans = planDefinitions();
     $subscription = null;
     $pendingSubscription = null;
@@ -125,11 +128,15 @@ function telegramPlanAvailable(PDO $pdo, string $userId): bool
     if (!$user) return $cache[$userId] = false;
     if (in_array($user['role'], ['admin', 'owner'], true)) return $cache[$userId] = true;
     $ownerId = $userId;
+    $standaloneParticipant = false;
     if ($user['role'] !== 'manager') {
         $ownerQuery = $pdo->prepare("SELECT inviter.id FROM users inviter WHERE inviter.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = inviter.id AND i.email = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = inviter.id AND i.email = ? AND i.status = 'accepted')) ORDER BY inviter.created_at ASC LIMIT 1");
         $ownerQuery->execute([$user['email'], $user['email']]);
-        $ownerId = (string)($ownerQuery->fetchColumn() ?: $userId);
+        $invitedOwnerId = $ownerQuery->fetchColumn();
+        $standaloneParticipant = !$invitedOwnerId;
+        $ownerId = (string)($invitedOwnerId ?: $userId);
     }
+    if ($standaloneParticipant) return $cache[$userId] = false;
     $planQuery = $pdo->prepare('SELECT plan_key FROM users WHERE id = ? LIMIT 1');
     $planQuery->execute([$ownerId]);
     $key = (string)($planQuery->fetchColumn() ?: 'start');
