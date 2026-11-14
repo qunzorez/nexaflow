@@ -9,6 +9,7 @@
     "dev:local": "vite --mode development",
     "dev:live": "vite --mode live",
     "build:local": "vite build --mode development",
+    "watch:local": "vite build --watch --mode development",
     "build:live": "vite build --mode live",
     "preview": "vite preview"
   },

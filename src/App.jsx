@@ -17,12 +17,15 @@ import ClientCreatePage from "./pages/ClientCreatePage.jsx";
 import ClientEditPage from "./pages/ClientEditPage.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Services from "./pages/Services.jsx";
+import Landing from "./pages/Landing.jsx";
 import PlanFeatureRoute from "./components/PlanFeatureRoute.jsx";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login initialMode="login" />} />
+      <Route path="/register" element={<Login initialMode="register" />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/team" element={<Team />} />
       <Route path="/notifications" element={<NotificationsPage />} />

@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { post } from '../services/api.js';
 import './auth.css';
 
-export default function Login() {
-  const [mode, setMode] = useState('login');
+export default function Login({ initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: 'user', terms: false });
   const [notice, setNotice] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
