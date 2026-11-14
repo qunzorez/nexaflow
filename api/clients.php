@@ -11,6 +11,7 @@ $userQuery->execute([$userId]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
+$user['subscription'] = planSettingsPayload($planContext);
 $pdo->exec("CREATE TABLE IF NOT EXISTS clients (id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, legal_form VARCHAR(40) NOT NULL, tax_system VARCHAR(80) NOT NULL, has_vat TINYINT(1) NOT NULL DEFAULT 0, has_excise TINYINT(1) NOT NULL DEFAULT 0, has_employees TINYINT(1) NOT NULL DEFAULT 0, employee_count INT NULL, special_taxes TEXT NULL, services TEXT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting', module_data TEXT NULL, created_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_clients_created_by (created_by)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS client_members (client_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, assigned_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (client_id, user_id), INDEX idx_client_members_user (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $columns = $pdo->query("SHOW COLUMNS FROM clients")->fetchAll(); $columnNames = array_column($columns, 'Field'); if (!in_array('module', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD module VARCHAR(40) NOT NULL DEFAULT 'accounting'"); if (!in_array('module_data', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD module_data TEXT NULL"); if (!in_array('services', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD services TEXT NULL");
@@ -171,11 +172,12 @@ $services = array_values(array_filter(array_map(static function ($service): arra
 }, (array)($data['services'] ?? [])), static fn(array $service): bool => $service['name'] !== ''));
 $existingAccountantIds = [];
 $existingPackageKeys = [];
+$previousServices = [];
 if ($action === 'update' && $id !== '') {
     $existingServicesQuery = $pdo->prepare('SELECT services FROM clients WHERE id = ? LIMIT 1');
     $existingServicesQuery->execute([$id]);
-    $existingServices = json_decode((string)($existingServicesQuery->fetchColumn() ?: '[]'), true) ?: [];
-    foreach ($existingServices as $existingService) {
+    $previousServices = json_decode((string)($existingServicesQuery->fetchColumn() ?: '[]'), true) ?: [];
+    foreach ($previousServices as $existingService) {
         $existingAccountantId = trim((string)($existingService['accountant_id'] ?? ''));
         if ($existingAccountantId !== '') $existingAccountantIds[$existingAccountantId] = true;
         $existingPackageId = trim((string)($existingService['package_id'] ?? ''));
@@ -238,16 +240,25 @@ if ($requestedAccountantIds) {
     }
 }
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
-if ($services && empty($planContext['plan']['services'])) {
-    $previousServices = [];
-    if ($action === 'update' && $id !== '') {
-        $oldServicesQuery = $pdo->prepare('SELECT services FROM clients WHERE id = ? LIMIT 1');
-        $oldServicesQuery->execute([$id]);
-        $previousServices = json_decode((string)($oldServicesQuery->fetchColumn() ?: '[]'), true) ?: [];
+if (empty($planContext['plan']['services'])) {
+    $serviceKey = static fn(array $service): string => (string)($service['name'] ?? '') . '|' . (string)($service['package_id'] ?? '');
+    $previousKeys = array_fill_keys(array_map($serviceKey, $previousServices), true);
+    $addedStandalone = 0;
+    foreach ($services as $service) {
+        $key = $serviceKey($service);
+        if (isset($previousKeys[$key])) continue;
+        if ($service['package_id'] !== '') requirePlanFeature($planContext, 'services');
+        $addedStandalone++;
     }
-    $newServiceKeys = array_map(static fn(array $service): string => (string)($service['name'] ?? '') . '|' . (string)($service['package_id'] ?? ''), $services);
-    $oldServiceKeys = array_map(static fn(array $service): string => (string)($service['name'] ?? '') . '|' . (string)($service['package_id'] ?? ''), $previousServices);
-    if (array_diff($newServiceKeys, $oldServiceKeys) || array_diff($oldServiceKeys, $newServiceKeys)) requirePlanFeature($planContext, 'services');
+    $serviceLimit = $planContext['plan']['services_per_client'] ?? null;
+    if ($serviceLimit !== null) {
+        $standaloneCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
+        if ($standaloneCount > (int)$serviceLimit && $addedStandalone > 0) {
+            jsonResponse(false, 'У плані «' . $planContext['plan']['name'] . '» можна додати не більше ' . (int)$serviceLimit . ' послуг на одного клієнта.', ['code' => 'plan_limit_reached', 'metric' => 'services_per_client', 'limit' => (int)$serviceLimit, 'current' => (int)$serviceLimit, 'plan' => $planContext['key']], 403);
+        }
+    } elseif ($addedStandalone > 0) {
+        requirePlanFeature($planContext, 'services');
+    }
 }
 if ($action === 'update' && $id !== '') {
     $existingClientQuery = $pdo->prepare('SELECT id FROM clients WHERE id = ? LIMIT 1');

@@ -279,7 +279,7 @@ function FieldTip({ children }) {
     <span className={`client-field-tooltip${open ? " is-open" : ""}`} role="tooltip">{children}</span>
   </span>;
 }
-export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [], currentUserId = "" }) {
+export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [], currentUserId = "", subscription = null }) {
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState("");
@@ -291,6 +291,9 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     duplicateNoticeTimer.current = window.setTimeout(() => setDuplicateNotice(""), 3800);
   };
   useEffect(() => () => window.clearTimeout(duplicateNoticeTimer.current), []);
+  const clientServiceLimit = subscription?.services_per_client ?? null;
+  const standaloneServiceCount = (form.services || []).filter((service) => !service.is_package && !service.package_id).length;
+  const serviceLimitReached = clientServiceLimit !== null && standaloneServiceCount >= Number(clientServiceLimit);
   const set = (field, value) =>
     setForm((current) => {
       const nameInput = formElementRef.current?.elements?.namedItem("name");
@@ -320,7 +323,13 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
       return { ...service, [field]: value };
     }));
   };
-  const addService = () => set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  const addService = () => {
+    if (serviceLimitReached) {
+      showDuplicateNotice(`У плані «${subscription.name}» дозволено до ${clientServiceLimit} послуг на одного клієнта.`);
+      return;
+    }
+    set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  };
   const addPackage = () => {
     const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
     if (!packageItem) return;
@@ -593,9 +602,9 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
             {form.module === "accounting" && <fieldset className="client-services-fieldset">
               <legend>Необхідні бухгалтерські послуги</legend>
               <p className="client-field-hint">Додайте послуги для цього клієнта та їхню вартість.</p>
-              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>Оберіть послугу — дата заповниться автоматично за відомим строком.</small></div><button type="button" className="primary-action" onClick={addService}><Icon name="plus" /> Додати послугу</button></div>
+              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>{clientServiceLimit !== null ? `До ${clientServiceLimit} послуг на клієнта в плані «${subscription.name}».` : "Оберіть послугу — дата заповниться автоматично за відомим строком."}</small></div><button type="button" className="primary-action" disabled={serviceLimitReached} onClick={addService}><Icon name="plus" /> {serviceLimitReached ? "Ліміт послуг досягнуто" : "Додати послугу"}</button></div>
               {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн` }))} value={selectedPackageId} onChange={setSelectedPackageId} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
-              <div className="client-services-list-label">Додані послуги <span>{(form.services || []).length}</span></div>
+              <div className="client-services-list-label">Додані послуги <span>{standaloneServiceCount}{clientServiceLimit !== null ? ` / ${clientServiceLimit}` : ""}</span></div>
               <div className="client-services-list">
                 {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}${service.is_package ? ` client-package-card price-tier-${packageTier(service)}` : ""}`} key={`${index}-${service.name}`}>
                   <div className={`client-service-row${service.is_package ? " is-package" : ""}`}>
@@ -981,6 +990,7 @@ export default function Clients() {
           setForm={setForm}
           editing={editing}
           currentUserId={data.user?.id || ""}
+          subscription={data.user?.subscription}
           availableUsers={data?.available_users || []}
           availableUsersByClient={data?.available_users_by_client || {}}
           onSave={save}

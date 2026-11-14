@@ -471,7 +471,7 @@ export default function Settings() {
             <div className="plan-feature-list">
               <span className={subscription?.features.calendar ? "enabled" : "locked"}>{subscription?.features.calendar ? "✓" : "×"} Календар</span>
               <span className={subscription?.features.analytics ? "enabled" : "locked"}>{subscription?.features.analytics ? "✓" : "×"} Аналітика</span>
-              <span className={subscription?.features.services ? "enabled" : "locked"}>{subscription?.features.services ? "✓" : "×"} Створення послуг і пакетів</span>
+              <span className={subscription?.features.services || subscription?.services_per_client ? "enabled" : "locked"}>{subscription?.features.services ? "✓ Створення послуг і пакетів" : subscription?.services_per_client ? `✓ До ${subscription.services_per_client} послуг на клієнта · без пакетів` : "× Створення послуг і пакетів"}</span>
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
             </div>
             {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план — ми відкриємо його можливості без списання коштів.</span></div>}
@@ -481,7 +481,7 @@ export default function Settings() {
                 <header><strong>{plan.name}</strong><span>{plan.price}</span></header>
                 <p>{plan.limits.participants === 49 ? "До 50 учасників загалом · до 5 менеджерів" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
                 <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
-                <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
+                <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : plan.limits.services_per_client ? `До ${plan.limits.services_per_client} послуг на клієнта · без пакетів` : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
                 {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
                 {plan.key !== "start" && user?.role === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
               </article>)}

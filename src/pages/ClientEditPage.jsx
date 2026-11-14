@@ -127,7 +127,7 @@ export default function ClientEditPage() {
         <section className="welcome-row clients-hero"><div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Редагувати клієнта</h1><p className="subtext">Оновіть дані клієнта в полях активного модуля.</p></div></section>
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
-        <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} clientId={id} currentUserId={user?.id || ""} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
+        <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} clientId={id} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>
   );

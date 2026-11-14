@@ -80,7 +80,7 @@ export default function ClientCreatePage() {
           <div><p className="eyebrow">РОБОЧИЙ ПРОСТІР</p><h1>Створити клієнта</h1><p className="subtext">Заповніть дані клієнта за полями активного модуля.</p></div>
         </section>
         {error && <div className="form-notice">{error}</div>}
-        <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} currentUserId={user?.id || ""} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
+        <ClientFormModal form={form} setForm={setForm} editing={null} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>
   );
