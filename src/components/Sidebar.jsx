@@ -1,5 +1,5 @@
 import Icon from './Icon.jsx';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, post } from "../services/api.js";
 import "./sidebar-icons.css";
@@ -28,9 +28,23 @@ export default function Sidebar({ user, open }) {
   });
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const workspaceMenuRef = useRef(null);
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
+  const activeWorkspace = workspaces.find(workspace => workspace.id === activeWorkspaceId);
+  useEffect(() => {
+    if (!workspaceMenuOpen) return undefined;
+    const closeOnOutside = event => { if (!workspaceMenuRef.current?.contains(event.target)) setWorkspaceMenuOpen(false); };
+    const closeOnEscape = event => { if (event.key === "Escape") setWorkspaceMenuOpen(false); };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [workspaceMenuOpen]);
   useEffect(() => {
     if (!user?.subscription?.features) return;
     setPlanFeatures(user.subscription.features);
@@ -96,17 +110,22 @@ export default function Sidebar({ user, open }) {
           <small>SRM SYSTEM</small>
         </div>
       </Link>
-      {workspaces.length > 0 && <section className="my-workspaces" aria-label="Мої простори">
+      {workspaces.length > 0 && <section className={`my-workspaces${workspaceMenuOpen ? " is-open" : ""}`} aria-label="Мої простори" ref={workspaceMenuRef}>
         <p className="nav-label">МОЇ ПРОСТОРИ</p>
-        <div className="workspace-list">
-          {workspaces.map(workspace => <button key={workspace.id} type="button" className={`workspace-option${workspace.id === activeWorkspaceId ? " active" : ""}`} aria-current={workspace.id === activeWorkspaceId ? "true" : undefined} title={`${workspace.name}${workspace.is_own ? " · мій простір" : ""}`} disabled={switchingWorkspace} onClick={() => switchWorkspace(workspace.id)}>
+        <button type="button" className="workspace-trigger" aria-expanded={workspaceMenuOpen} aria-haspopup="listbox" onClick={() => setWorkspaceMenuOpen(open => !open)}>
+          <span className="workspace-switcher-icon"><Icon name="project" /></span>
+          <span className="workspace-option-copy"><strong>{activeWorkspace?.name || "Оберіть простір"}</strong><small>{activeWorkspace?.workspace_role || "Робочий простір"}</small></span>
+          <Icon name="down" className={`workspace-trigger-chevron${workspaceMenuOpen ? " rotated" : ""}`} />
+        </button>
+        {workspaceMenuOpen && <div className="workspace-menu" role="listbox" aria-label="Оберіть робочий простір">
+          {workspaces.map(workspace => <button key={workspace.id} type="button" role="option" aria-selected={workspace.id === activeWorkspaceId} className={`workspace-option${workspace.id === activeWorkspaceId ? " active" : ""}`} title={workspace.name} disabled={switchingWorkspace} onClick={() => { setWorkspaceMenuOpen(false); switchWorkspace(workspace.id); }}>
             <span className="workspace-switcher-icon"><Icon name="project" /></span>
-            <span className="workspace-option-copy"><strong>{workspace.name}</strong><small>{workspace.is_own ? "Мій простір" : "Команда"}</small></span>
+            <span className="workspace-option-copy"><strong>{workspace.name}</strong><small>{workspace.workspace_role || "Учасник"}</small></span>
             {workspace.id === activeWorkspaceId && <span className="workspace-active-dot" aria-label="Активний" />}
           </button>)}
-        </div>
-        {workspaceError && <small className="workspace-switcher-error" role="alert">{workspaceError}</small>}
-        {switchingWorkspace && <small className="workspace-switcher-loading">Перемикаємо простір…</small>}
+          {workspaceError && <small className="workspace-switcher-error" role="alert">{workspaceError}</small>}
+          {switchingWorkspace && <small className="workspace-switcher-loading">Перемикаємо простір…</small>}
+        </div>}
       </section>}
       <nav>
         <p className="nav-label">ОСНОВНЕ</p>
