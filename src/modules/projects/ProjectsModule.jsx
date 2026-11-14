@@ -9,7 +9,7 @@ import './projects-empty-fix.css';
 const canCreate = role => ['admin', 'owner', 'manager'].includes(role);
 
 export default function ProjectsModule({ user, projects, onCreated }) {
-  const isManager = canCreate(user?.role);
+  const isManager = canCreate(user?.workspace_role || user?.role);
   const projectLimitReached = isPlanLimitReached(user?.subscription, 'projects');
   const [search, setSearch] = useState(() => localStorage.getItem('nexaflow.projects.search') || '');
   const [status, setStatus] = useState(() => localStorage.getItem('nexaflow.projects.status') || 'all');

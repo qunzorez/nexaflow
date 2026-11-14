@@ -214,7 +214,7 @@ export default function Tasks() {
     setModalError("");
     setEditing(null);
     setProjectIds([]);
-    const canManage = ["admin", "owner", "manager"].includes(data?.user?.role);
+    const canManage = ["admin", "owner", "manager"].includes(data?.user?.workspace_role || data?.user?.role);
     setAssigneeIds(!canManage && data?.user?.id ? [data.user.id] : []);
     setClientIds([]);
     setInitialDueDate(dueDate);
@@ -271,7 +271,7 @@ export default function Tasks() {
     if (!result.ok) return setError(result.message);
     setNotice(result.message);
     load();
-    if (status === "done" && ["admin", "owner", "manager"].includes(data?.user?.role)) setArchivePrompt(task);
+    if (status === "done" && ["admin", "owner", "manager"].includes(data?.user?.workspace_role || data?.user?.role)) setArchivePrompt(task);
   }
   async function archiveCompletedTask() {
     if (!archivePrompt) return;
@@ -292,7 +292,7 @@ export default function Tasks() {
   }
   if (!data) return <div className="loading-screen">Завантаження задач…</div>;
   const canArchive = (task) =>
-    ["admin", "owner"].includes(data.user?.role) ||
+    ["admin", "owner", "manager"].includes(data.user?.workspace_role || data.user?.role) ||
     task.created_by === data.user?.id;
   const normalizedSearch = search.trim().toLowerCase();
   const filteredTasks = data.tasks
@@ -319,7 +319,7 @@ export default function Tasks() {
     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
     .map((task) => ({
       ...task,
-      canManage: ["admin", "owner", "manager"].includes(data.user?.role),
+      canManage: ["admin", "owner", "manager"].includes(data.user?.workspace_role || data.user?.role),
     }));
   const firstRow = filteredTasks.length ? (currentPage - 1) * pageSize + 1 : 0;
   const lastRow = Math.min(currentPage * pageSize, filteredTasks.length);

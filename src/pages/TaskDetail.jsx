@@ -127,7 +127,7 @@ export default function TaskDetail() {
     if (!result.ok) return setError(result.message);
     setNotice(result.message);
     load();
-    if (status === "done" && ["admin", "owner", "manager"].includes(data?.user?.role)) setArchivePrompt(true);
+    if (status === "done" && ["admin", "owner", "manager"].includes(data?.user?.workspace_role || data?.user?.role)) setArchivePrompt(true);
   }
   async function archiveCompletedTask() {
     setError("");
@@ -157,7 +157,7 @@ export default function TaskDetail() {
   if (!data || !listData)
     return <div className="loading-screen">Завантаження задачі…</div>;
   const task = data.task;
-  const canManage = ["admin", "owner", "manager"].includes(data.user?.role);
+  const canManage = ["admin", "owner", "manager"].includes(data.user?.workspace_role || data.user?.role);
   const priorityInfo = {
     low: ["Низький", <Icon name="low" />],
     normal: ["Звичайний", <Icon name="normal" />],

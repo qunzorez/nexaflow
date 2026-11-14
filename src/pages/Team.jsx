@@ -12,7 +12,7 @@ export default function Team() {
 
   async function load() {
     const [result, me] = await Promise.all([api('/api/team.php'), api('/api/me.php')]);
-    if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.role)) {
+    if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.workspace_role || me.user.role)) {
       navigate('/dashboard', { replace: true });
       return;
     }
