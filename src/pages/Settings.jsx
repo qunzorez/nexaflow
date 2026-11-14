@@ -356,9 +356,16 @@ export default function Settings() {
                   <p>Керуйте доступом до можливостей NexaFlow.</p>
                 </div>
               </div>
-              <div className="subscription-plan">
-                <strong>{subscription?.name || "Старт"}</strong>
-                <span>Поточний план · {subscription?.price || "Безкоштовно"}</span>
+              <div className={`subscription-current-plan ${subscription?.billing?.status === "active" ? "is-paid" : ""}`}>
+                <div className="subscription-current-icon"><Icon name="subscription" /></div>
+                <div className="subscription-current-copy">
+                  <span className="subscription-current-eyebrow">ВАШ ПОТОЧНИЙ ПЛАН</span>
+                  <strong>{subscription?.name || "Старт"}</strong>
+                  <small>{subscription?.price || "Безкоштовно"}{subscription?.billing?.status === "active" ? " · щомісячна підписка" : ""}</small>
+                </div>
+                <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
+                  {subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "pending" ? "Очікує оплати" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : "Безкоштовний план"}
+                </span>
               </div>
               <div className="subscription-module-select">
                 <div className="subscription-module-label">
@@ -390,12 +397,12 @@ export default function Settings() {
             </div>
             <div className="subscription-meta">
               <div>
-                <span>Статус</span>
-                <strong><Icon name="check" />{subscription?.price === "Безкоштовно" ? " Активна" : ["active", "cancelled"].includes(subscription?.billing?.status) ? (subscription.billing.status === "cancelled" ? " Скасована · доступ до " : " Активна до ") + new Date(String(subscription.billing.current_period_end || "").replace(" ", "T") + "Z").toLocaleDateString("uk-UA") : subscription?.billing?.status === "pending" ? " Очікує підтвердження" : subscription?.billing?.status === "failed" ? " Платіж не пройшов" : " Не оплачено"}</strong>
+                <span>{subscription?.billing?.status === "cancelled" ? "Доступ до" : "Наступне оновлення"}</span>
+                <strong>{["active", "cancelled"].includes(subscription?.billing?.status) && subscription?.billing?.current_period_end ? new Date(String(subscription.billing.current_period_end).replace(" ", "T") + "Z").toLocaleDateString("uk-UA") : subscription?.billing?.status === "pending" ? "Після підтвердження платежу" : subscription?.billing?.status === "failed" ? "Спробуйте оплатити ще раз" : "Немає активних оплат"}</strong>
               </div>
               <div>
-                <span>Оплата</span>
-                <b>{subscription?.price === "Безкоштовно" ? "Без оплати" : ["active", "cancelled"].includes(subscription?.billing?.status) ? "LiqPay · щомісячна підписка" : subscription?.billing?.status === "pending" ? "LiqPay · очікується" : "Оберіть платний план нижче"}</b>
+                <span>Спосіб оплати</span>
+                <b>{["active", "cancelled"].includes(subscription?.billing?.status) ? "LiqPay · щомісяця" : subscription?.billing?.status === "pending" ? "LiqPay · очікується" : "Не потрібна"}</b>
               </div>
             </div>
             <div className="plan-usage-grid">
@@ -413,6 +420,7 @@ export default function Settings() {
               <span className={subscription?.features.services ? "enabled" : "locked"}>{subscription?.features.services ? "✓" : "×"} Створення послуг і пакетів</span>
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
             </div>
+            <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
             <div className="plan-comparison-grid">
               {(subscription?.available_plans || []).map((plan) => <article className={plan.key === subscription?.key ? "current" : ""} key={plan.key}>
                 <header><strong>{plan.name}</strong><span>{plan.price}</span></header>
