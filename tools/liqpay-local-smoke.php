@@ -67,6 +67,8 @@ try {
         $cookieFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'nxf-liqpay-' . $id . '.cookies'; $cookies[] = $cookieFile;
         [$code, , $login] = httpSmoke($base . '/api/login.php', ['email' => $email, 'password' => $password], $cookieFile);
         assertSmoke($code === 200 && ($login['ok'] ?? false) && ($login['user']['role'] ?? '') === 'manager', "$plan: manager login failed");
+        [$code, , $verification] = httpSmoke($base . '/api/liqpay.php', ['action' => 'verify'], $cookieFile);
+        assertSmoke($code === 200 && ($verification['ok'] ?? false) && ($verification['status'] ?? '') === 'none', "$plan: payment verification action rejected when plan was omitted");
 
         [$code, , $checkout] = httpSmoke($base . '/api/liqpay.php', ['plan' => $plan], $cookieFile);
         assertSmoke($code === 200 && ($checkout['ok'] ?? false), "$plan: checkout creation failed");
@@ -109,6 +111,8 @@ try {
     httpSmoke($base . '/api/login.php', ['email' => $email, 'password' => $password], $cookieFile);
     [$code, , $denied] = httpSmoke($base . '/api/liqpay.php', ['plan' => 'growth'], $cookieFile);
     assertSmoke($code === 403 && ($denied['ok'] ?? true) === false, 'non-manager was allowed to buy a workspace plan');
+    [$code, , $denied] = httpSmoke($base . '/api/liqpay.php', ['action' => 'verify'], $cookieFile);
+    assertSmoke($code === 403 && ($denied['ok'] ?? true) === false, 'non-manager was allowed to verify workspace billing');
     echo "PASS: $checks assertions\n";
 } catch (Throwable $error) {
     fwrite(STDERR, 'FAIL: ' . $error->getMessage() . "\n");

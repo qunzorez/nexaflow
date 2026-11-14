@@ -48,13 +48,18 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     $planKey = (string)($planQuery->fetchColumn() ?: 'start');
     $plans = planDefinitions();
     $subscription = null;
+    $pendingSubscription = null;
     try {
         $subscriptionQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1");
         $subscriptionQuery->execute([$ownerId]);
-        $subscription = $subscriptionQuery->fetch() ?: null;
-        $accessQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end FROM plan_subscriptions WHERE owner_id = ? AND status IN ('active','cancelled') AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP) ORDER BY created_at DESC LIMIT 1");
+        $latestSubscription = $subscriptionQuery->fetch() ?: null;
+        $pendingQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
+        $pendingQuery->execute([$ownerId]);
+        $pendingSubscription = $pendingQuery->fetch() ?: null;
+        $accessQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? AND status IN ('active','cancelled') AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP) ORDER BY created_at DESC LIMIT 1");
         $accessQuery->execute([$ownerId]);
         $accessSubscription = $accessQuery->fetch() ?: null;
+        $subscription = $accessSubscription ?: $latestSubscription;
         if ($accessSubscription) {
             $planKey = (string)$accessSubscription['plan_key'];
         } else {
@@ -96,7 +101,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
-    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription];
+    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription];
 }
 
 function requirePlanFeature(array $context, string $feature): void
@@ -143,6 +148,7 @@ function planSettingsPayload(array $context): array
     $limits = [];
     foreach ($labels as $key => $label) $limits[] = ['key' => $key, 'label' => $label, 'limit' => $context['plan'][$key], 'used' => $context['counts'][$key]];
     $subscription = $context['subscription'] ?? null;
-    $pendingPlan = $subscription && $subscription['status'] === 'pending' ? ['key' => $subscription['plan_key'], 'name' => $context['plans'][$subscription['plan_key']]['name'] ?? '', 'price' => $context['plans'][$subscription['plan_key']]['price'] ?? '', 'order_id' => $subscription['order_id']] : null;
+    $pending = $context['pending_subscription'] ?? null;
+    $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
     return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
 }
