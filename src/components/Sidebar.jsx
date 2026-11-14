@@ -7,6 +7,7 @@ import "./sidebar-icons.css";
 export default function Sidebar({ user, open }) {
   const navigate = useNavigate();
   const countsStorageKey = `nexaflow.sidebar.counts.${user?.id || "guest"}`;
+  const featuresStorageKey = `nexaflow.sidebar.features.${user?.id || "guest"}`;
   const [counts, setCounts] = useState(() => {
     try {
       return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, ...JSON.parse(window.localStorage.getItem(countsStorageKey) || "{}") };
@@ -14,13 +15,22 @@ export default function Sidebar({ user, open }) {
       return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0 };
     }
   });
-  const [planFeatures, setPlanFeatures] = useState(() => user?.subscription?.features || {});
+  const [planFeatures, setPlanFeatures] = useState(() => {
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(featuresStorageKey) || "{}");
+      return { ...cached, ...(user?.subscription?.features || {}) };
+    } catch {
+      return user?.subscription?.features || {};
+    }
+  });
   const userRole = String(user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
   useEffect(() => {
-    if (user?.subscription?.features) setPlanFeatures(user.subscription.features);
-  }, [user?.id, user?.subscription?.features]);
+    if (!user?.subscription?.features) return;
+    setPlanFeatures(user.subscription.features);
+    window.localStorage.setItem(featuresStorageKey, JSON.stringify(user.subscription.features));
+  }, [featuresStorageKey, user?.subscription?.features]);
   useEffect(() => {
     let active = true;
     const loadCounts = async () => {
@@ -31,7 +41,9 @@ export default function Sidebar({ user, open }) {
       ]);
       if (!active) return;
       if (dashboard.user?.subscription?.features) {
-        setPlanFeatures(dashboard.user.subscription.features);
+        const features = dashboard.user.subscription.features;
+        setPlanFeatures(features);
+        window.localStorage.setItem(featuresStorageKey, JSON.stringify(features));
       }
       const nextCounts = {
         clients: Number(clients.clients?.length || 0),
@@ -51,7 +63,7 @@ export default function Sidebar({ user, open }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [countsStorageKey, user?.id]);
+  }, [countsStorageKey, featuresStorageKey, user?.id]);
   async function logout() {
     await post("/api/logout.php", {});
     navigate("/");
