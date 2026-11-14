@@ -32,9 +32,21 @@ if ($method === 'POST' && $action === 'create_global_group') {
     if (!$creator->fetch()) jsonResponse(false, 'Недостатньо прав для створення групи.', [], 403);
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
+    if (!$actorAdmin) {
+        $pdo->beginTransaction();
+        $lockCreator = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+        $lockCreator->execute([$userId]);
+        $groupCount = $pdo->prepare("SELECT COUNT(*) FROM project_groups WHERE project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(permissions) THEN permissions ELSE '{}' END, '$.owner_id')) = ?");
+        $groupCount->execute([$userId]);
+        if ((int)$groupCount->fetchColumn() >= 1) {
+            $pdo->commit();
+            jsonResponse(false, 'Ви вже створили одну групу claims. Відредагуйте або видаліть її, щоб створити іншу.', ['code' => 'group_limit_reached', 'limit' => 1], 409);
+        }
+    }
     $permissions = encodeGroupPolicy($data, $userId);
     $groupId = bin2hex(random_bytes(16));
     $pdo->prepare('INSERT INTO project_groups (id, project_id, name, role_name, permissions) VALUES (?, NULL, ?, ?, ?)')->execute([$groupId, $groupName, '', $permissions]);
+    if (!$actorAdmin) $pdo->commit();
     jsonResponse(true, 'Глобальну групу створено.', ['group_id' => $groupId]);
 }
 if ($method === 'POST' && in_array($action, ['update_global_group', 'delete_global_group'], true)) {
