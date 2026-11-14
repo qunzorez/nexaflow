@@ -16,6 +16,8 @@ const roleNames = {
 export default function Settings() {
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const activeWorkspaceRole = user?.workspace_role || user?.role || "user";
+  const canManageSubscription = user?.role === "admin" || ["owner", "manager"].includes(activeWorkspaceRole);
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const [phone, setPhone] = useState("");
@@ -324,60 +326,13 @@ export default function Settings() {
               </label>
             </div>
           </section>
-          <section
-            className={`panel password-card${showPasswordFields ? " is-open" : ""}`}
-          >
-            <div className="settings-section-title password-section-heading">
-              <div>
-                <h2>
-                  <span className="settings-section-icon"><Icon name="security" /></span>Безпека
-                </h2>
-                <p>Змініть пароль, якщо потрібно.</p>
-              </div>
-              <button
-                type="button"
-                className={`settings-switch${showPasswordFields ? " is-on" : ""}`}
-                aria-expanded={showPasswordFields}
-                onClick={() => setShowPasswordFields((value) => !value)}
-              >
-                <span />
-                {showPasswordFields ? "Сховати" : "Змінити пароль"}
-              </button>
-            </div>
-            {showPasswordFields && (
-              <>
-                <label>
-                  Поточний пароль
-                  <input
-                    type="password"
-                    name="current_password"
-                    autoComplete="current-password"
-                    placeholder="Введіть поточний пароль"
-                  />
-                </label>
-                <label>
-                  Новий пароль
-                  <input
-                    type="password"
-                    name="new_password"
-                    minLength="8"
-                    autoComplete="new-password"
-                    placeholder="Мінімум 8 символів"
-                  />
-                </label>
-                <small className="settings-hint">
-                  Залиште поля порожніми, якщо не хочете змінювати пароль.
-                </small>
-              </>
-            )}
-          </section>
-          <section className="panel account-info-card">
+          <section className={`panel account-security-card${showPasswordFields ? " is-open" : ""}`}>
             <div className="settings-section-title">
               <div>
                 <h2>
-                  <span className="settings-section-icon"><Icon name="sparkle" /></span>Про акаунт
+                  <span className="settings-section-icon"><Icon name="security" /></span>Акаунт і безпека
                 </h2>
-                <p>Ваш поточний статус у NexaFlow.</p>
+                <p>Інформація облікового запису та керування паролем.</p>
               </div>
             </div>
             <div className="account-info-list">
@@ -394,8 +349,52 @@ export default function Settings() {
                 <strong className="account-verified"><Icon name="check" /> Підтверджено</strong>
               </div>
             </div>
+            <div className="account-password-section">
+              <div className="password-section-heading">
+                <div>
+                  <strong>Пароль</strong>
+                  <small>Оновлюйте його, щоб захистити свій акаунт.</small>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-switch${showPasswordFields ? " is-on" : ""}`}
+                  aria-expanded={showPasswordFields}
+                  onClick={() => setShowPasswordFields((value) => !value)}
+                >
+                  <span />
+                  {showPasswordFields ? "Сховати" : "Змінити пароль"}
+                </button>
+              </div>
+              {showPasswordFields && <div className="password-fields">
+                <label>Поточний пароль<input type="password" name="current_password" autoComplete="current-password" placeholder="Введіть поточний пароль" /></label>
+                <label>Новий пароль<input type="password" name="new_password" minLength="8" autoComplete="new-password" placeholder="Мінімум 8 символів" /></label>
+                <small className="settings-hint">Залиште поля порожніми, якщо не хочете змінювати пароль.</small>
+              </div>}
+            </div>
           </section>
-          <section className="panel subscription-card">
+          {!canManageSubscription && <section className="panel subscription-card subscription-member-summary">
+            <div className="subscription-main">
+              <div className="settings-section-title">
+                <div>
+                  <h2><span className="settings-section-icon"><Icon name="subscription" /></span>Тариф простору</h2>
+                  <p>Поточний рівень доступу у вашому робочому просторі.</p>
+                </div>
+              </div>
+              <div className={`subscription-current-plan plan-tier-${subscription?.key || "start"}${subscription?.billing?.status === "active" ? " is-paid" : ""}`}>
+                <div className="subscription-current-icon"><Icon name="subscription" /></div>
+                <div className="subscription-current-copy">
+                  <span className="subscription-current-eyebrow">ВАШ ПОТОЧНИЙ ТАРИФ</span>
+                  <strong>{subscription?.name || "Старт"}</strong>
+                  <small>{subscription?.price || "Безкоштовно"}</small>
+                </div>
+                <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
+                  {subscription?.billing?.status === "active" ? "Оплачено" : subscription?.key === "start" ? "Безкоштовний план" : "Доступ надано менеджером"}
+                </span>
+              </div>
+              <small className="billing-manager-note">Обрати або змінити тариф може лише менеджер робочого простору.</small>
+            </div>
+          </section>}
+          {canManageSubscription && <section className="panel subscription-card">
             <div className="subscription-main">
               <div className="settings-section-title">
                 <div>
@@ -405,7 +404,7 @@ export default function Settings() {
                   <p>Керуйте доступом до можливостей NexaFlow.</p>
                 </div>
               </div>
-              <div className={`subscription-current-plan ${subscription?.billing?.status === "active" ? "is-paid" : ""}`}>
+              <div className={`subscription-current-plan plan-tier-${subscription?.key || "start"}${subscription?.billing?.status === "active" ? " is-paid" : ""}`}>
                 <div className="subscription-current-icon"><Icon name="subscription" /></div>
                 <div className="subscription-current-copy">
                   <span className="subscription-current-eyebrow">ВАШ ПОТОЧНИЙ ПЛАН</span>
@@ -473,22 +472,39 @@ export default function Settings() {
               <span className={subscription?.features.analytics ? "enabled" : "locked"}>{subscription?.features.analytics ? "✓" : "×"} Аналітика</span>
               <span className={subscription?.features.services || subscription?.services_per_client ? "enabled" : "locked"}>{subscription?.features.services ? "✓ Створення послуг і пакетів" : subscription?.services_per_client ? `✓ До ${subscription.services_per_client} послуг на клієнта · без пакетів` : "× Створення послуг і пакетів"}</span>
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
+              <span className={subscription?.features.support ? "enabled" : "locked"}>{subscription?.features.support ? "✓" : "×"} Онлайн-підтримка</span>
             </div>
             {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план — ми відкриємо його можливості без списання коштів.</span></div>}
             <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
             <div className="plan-comparison-grid">
-              {(subscription?.available_plans || []).map((plan) => <article className={plan.key === subscription?.key ? "current" : ""} key={plan.key}>
-                <header><strong>{plan.name}</strong><span>{plan.price}</span></header>
-                <p>{plan.limits.participants === 49 ? "До 50 учасників загалом" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
-                <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
-                <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : plan.limits.services_per_client ? `До ${plan.limits.services_per_client} послуг на клієнта · без пакетів` : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators > 0 ? ` · до ${plan.limits.moderators} модераторів` : ""}{plan.limits.project_leads === 1 ? " · 1 керівник проєкту" : plan.limits.project_leads > 1 ? ` · до ${plan.limits.project_leads} керівників проєктів` : ""}</small>
-                {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
+              {(subscription?.available_plans || []).map((plan) => <article className={`plan-tier plan-tier-${plan.key}${plan.key === subscription?.key ? " current" : ""}`} key={plan.key}>
+                <header className="plan-tier-heading">
+                  <span className="plan-tier-icon"><Icon name={plan.key === "business" ? "briefcase" : plan.key === "team" ? "users" : plan.key === "growth" ? "chart" : "sparkle"} /></span>
+                  <div><strong>{plan.name}</strong><span>{plan.price}</span></div>
+                  {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
+                </header>
+                <p className="plan-tier-audience">{plan.limits.participants === 49 ? "До 50 учасників загалом" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
+                <div className="plan-tier-metrics">
+                  <span><strong>{plan.limits.projects ?? "∞"}</strong><small>проєктів</small></span>
+                  <span><strong>{plan.limits.tasks_month ?? "∞"}</strong><small>задач / міс.</small></span>
+                  <span><strong>{plan.limits.clients ?? "∞"}</strong><small>клієнтів</small></span>
+                </div>
+                <div className="plan-tier-details">
+                  <div className="plan-tier-features">
+                    <span className={plan.features.calendar ? "available" : "unavailable"}>{plan.features.calendar ? "✓" : "–"} Календар</span>
+                    <span className={plan.features.analytics ? "available" : "unavailable"}>{plan.features.analytics ? "✓" : "–"} Аналітика</span>
+                    <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "– Послуги"}</span>
+                    <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "–"} Telegram</span>
+                    <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "– Онлайн-підтримка"}</span>
+                  </div>
+                  {(plan.limits.project_leads > 0 || plan.limits.moderators > 0) && <small className="plan-tier-roles">{plan.limits.project_leads > 0 ? `${plan.limits.project_leads === 1 ? "1 керівник проєкту" : `До ${plan.limits.project_leads} керівників проєктів`}` : ""}{plan.limits.project_leads > 0 && plan.limits.moderators > 0 ? " · " : ""}{plan.limits.moderators > 0 ? `До ${plan.limits.moderators} модераторів` : ""}</small>}
+                </div>
                 {plan.key !== "start" && (user?.workspace_role || user?.role) === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
               </article>)}
             </div>
             {subscription?.billing_enabled && (user?.workspace_role || user?.role) === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
             {(user?.workspace_role || user?.role) !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
-          </section>
+          </section>}
           <div className="settings-actions">
             <button className="primary-action" disabled={emailSaving}>Зберегти зміни</button>
           </div>

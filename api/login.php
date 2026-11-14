@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
 
 $data = body();
 $email = strtolower(trim((string)($data['email'] ?? '')));
@@ -11,7 +12,10 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
 }
 
 try {
-    $query = db()->prepare('SELECT id, name, email, password_hash, role, email_verified_at FROM users WHERE email = ? LIMIT 1');
+    $pdo = db();
+    require_once __DIR__ . '/rate-limit.php';
+    enforcePublicRateLimit($pdo, 'login', $email, 30, 10, 900);
+    $query = $pdo->prepare('SELECT id, name, email, password_hash, role, email_verified_at FROM users WHERE email = ? LIMIT 1');
     $query->execute([$email]);
     $user = $query->fetch();
     // Old/imported accounts can contain an empty or malformed hash. Treat

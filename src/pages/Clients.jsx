@@ -169,6 +169,7 @@ export function serviceTaskPayload(client, service, clientId) {
     : "";
   return {
     action: "create",
+    workspace_owner_id: client.workspace_owner_id || "",
     title: `${service.name} — ${client.name}`,
     description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}.${packageDetails}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
     client_ids: normalizedClientId ? [normalizedClientId] : [],

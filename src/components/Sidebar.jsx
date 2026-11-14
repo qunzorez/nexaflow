@@ -1,11 +1,13 @@
 import Icon from './Icon.jsx';
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, post } from "../services/api.js";
 import "./sidebar-icons.css";
+import "./support-nav.css";
 
 export default function Sidebar({ user, open }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const workspaces = user?.workspaces || [];
   const activeWorkspaceId = user?.active_workspace_id || user?.subscription?.workspace_id || "";
   const workspaceCacheKey = `${user?.id || "guest"}.${activeWorkspaceId || "default"}`;
@@ -13,9 +15,9 @@ export default function Sidebar({ user, open }) {
   const featuresStorageKey = `nexaflow.sidebar.features.${workspaceCacheKey}`;
   const [counts, setCounts] = useState(() => {
     try {
-      return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, ...JSON.parse(window.localStorage.getItem(countsStorageKey) || "{}") };
+      return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, support: 0, ...JSON.parse(window.localStorage.getItem(countsStorageKey) || "{}") };
     } catch {
-      return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0 };
+      return { clients: 0, projects: 0, tasks: 0, team: 0, notifications: 0, support: 0 };
     }
   });
   const [planFeatures, setPlanFeatures] = useState(() => {
@@ -33,6 +35,7 @@ export default function Sidebar({ user, open }) {
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
+  const canUseSupport = isAdmin || ["admin", "owner"].includes(String(user?.role || "").toLowerCase()) || Number(user?.is_support_agent) === 1 || Boolean(planFeatures.support);
   const activeWorkspace = workspaces.find(workspace => workspace.id === activeWorkspaceId);
   useEffect(() => {
     if (!workspaceMenuOpen) return undefined;
@@ -53,10 +56,11 @@ export default function Sidebar({ user, open }) {
   useEffect(() => {
     let active = true;
     const loadCounts = async () => {
-      const [dashboard, notifications, clients] = await Promise.all([
+      const [dashboard, notifications, clients, supportUnread] = await Promise.all([
         api("/api/dashboard.php"),
         api("/api/notifications.php"),
         api("/api/clients.php"),
+        canUseSupport && location.pathname !== "/support" ? api("/api/support.php?action=unread") : Promise.resolve({ unread: 0 }),
       ]);
       if (!active) return;
       if (dashboard.user?.subscription?.features) {
@@ -72,6 +76,7 @@ export default function Sidebar({ user, open }) {
         tasks: Number(dashboard.metrics?.tasks || 0),
         team: Number(dashboard.users?.length || 0),
         notifications: Number(notifications.unread || 0),
+        support: window.location.pathname === "/support" ? 0 : Number(supportUnread.unread || 0),
       };
       window.localStorage.setItem(countsStorageKey, JSON.stringify(nextCounts));
       setCounts(current => JSON.stringify(current) === JSON.stringify(nextCounts) ? current : nextCounts);
@@ -82,7 +87,17 @@ export default function Sidebar({ user, open }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [countsStorageKey, featuresStorageKey, user?.id]);
+  }, [canUseSupport, countsStorageKey, featuresStorageKey, location.pathname, user?.id]);
+  function clearSupportUnread() {
+    setCounts(current => {
+      const next = { ...current, support: 0 };
+      window.localStorage.setItem(countsStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }
+  useEffect(() => {
+    if (location.pathname === "/support") clearSupportUnread();
+  }, [location.pathname, countsStorageKey]);
   async function logout() {
     await post("/api/logout.php", {});
     navigate("/");
@@ -149,7 +164,7 @@ export default function Sidebar({ user, open }) {
             Команда <b>{counts.team}</b>
           </Link>
         )}
-        {canManage && planFeatures.services && <Link className="nav-item" to="/services">
+        {(isAdmin || (canManage && planFeatures.services)) && <Link className="nav-item" to="/services">
           <span><Icon name="subscription" /></span> Послуги
         </Link>}
         {isAdmin && (
@@ -162,7 +177,10 @@ export default function Sidebar({ user, open }) {
         )}
         <p className="nav-label">РОБОЧІ ІНСТРУМЕНТИ</p>
         {planFeatures.calendar && <Link className="nav-item" to="/calendar">
-          <span><Icon name="calendar" /></span> Календар <b>0</b>
+          <span><Icon name="calendar" /></span> Календар
+        </Link>}
+        {canUseSupport && <Link className="nav-item" to="/support" onClick={clearSupportUnread}>
+          <span><Icon name="question" /></span> Онлайн підтримка {counts.support > 0 && <b className="support-unread-badge" aria-label={`${counts.support} непрочитаних повідомлень`}>{counts.support}</b>}
         </Link>}
         <span className="nav-item disabled" aria-disabled="true">
           <span><Icon name="document" /></span> Документи <b>0</b>

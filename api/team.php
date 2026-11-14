@@ -8,6 +8,7 @@ session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 
 $pdo = db();
+ensurePlanSchema($pdo);
 $userId = (string)$_SESSION['user_id'];
 $pdo->exec("CREATE TABLE IF NOT EXISTS client_members (client_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, assigned_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (client_id, user_id), INDEX idx_client_members_user (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 function projectInviteUrl(string $token): string
@@ -35,7 +36,7 @@ if (!$currentUser || !$canManage) {
 try {
     if ($method === 'GET') {
         if ($isAdmin) {
-            $users = $pdo->query('SELECT id, name, email, role, created_at FROM users ORDER BY name')->fetchAll();
+            $users = $pdo->query('SELECT id, name, email, role, is_support_agent, created_at FROM users ORDER BY name')->fetchAll();
         } else {
             $workspaceLeadIds = array_map('strval', $planContext['lead_actor_ids'] ?? []);
             $inviterIds = $isProjectLead ? [$userId] : array_values(array_unique(array_merge([(string)$planContext['owner_id']], $workspaceLeadIds)));
@@ -114,7 +115,30 @@ try {
             foreach ($assignableGroups as &$assignableGroup) $assignableGroup = exposeGroupPolicy($assignableGroup);
             unset($assignableGroup);
         }
-        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'assignable_groups' => $assignableGroups, 'clients' => $clients, 'permissions' => ['admin' => $isAdmin, 'project_lead' => $isProjectLead]]);
+        $adminStats = null;
+        if ($isAdmin) {
+            $userStats = $pdo->query("SELECT COUNT(*) AS total, SUM(email_verified_at IS NOT NULL) AS verified, SUM(email_verified_at IS NULL) AS unverified, SUM(role = 'manager') AS managers, SUM(role = 'admin' OR role = 'owner') AS administrators FROM users")->fetch();
+            $workspacePlanCounts = $pdo->query("SELECT COALESCE(plan_key, 'start') AS plan_key, COUNT(*) AS total FROM users WHERE role IN ('manager', 'admin', 'owner') GROUP BY COALESCE(plan_key, 'start')")->fetchAll();
+            $selectedPaidWorkspaces = 0;
+            $potentialMonthlyValue = 0.0;
+            foreach ($workspacePlanCounts as $planCount) {
+                $key = (string)$planCount['plan_key'];
+                $count = (int)$planCount['total'];
+                if ($key !== 'start') $selectedPaidWorkspaces += $count;
+                $potentialMonthlyValue += $count * (float)(planDefinitions()[$key]['amount'] ?? 0);
+            }
+            $subscriptionStats = ['active' => 0, 'paid' => 0, 'mrr' => 0.0, 'pending' => 0];
+            try {
+                $row = $pdo->query("SELECT SUM(status IN ('active','cancelled') AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP)) AS active, SUM(status IN ('active','cancelled') AND plan_key <> 'start' AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP)) AS paid, COALESCE(SUM(CASE WHEN status = 'active' AND plan_key <> 'start' AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP) THEN amount ELSE 0 END), 0) AS mrr, SUM(status = 'pending') AS pending FROM plan_subscriptions")->fetch();
+                $subscriptionStats = ['active' => (int)($row['active'] ?? 0), 'paid' => (int)($row['paid'] ?? 0), 'mrr' => (float)($row['mrr'] ?? 0), 'pending' => (int)($row['pending'] ?? 0)];
+            } catch (Throwable $ignored) {}
+            $adminStats = [
+                'users' => ['total' => (int)($userStats['total'] ?? 0), 'verified' => (int)($userStats['verified'] ?? 0), 'unverified' => (int)($userStats['unverified'] ?? 0), 'managers' => (int)($userStats['managers'] ?? 0), 'administrators' => (int)($userStats['administrators'] ?? 0)],
+                'workspaces' => ['total' => array_sum(array_map(static fn(array $row): int => (int)$row['total'], $workspacePlanCounts)), 'plans' => array_column($workspacePlanCounts, 'total', 'plan_key'), 'selected_paid' => $selectedPaidWorkspaces, 'potential_mrr' => $potentialMonthlyValue],
+                'projects' => count($projects), 'clients' => count($clients), 'subscriptions' => $subscriptionStats,
+            ];
+        }
+        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'assignable_groups' => $assignableGroups, 'clients' => $clients, 'admin_stats' => $adminStats, 'permissions' => ['admin' => $isAdmin, 'project_lead' => $isProjectLead]]);
     }
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
@@ -317,7 +341,7 @@ try {
         $userId = trim((string)($data['user_id'] ?? ''));
         $role = trim((string)($data['role'] ?? 'user'));
         if ($userId === '' || !in_array($role, ['admin', 'manager', 'user'], true)) jsonResponse(false, 'Оберіть коректну глобальну роль.', [], 422);
-        if ($role === 'manager' && $planContext['plan']['managers'] !== null) {
+        if (!$isAdmin && $role === 'manager' && $planContext['plan']['managers'] !== null) {
             $existingRole = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
             $existingRole->execute([$userId]);
             if ($existingRole->fetchColumn() !== 'manager') {
@@ -327,9 +351,41 @@ try {
                 if ($currentManagers >= (int)$planContext['plan']['managers']) { notifyPlanCapacityReached($planContext, 'managers', $currentManagers, (int)$planContext['plan']['managers']); jsonResponse(false, 'Ліміт менеджерів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'managers', 'limit' => (int)$planContext['plan']['managers'], 'current' => $currentManagers, 'plan' => $planContext['key']], 403); }
             }
         }
-        $update = $pdo->prepare('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-        $update->execute([$role, $userId]);
+        $update = $pdo->prepare("UPDATE users SET role = ?, is_support_agent = CASE WHEN ? = 'admin' THEN 1 ELSE is_support_agent END, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $update->execute([$role, $role, $userId]);
         jsonResponse(true, 'Глобальну роль оновлено.');
+    }
+
+    if ($action === 'set_support_role') {
+        if (!$isAdmin) jsonResponse(false, 'Тільки адміністратор може призначати додаткову роль підтримки.', [], 403);
+        $targetUserId = trim((string)($data['user_id'] ?? ''));
+        $supportAgent = !empty($data['enabled']) ? 1 : 0;
+        if ($targetUserId === '') jsonResponse(false, 'Не вказано користувача.', [], 422);
+        $target = $pdo->prepare('SELECT id, role FROM users WHERE id = ? LIMIT 1');
+        $target->execute([$targetUserId]);
+        $targetUser = $target->fetch();
+        if (!$targetUser) jsonResponse(false, 'Користувача не знайдено.', [], 404);
+        if (in_array($targetUser['role'], ['admin', 'owner'], true)) $supportAgent = 1;
+        $pdo->prepare('UPDATE users SET is_support_agent = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$supportAgent, $targetUserId]);
+        jsonResponse(true, $supportAgent ? 'Роль підтримки призначено.' : 'Роль підтримки знято.', ['is_support_agent' => (bool)$supportAgent]);
+    }
+
+    if ($action === 'update_user') {
+        if (!$isAdmin) jsonResponse(false, 'Тільки адміністратор може редагувати облікові записи.', [], 403);
+        $targetUserId = trim((string)($data['user_id'] ?? ''));
+        $name = trim((string)($data['name'] ?? ''));
+        $email = mb_strtolower(trim((string)($data['email'] ?? '')));
+        if ($targetUserId === '' || $name === '' || mb_strlen($name) > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            jsonResponse(false, 'Вкажіть коректне ім’я та email користувача.', [], 422);
+        }
+        $target = $pdo->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
+        $target->execute([$targetUserId]);
+        if (!$target->fetchColumn()) jsonResponse(false, 'Користувача не знайдено.', [], 404);
+        $duplicate = $pdo->prepare('SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1');
+        $duplicate->execute([$email, $targetUserId]);
+        if ($duplicate->fetchColumn()) jsonResponse(false, 'Користувач із таким email уже існує.', [], 409);
+        $pdo->prepare('UPDATE users SET name = ?, email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$name, $email, $targetUserId]);
+        jsonResponse(true, 'Дані користувача оновлено.');
     }
 
     jsonResponse(false, 'Невідома дія.', [], 400);

@@ -14,6 +14,24 @@ require_once __DIR__ . '/task-deadline-notifications.php';
 
 $pdo = db();
 $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+// Keep support history for 60 days after a session is closed, then purge its
+// messages and private image files as part of the existing daily cron run.
+$supportTables = $pdo->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('support_sessions','support_messages','support_attachments')")->fetchAll(PDO::FETCH_COLUMN);
+if (count($supportTables) === 3) {
+    $expiredSupportSessions = $pdo->query("SELECT id FROM support_sessions WHERE status = 'closed' AND closed_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 60 DAY) ORDER BY closed_at ASC LIMIT 500")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($expiredSupportSessions as $supportSessionId) {
+        $supportFiles = $pdo->prepare('SELECT file_path FROM support_attachments WHERE session_id = ? AND file_path IS NOT NULL');
+        $supportFiles->execute([$supportSessionId]);
+        foreach ($supportFiles->fetchAll(PDO::FETCH_COLUMN) as $supportPath) {
+            if (preg_match('/^[a-f0-9]{32}\.(jpg|png|gif|webp|avif|bmp|heic|heif|tiff)$/', (string)$supportPath)) {
+                @unlink(__DIR__ . '/support-private/' . $supportPath);
+            }
+        }
+        $pdo->prepare('DELETE FROM support_attachments WHERE session_id = ?')->execute([$supportSessionId]);
+        $pdo->prepare('DELETE FROM support_messages WHERE session_id = ?')->execute([$supportSessionId]);
+        $pdo->prepare('DELETE FROM support_sessions WHERE id = ?')->execute([$supportSessionId]);
+    }
+}
 // Додаткове очищення під час cron гарантує видалення старих записів навіть
 // якщо ніхто не відкриває сторінку сповіщень.
 $pdo->exec("DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");

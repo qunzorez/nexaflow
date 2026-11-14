@@ -100,7 +100,7 @@ export default function Calendar() {
   const [view, setView] = useState(() => VIEWS.some(option => option.id === searchParams.get("view")) ? searchParams.get("view") : "month");
 
   useEffect(() => {
-    Promise.all([api("/api/clients.php"), api("/api/tasks.php")]).then(([clientsResult, tasksResult]) => {
+    Promise.all([api("/api/clients.php"), api("/api/tasks.php?scope=calendar")]).then(([clientsResult, tasksResult]) => {
       if (!clientsResult.ok) return navigate("/");
       setData({ ...clientsResult, tasks: tasksResult.ok ? (tasksResult.tasks || []) : [] });
     });

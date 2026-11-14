@@ -17,6 +17,14 @@
   margin-bottom: 18px;
 }
 
+.admin-overview-panel { margin-bottom: 18px; }
+.admin-overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.admin-overview-grid article { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(145deg, #fff, #f7fbf8); }
+.admin-overview-grid article small { color: var(--muted); font-size: 10px; font-weight: 700; }
+.admin-overview-grid article strong { color: var(--ink); font: 800 23px/1.1 Manrope, sans-serif; }
+.admin-overview-grid article span { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.admin-overview-note { margin: 12px 0 0; color: var(--muted); font-size: 10px; }
+
 .admin-role-table {
   margin-top: 16px;
   border: 1px solid var(--line);
@@ -61,7 +69,7 @@
 .admin-role-head,
 .admin-role-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr) 180px;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(150px, 1fr) minmax(125px, .8fr) minmax(130px, .8fr) 100px;
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
@@ -90,6 +98,11 @@
 .admin-role-row:hover { background: #fbfefc; }
 .admin-role-row select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
 .admin-role-row select:disabled { opacity: .55; cursor: not-allowed; background: #f2f5f3; }
+.admin-role-head { grid-template-columns: minmax(150px, 1.2fr) minmax(150px, 1fr) minmax(125px, .8fr) minmax(130px, .8fr) 100px; }
+.admin-user-edit-row input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
+.admin-user-edit-actions { display: flex; gap: 6px; }
+.admin-user-edit-actions button, .admin-role-row > .outline-btn { min-height: 34px; padding: 7px 10px; font-size: 10px; }
+.admin-user-email { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
 
 .admin-group-owner {
   border: 1px solid var(--line);
@@ -134,6 +147,7 @@
 @media (max-width: 700px) {
   .admin-role-head { display: none; }
   .admin-role-row { grid-template-columns: 1fr; gap: 8px; }
+  .admin-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .manager-team-grid > .panel {

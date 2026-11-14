@@ -173,3 +173,27 @@
 }
 .manager-deadlines-widget .manager-list{padding-right:10px;scrollbar-gutter:stable}
 .manager-dashboard-grid.analytics-disabled>article:nth-of-type(n+3){display:none}
+.dashboard-page > .welcome-row,
+.dashboard-page > .reminders-panel,
+.dashboard-page > .review-notification-panel,
+.dashboard-page > .stat-grid,
+.dashboard-page > .grid-two,
+.dashboard-page > .manager-dashboard-grid,
+.dashboard-page > .team-time-panel,
+.dashboard-page > .team-notice { animation: dashboard-arrive .72s cubic-bezier(.2,.75,.25,1) both; }
+.dashboard-page > .welcome-row { animation-delay: .04s; }
+.dashboard-page > .team-notice { animation-delay: .08s; }
+.dashboard-page > .reminders-panel { animation-delay: .12s; }
+.dashboard-page > .review-notification-panel { animation-delay: .17s; }
+.dashboard-page > .stat-grid { animation-delay: .2s; }
+.dashboard-page > .grid-two { animation-delay: .29s; }
+.dashboard-page > .manager-dashboard-grid { animation-delay: .37s; }
+.dashboard-page > .team-time-panel { animation-delay: .45s; }
+.dashboard-page > .stat-grid > * { animation: dashboard-card-arrive .62s cubic-bezier(.2,.75,.25,1) both; }
+.dashboard-page > .stat-grid > :nth-child(2) { animation-delay: .25s; }
+.dashboard-page > .stat-grid > :nth-child(3) { animation-delay: .3s; }
+.dashboard-page > .stat-grid > :nth-child(4) { animation-delay: .35s; }
+.dashboard-page > .stat-grid > :nth-child(5) { animation-delay: .4s; }
+@keyframes dashboard-arrive { from { opacity: 0; transform: translate3d(0,22px,0) scale(.99); filter: blur(3px); } to { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0); } }
+@keyframes dashboard-card-arrive { from { opacity: 0; transform: translate3d(0,18px,0) scale(.97); } to { opacity: 1; transform: translate3d(0,0,0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dashboard-page > .welcome-row,.dashboard-page > .reminders-panel,.dashboard-page > .review-notification-panel,.dashboard-page > .stat-grid,.dashboard-page > .grid-two,.dashboard-page > .manager-dashboard-grid,.dashboard-page > .team-time-panel,.dashboard-page > .team-notice,.dashboard-page > .stat-grid > * { animation: none; } }

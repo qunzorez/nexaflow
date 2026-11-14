@@ -7,7 +7,7 @@ export default function PlanFeatureRoute({ feature, children }) {
   useEffect(() => {
     let active = true;
     api("/api/profile.php").then(result => {
-      if (active) setState(result.ok && result.subscription?.features?.[feature] ? "allowed" : "locked");
+      if (active) setState(result.ok && (['admin', 'owner'].includes(result.user?.role) || (feature === 'support' && Number(result.user?.is_support_agent) === 1) || result.subscription?.features?.[feature]) ? "allowed" : "locked");
     }).catch(() => { if (active) setState("locked"); });
     return () => { active = false; };
   }, [feature]);

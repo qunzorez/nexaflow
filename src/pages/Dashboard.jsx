@@ -46,7 +46,11 @@ const reminderLabel = (value) =>
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [reminderTask, setReminderTask] = useState(null);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(() => {
+    const message = window.sessionStorage.getItem("nexaflow.dashboard.notice") || "";
+    window.sessionStorage.removeItem("nexaflow.dashboard.notice");
+    return message;
+  });
   const [reviewPanelOpen, setReviewPanelOpen] = useState(() => window.localStorage.getItem("nexaflow.dashboard.reviewPanelOpen") !== "false");
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");

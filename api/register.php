@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__ . '/db.php';
 require __DIR__ . '/verification.php';
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
 
 $data = body();
 $name = trim((string)($data['name'] ?? ''));
@@ -17,13 +18,15 @@ if ($password !== $passwordConfirmation) jsonResponse(false, 'Паролі не 
 
 try {
     $pdo = db();
+    require_once __DIR__ . '/rate-limit.php';
+    enforcePublicRateLimit($pdo, 'register', $email, 10, 3, 3600);
     $check = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
     $check->execute([$email]);
     if ($check->fetch()) jsonResponse(false, 'Користувач з такою поштою вже існує.', [], 409);
 
     $id = bin2hex(random_bytes(16));
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $insert = $pdo->prepare('INSERT INTO users (id, name, email, password_hash, role, requested_role, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, NULL)');
+    $insert = $pdo->prepare('INSERT INTO users (id, name, email, password_hash, role, requested_role, email_notifications_enabled, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, 1, NULL)');
     $insert->execute([$id, $name, $email, $hash, $requestedRole, $requestedRole]);
     $notificationUsers = $pdo->prepare("SELECT id FROM users WHERE role IN ('admin', 'owner') AND id <> ?");
     $notificationUsers->execute([$id]);

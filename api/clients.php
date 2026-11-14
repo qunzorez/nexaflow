@@ -19,6 +19,7 @@ $columns = $pdo->query("SHOW COLUMNS FROM clients")->fetchAll(); $columnNames = 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
 $canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
+$isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $isProjectLead = $planContext['workspace_role'] === 'project_lead';
 $clientAction = (string)($data['action'] ?? 'create');
 if ($method === 'POST' && in_array($clientAction, ['update', 'delete'], true)) {
@@ -87,7 +88,9 @@ if ($method === 'GET') {
         $invitedUsers->execute([$userId, $userId]);
         $manageableTeamIds = array_fill_keys(array_map('strval', $invitedUsers->fetchAll(PDO::FETCH_COLUMN)), true);
     }
-    if ($canManage) {
+    if ($isAdmin && $canManage) {
+        $availableUsers = $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('admin','owner','manager','user') ORDER BY name, email")->fetchAll();
+    } elseif ($canManage) {
         $accountingGroupIds = [];
         foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
             if (!in_array($user['role'], ['admin', 'owner'], true) && (groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $planContext['owner_id']) continue;
@@ -116,6 +119,28 @@ if ($method === 'GET') {
             });
         }
     }
+    if ($isAdmin && trim((string)($_GET['workspace_owner_id'] ?? '')) !== '') {
+        $selectedOwnerId = trim((string)$_GET['workspace_owner_id']);
+        $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
+        $ownerCheck->execute([$selectedOwnerId]);
+        if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Простір не знайдено.', [], 404);
+        $accountingGroupIds = [];
+        foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+            if ((groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $selectedOwnerId) continue;
+            $groupName = (string)$group['name']; $nameHex = strtoupper(bin2hex($groupName));
+            if (preg_match('/(?:бухгалт|бугалт|account)/iu', $groupName) || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0 || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) $accountingGroupIds[(string)$group['id']] = true;
+        }
+        $accountantIds = [];
+        if ($accountingGroupIds) {
+            $groupMarks = implode(',', array_fill(0, count($accountingGroupIds), '?'));
+            $accountantQuery = $pdo->prepare("SELECT DISTINCT user_id FROM project_group_members WHERE group_id IN ({$groupMarks})");
+            $accountantQuery->execute(array_keys($accountingGroupIds));
+            $accountantIds = array_fill_keys(array_map('strval', $accountantQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+        }
+        $availableUsers = array_values(array_filter($serviceUsers, static fn(array $person): bool => isset($accountantIds[(string)$person['id']]) && in_array($person['role'], ['admin','owner','manager','user'], true)));
+        usort($availableUsers, static fn(array $a, array $b): int => strcmp($a['name'], $b['name']) ?: strcmp($a['email'], $b['email']));
+        $manageableTeamIds = $accountantIds;
+    }
     $availableByClient = [];
     if ($canManage && $clients) {
         foreach ($clients as $clientRow) {
@@ -139,7 +164,8 @@ if ($method === 'GET') {
         }
         unset($clientAccountants);
     }
-    jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'permissions' => ['manage' => $canManage, 'delete' => !$isProjectLead]]);
+    $adminWorkspaces = $isAdmin ? $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('manager','admin','owner') ORDER BY name")->fetchAll() : [];
+    jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'admin_workspaces' => $adminWorkspaces, 'permissions' => ['manage' => $canManage, 'delete' => !$isProjectLead]]);
 }
 if (!$canManage) jsonResponse(false, 'Створювати клієнтів можуть лише адміністратор, менеджер або керівник проєкту.', [], 403);
 $action = (string)($data['action'] ?? 'create');
@@ -215,8 +241,8 @@ foreach ($services as $service) {
 $packageIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['package_id'] ?? ''), $services))));
 if ($packageIds) {
     $packageMarks = implode(',', array_fill(0, count($packageIds), '?'));
-    $ownedPackagesQuery = $pdo->prepare("SELECT id FROM service_packages WHERE created_by = ? AND id IN ({$packageMarks})");
-    $ownedPackagesQuery->execute(array_merge([$userId], $packageIds));
+    $ownedPackagesQuery = $pdo->prepare("SELECT id FROM service_packages WHERE ".($isAdmin ? '' : 'created_by = ? AND ')."id IN ({$packageMarks})");
+    $ownedPackagesQuery->execute($isAdmin ? $packageIds : array_merge([$planContext['owner_id']], $packageIds));
     $ownedPackageIds = array_fill_keys(array_map('strval', $ownedPackagesQuery->fetchAll(PDO::FETCH_COLUMN)), true);
     foreach ($services as $service) {
         $packageId = (string)$service['package_id'];
@@ -251,7 +277,7 @@ if ($requestedAccountantIds) {
     foreach ($requestedAccountantIds as $accountantId) {
         // Keep legacy assignments after a claim/team change, but never allow
         // a new assignment to a person outside the current team.
-        if (!isset($allowedAccountantIds[$accountantId]) && !isset($existingAccountantIds[$accountantId])) jsonResponse(false, 'Відповідального бухгалтера не знайдено у вашій команді.', [], 422);
+        if (!$isAdmin && !isset($allowedAccountantIds[$accountantId]) && !isset($existingAccountantIds[$accountantId])) jsonResponse(false, 'Відповідального бухгалтера не знайдено у вашій команді.', [], 422);
     }
 }
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
@@ -285,8 +311,18 @@ if ($action === 'update' && $id !== '') {
     $existingClientQuery = $pdo->prepare('SELECT id FROM clients WHERE id = ? LIMIT 1');
     $existingClientQuery->execute([$id]);
     if (!$existingClientQuery->fetchColumn()) jsonResponse(false, 'Клієнта не знайдено.', [], 404);
-    $update = $pdo->prepare('UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ? WHERE id = ?');
-    $update->execute([$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $id]);
+    $ownerId = null;
+    if ($isAdmin && !empty($data['workspace_owner_id'])) {
+        $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
+        $ownerCheck->execute([(string)$data['workspace_owner_id']]);
+        if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для клієнта.', [], 422);
+        $ownerId = (string)$data['workspace_owner_id'];
+    }
+    $updateSql = 'UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ?'.($ownerId !== null ? ', created_by = ?' : '').' WHERE id = ?';
+    $updateValues = [$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData];
+    if ($ownerId !== null) $updateValues[] = $ownerId;
+    $updateValues[] = $id;
+    $pdo->prepare($updateSql)->execute($updateValues);
     releasePlanCapacityLocks((string)$planContext['owner_id']);
     $savedClientQuery = $pdo->prepare('SELECT id, name FROM clients WHERE id = ? LIMIT 1');
     $savedClientQuery->execute([$id]);
@@ -294,9 +330,16 @@ if ($action === 'update' && $id !== '') {
     if ($serviceLimit !== null && $addedStandalone > 0 && $standaloneCount >= (int)$serviceLimit) notifyPlanCapacityReached($planContext, 'services_per_client', (int)$serviceLimit, (int)$serviceLimit);
     jsonResponse(true, 'Дані клієнта оновлено.', ['client' => $savedClient]);
 }
-requirePlanCapacity($planContext, 'clients');
+$ownerId = $userId;
+if ($isAdmin && !empty($data['workspace_owner_id'])) {
+    $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
+    $ownerCheck->execute([(string)$data['workspace_owner_id']]);
+    if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для клієнта.', [], 422);
+    $ownerId = (string)$data['workspace_owner_id'];
+}
+if (!$isAdmin) requirePlanCapacity($planContext, 'clients');
 $newId = bin2hex(random_bytes(16));
-$pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $userId]);
+$pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $ownerId]);
 releasePlanCapacityLocks((string)$planContext['owner_id']);
     $clientPlanLimit = $planContext['plan']['clients'] ?? null;
     if ($clientPlanLimit !== null && (int)$planContext['counts']['clients'] + 1 >= (int)$clientPlanLimit) notifyPlanCapacityReached($planContext, 'clients', (int)$clientPlanLimit, (int)$clientPlanLimit);

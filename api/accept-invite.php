@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/rate-limit.php';
 session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off', 'samesite' => 'Lax']);
 session_start();
 $data = body();
@@ -9,6 +10,7 @@ $name = trim((string)($data['name'] ?? ''));
 $password = (string)($data['password'] ?? '');
 if ($token === '') jsonResponse(false, 'Запрошення не знайдено.', [], 422);
 $pdo = db();
+enforcePublicRateLimit($pdo, 'accept_invite', '', 60, 60, 900);
 $query = $pdo->prepare("SELECT pi.*, p.name AS project_name FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.token_hash = ? AND pi.status = 'pending' AND pi.expires_at > NOW() LIMIT 1");
 $query->execute([hash('sha256', $token)]);
 $invite = $query->fetch();

@@ -50,7 +50,7 @@ if ($method === 'POST' && $action === 'create_global_group') {
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
     $presetMetric = ['керівник проєкту' => 'project_leads', 'модератор' => 'moderators'][mb_strtolower($groupName)] ?? null;
-    if ($presetMetric !== null && (int)($planContext['plan'][$presetMetric] ?? 0) < 1) jsonResponse(false, 'Ця роль недоступна у вашому плані.', ['code' => 'plan_role_unavailable', 'metric' => $presetMetric], 403);
+    if (!$actorAdmin && $presetMetric !== null && (int)($planContext['plan'][$presetMetric] ?? 0) < 1) jsonResponse(false, 'Ця роль недоступна у вашому плані.', ['code' => 'plan_role_unavailable', 'metric' => $presetMetric], 403);
     $existingGroups = $pdo->query('SELECT name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll();
     foreach ($existingGroups as $existingGroup) {
         $policy = groupPolicy($existingGroup['permissions'] ?? null);

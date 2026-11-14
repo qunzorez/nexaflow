@@ -123,6 +123,14 @@ if (!$user || ($planContext['workspace_role'] ?? '') !== 'manager') jsonResponse
 $workspaceOwnerId = (string)$planContext['owner_id'];
 ensurePlanSchema($pdo);
 $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+if ($requestAction === 'activate_without_payment') {
+    if (!isset($plans[$planKey]) || $planKey === 'start') jsonResponse(false, 'Оберіть платний тариф.', [], 422);
+    if ($billingEnabled) jsonResponse(false, 'Безоплатне підключення плану вимкнено, оскільки онлайн-оплата активна.', ['code' => 'billing_enabled'], 409);
+    requirePlanRoleCapacity($pdo, $planContext, $planKey);
+    normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
+    $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, $workspaceOwnerId]);
+    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплата наразі вимкнена, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
+}
 if (in_array($requestAction, ['', 'select_plan'], true) && !$billingEnabled) {
     requirePlanRoleCapacity($pdo, $planContext, $planKey);
     normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
