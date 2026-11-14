@@ -9,7 +9,7 @@ export default function Login({ initialMode = 'login' }) {
   if (['growth', 'team', 'business'].includes(requestedPlan)) window.localStorage.setItem('nexaflow.pending-plan', requestedPlan);
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: requestedPlan ? 'manager' : 'user', terms: false });
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(() => new URLSearchParams(window.location.search).get('verified') === '1' ? 'Пошту підтверджено. Увійдіть, щоб відкрити свій робочий простір.' : '');
   const [verificationEmail, setVerificationEmail] = useState('');
   const navigate = useNavigate();
 
