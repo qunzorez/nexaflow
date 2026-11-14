@@ -38,7 +38,7 @@ function ensurePlanSchema(PDO $pdo): void
 function availableWorkspaces(PDO $pdo, string $userId, string $role): array
 {
     if (in_array($role, ['admin', 'owner'], true)) return [];
-    $query = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.role FROM users u WHERE u.id <> ? AND u.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = u.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = u.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted')) ORDER BY u.created_at ASC");
+    $query = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.role, u.created_at FROM users u WHERE u.id <> ? AND u.role IN ('manager','owner','admin') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = u.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = u.id AND i.email = (SELECT email FROM users WHERE id = ?) AND i.status = 'accepted')) ORDER BY u.created_at ASC");
     $query->execute([$userId, $userId, $userId]);
     $workspaces = [];
     if (in_array($role, ['manager', 'owner'], true)) {
