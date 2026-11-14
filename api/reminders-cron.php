@@ -10,6 +10,7 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/db.php';
 require __DIR__ . '/telegram.php';
 require __DIR__ . '/mailer.php';
+require_once __DIR__ . '/task-deadline-notifications.php';
 
 $pdo = db();
 $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
@@ -131,4 +132,26 @@ foreach ($tasks as $task) {
 }
 
 $log("processed=" . count($tasks) . " sent={$sent} skipped={$skipped}");
-echo "NexaFlow reminders: tasks=" . count($tasks) . " sent={$sent} skipped={$skipped}" . PHP_EOL;
+$deadlineTasks = $pdo->query(
+    "SELECT t.id, t.title, t.due_date, t.assignee_id
+     FROM tasks t
+     WHERE t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+       AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+       AND t.status IN ('todo', 'in_progress', 'review')
+     ORDER BY t.due_date ASC
+     LIMIT 2000"
+)->fetchAll();
+$deadlineAssignees = $pdo->prepare('SELECT user_id FROM task_assignees WHERE task_id = ?');
+$deadlineNotifications = 0;
+foreach ($deadlineTasks as $deadlineTask) {
+    $recipients = [];
+    if (!empty($deadlineTask['assignee_id'])) $recipients[] = (string)$deadlineTask['assignee_id'];
+    $deadlineAssignees->execute([$deadlineTask['id']]);
+    foreach ($deadlineAssignees->fetchAll(PDO::FETCH_COLUMN) as $assigneeId) $recipients[] = (string)$assigneeId;
+    $deadlineAssignees->closeCursor();
+    foreach (array_unique(array_filter($recipients)) as $assigneeId) {
+        if (deliverTaskDeadlineNotification($pdo, $assigneeId, $deadlineTask)) $deadlineNotifications++;
+    }
+}
+$log('deadline notifications=' . $deadlineNotifications);
+echo "NexaFlow reminders: tasks=" . count($tasks) . " sent={$sent} skipped={$skipped} deadlines={$deadlineNotifications}" . PHP_EOL;

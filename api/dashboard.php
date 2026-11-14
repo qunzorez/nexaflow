@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/db.php';
 require_once __DIR__ . '/plans.php';
 require __DIR__ . '/telegram.php';
+require_once __DIR__ . '/task-deadline-notifications.php';
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db();
@@ -57,6 +58,9 @@ try {
     $remindersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $reminders = claimRows($pdo, (string)$_SESSION['user_id'], 'task', $remindersQuery->fetchAll());
     foreach ($reminders as $reminder) deliverDueReminder($pdo, (string)$_SESSION['user_id'], $reminder);
+    $deadlineTasksQuery = $pdo->prepare("SELECT t.id, t.title, t.due_date FROM tasks t WHERE t.due_date >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND t.due_date < DATE_ADD(CURDATE(), INTERVAL 2 DAY) AND t.status IN ('todo', 'in_progress', 'review') AND (t.assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)) ORDER BY t.due_date ASC LIMIT 200");
+    $deadlineTasksQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+    foreach ($deadlineTasksQuery->fetchAll() as $deadlineTask) deliverTaskDeadlineNotification($pdo, (string)$_SESSION['user_id'], $deadlineTask);
     $taskCountQuery = $isAdmin ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress', 'review')") : $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE status IN ('todo', 'in_progress', 'review') AND (created_by = ? OR assignee_id = ? OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tasks.id AND ta.user_id = ?))");
     if (!$isAdmin) $taskCountQuery->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
     $taskCountQuery->fetchColumn(); $taskCount = count(array_filter($tasks, static function ($task): bool { return in_array($task['status'], ['todo', 'in_progress', 'review'], true); }));
