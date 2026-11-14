@@ -32,6 +32,13 @@ if ($method === 'POST' && $action === 'create_global_group') {
     if (!$creator->fetch()) jsonResponse(false, 'Недостатньо прав для створення групи.', [], 403);
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
+    $existingGroups = $pdo->query('SELECT name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll();
+    foreach ($existingGroups as $existingGroup) {
+        $policy = groupPolicy($existingGroup['permissions'] ?? null);
+        if (($policy['owner_id'] ?? '') === $userId && mb_strtolower(trim((string)$existingGroup['name'])) === mb_strtolower($groupName)) {
+            jsonResponse(false, 'Групу з такою роллю вже створено. Виберіть іншу роль або відредагуйте наявну групу.', ['code' => 'group_role_exists'], 409);
+        }
+    }
     $permissions = encodeGroupPolicy($data, $userId);
     $groupId = bin2hex(random_bytes(16));
     $pdo->prepare('INSERT INTO project_groups (id, project_id, name, role_name, permissions) VALUES (?, NULL, ?, ?, ?)')->execute([$groupId, $groupName, '', $permissions]);
