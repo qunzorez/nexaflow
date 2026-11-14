@@ -5,14 +5,14 @@ import Notifications from './Notifications.jsx';
 import { api, post } from '../services/api.js';
 import { isPlanLimitReached, planLimitHint } from '../utils/planLimits.js';
 
-const roleNames = { admin: 'Адміністратор', owner: 'Власник', manager: 'Менеджер', user: 'Користувач', viewer: 'Переглядач' };
+const roleNames = { admin: 'Адміністратор', owner: 'Власник', manager: 'Менеджер', project_lead: 'Керівник проєкту', user: 'Користувач', viewer: 'Переглядач' };
 export default function Header({ page, user, onMenu }) {
   const [profile, setProfile] = useState(user); const [open, setOpen] = useState(false); const menuRef = useRef(null); const navigate = useNavigate();
   useEffect(() => { setProfile(user); }, [user]);
   useEffect(() => { api('/api/me.php').then(result => result.ok && setProfile(result.user)); const syncProfile = event => event.detail && setProfile(event.detail); window.addEventListener('nexaflow:profile-updated', syncProfile); return () => window.removeEventListener('nexaflow:profile-updated', syncProfile); }, []);
   useEffect(() => { const close = event => { if (!menuRef.current?.contains(event.target)) setOpen(false); }; document.addEventListener('mousedown', close); return () => document.removeEventListener('mousedown', close); }, []);
   const activeRole = profile?.workspace_role || profile?.role;
-  const canCreateProject = ['admin', 'owner', 'manager'].includes(activeRole);
+  const canCreateProject = ['admin', 'owner', 'manager', 'project_lead'].includes(activeRole);
   const taskLimitReached = isPlanLimitReached(profile?.subscription, 'tasks_month');
   const projectLimitReached = isPlanLimitReached(profile?.subscription, 'projects');
   async function logout() { await post('/api/logout.php', {}); navigate('/'); }

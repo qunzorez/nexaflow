@@ -29,7 +29,7 @@ export default function Sidebar({ user, open }) {
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
-  const canManage = ["admin", "owner", "manager"].includes(userRole);
+  const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
   useEffect(() => {
     if (!user?.subscription?.features) return;

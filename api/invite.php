@@ -35,15 +35,16 @@ $actorRole = (string)$actorRoleQuery->fetchColumn();
 $actorRoleQuery->closeCursor();
 $planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], $actorRole);
 $actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
-if (!in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true)) jsonResponse(false, 'Керувати запрошеннями може лише менеджер активного простору.', [], 403);
+$isProjectLead = ($planContext['workspace_role'] ?? '') === 'project_lead';
+if (!in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true)) jsonResponse(false, 'Керувати запрошеннями може лише менеджер або керівник проєкту активного простору.', [], 403);
 
 if ($action === 'resend') {
     $inviteId = trim((string)($data['invite_id'] ?? ''));
     $inviteType = (string)($data['invite_type'] ?? '');
     if ($inviteId === '' || !in_array($inviteType, ['team', 'project'], true)) jsonResponse(false, 'Не вказано коректне запрошення.', [], 422);
     if ($inviteType === 'team') {
-        $inviteQuery = $pdo->prepare('SELECT i.*, g.name AS group_name FROM user_invitations i LEFT JOIN project_groups g ON g.id = i.group_id WHERE i.id = ? AND i.status = \'pending\' AND (? = 1 OR i.invited_by = ?) LIMIT 1');
-        $inviteQuery->execute([$inviteId, $actorAdmin ? 1 : 0, $_SESSION['user_id']]);
+        $inviteQuery = $pdo->prepare("SELECT i.*, g.name AS group_name FROM user_invitations i LEFT JOIN project_groups g ON g.id = i.group_id WHERE i.id = ? AND i.status = 'pending' AND (? = 1 OR i.invited_by = ? OR (? = 1 AND i.invited_by IN (SELECT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?))) LIMIT 1");
+        $inviteQuery->execute([$inviteId, $actorAdmin ? 1 : 0, $_SESSION['user_id'], $isProjectLead ? 0 : 1, $planContext['owner_id']]);
         $invite = $inviteQuery->fetch();
         if (!$invite) jsonResponse(false, 'Очікуване запрошення не знайдено.', [], 404);
         $token = bin2hex(random_bytes(32));
@@ -57,8 +58,8 @@ if ($action === 'resend') {
         $entityId = $inviteId;
         $notificationType = 'team_invite';
     } else {
-        $inviteQuery = $pdo->prepare('SELECT i.*, p.name AS project_name, g.name AS group_name FROM project_invitations i JOIN projects p ON p.id = i.project_id LEFT JOIN project_groups g ON g.id = i.group_id WHERE i.id = ? AND i.status = \'pending\' AND (? = 1 OR i.invited_by = ?) LIMIT 1');
-        $inviteQuery->execute([$inviteId, $actorAdmin ? 1 : 0, $_SESSION['user_id']]);
+        $inviteQuery = $pdo->prepare("SELECT i.*, p.name AS project_name, g.name AS group_name FROM project_invitations i JOIN projects p ON p.id = i.project_id LEFT JOIN project_groups g ON g.id = i.group_id WHERE i.id = ? AND i.status = 'pending' AND (? = 1 OR i.invited_by = ? OR (? = 1 AND p.owner_id = ? AND i.invited_by IN (SELECT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?))) LIMIT 1");
+        $inviteQuery->execute([$inviteId, $actorAdmin ? 1 : 0, $_SESSION['user_id'], $isProjectLead ? 0 : 1, $planContext['owner_id'], $planContext['owner_id']]);
         $invite = $inviteQuery->fetch();
         if (!$invite) jsonResponse(false, 'Очікуване запрошення не знайдено.', [], 404);
         $token = bin2hex(random_bytes(32));
@@ -94,6 +95,7 @@ $projectId = trim((string)($data['project_id'] ?? ''));
 $role = trim((string)($data['role'] ?? 'member'));
 $groupId = trim((string)($data['group_id'] ?? ''));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) jsonResponse(false, 'Введіть коректний email і роль.', [], 422);
+if ($isProjectLead && in_array($role, ['admin', 'manager'], true)) jsonResponse(false, 'Керівник проєкту може запросити учасника, але не призначати системні ролі.', [], 403);
 $emailUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
 $emailUser->execute([$email]);
 $existingId = (string)($emailUser->fetchColumn() ?: '');
@@ -129,12 +131,18 @@ if ($projectId === '' && $groupId !== '') {
 if ($projectId === '') {
     $current = $pdo->prepare("SELECT role FROM users WHERE id = ? AND role IN ('admin', 'owner', 'manager') LIMIT 1");
     $current->execute([$_SESSION['user_id']]);
-    if (!$current->fetch()) jsonResponse(false, 'Недостатньо прав для загального запрошення.', [], 403);
+    if (!$current->fetch() && !$isProjectLead) jsonResponse(false, 'Недостатньо прав для загального запрошення.', [], 403);
     if ($groupId !== '') {
         $groupCheck = $pdo->prepare('SELECT id FROM project_groups WHERE id = ? AND project_id IS NULL LIMIT 1');
         $groupCheck->execute([$groupId]);
         if (!$groupCheck->fetch()) jsonResponse(false, 'Обрана група не є глобальною.', [], 422);
-        if (!$actorAdmin) manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
+        if (!$actorAdmin) {
+            if ($isProjectLead) {
+                $groupCheck = $pdo->prepare("SELECT id FROM project_groups WHERE id = ? AND project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(permissions) THEN permissions ELSE '{}' END, '$.owner_id')) = ? LIMIT 1");
+                $groupCheck->execute([$groupId, $planContext['owner_id']]);
+                if (!$groupCheck->fetchColumn()) jsonResponse(false, 'Можна запрошувати лише з claims активного простору.', [], 403);
+            } else manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
+        }
     }
     if ($existingId !== '' && $alreadyMember) jsonResponse(false, 'Цей користувач уже приєднався до вашої команди.', ['code' => 'already_team_member'], 409);
     $pendingDuplicate = $pdo->prepare("SELECT id FROM user_invitations WHERE invited_by = ? AND email = ? AND status = 'pending' LIMIT 1");
@@ -178,8 +186,8 @@ if ($projectId === '') {
     }
 }
 
-$access = $pdo->prepare("SELECT p.name FROM projects p LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? JOIN users cu ON cu.id = ? WHERE p.id = ? AND (cu.role IN ('admin', 'owner') OR p.owner_id = ? OR pm.role IN ('admin', 'manager')) LIMIT 1");
-$access->execute([$_SESSION['user_id'], $_SESSION['user_id'], $projectId, $_SESSION['user_id']]);
+$access = $pdo->prepare("SELECT p.name FROM projects p LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? JOIN users cu ON cu.id = ? WHERE p.id = ? AND (cu.role IN ('admin', 'owner') OR p.owner_id = ? OR p.owner_id = ? OR pm.role IN ('admin', 'manager')) LIMIT 1");
+$access->execute([$_SESSION['user_id'], $_SESSION['user_id'], $projectId, $_SESSION['user_id'], $planContext['owner_id']]);
 $project = $access->fetch();
 if (!$project) jsonResponse(false, 'У вас немає прав запрошувати людей у цей проєкт.', [], 403);
 $existingProjectMember = $pdo->prepare("SELECT 1 FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND u.email = ? LIMIT 1");
@@ -193,7 +201,14 @@ if ($groupId !== '') {
     $groupCheck->execute([$groupId, $projectId]);
     $selectedGroup = $groupCheck->fetch();
     if (!$selectedGroup) jsonResponse(false, 'Обрана група не належить цьому проєкту.', [], 422);
-    if (!$actorAdmin && $selectedGroup['project_id'] === null) manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
+    if (!$actorAdmin && $selectedGroup['project_id'] === null) {
+        if ($isProjectLead) {
+            $groupPermissions = $pdo->prepare('SELECT permissions FROM project_groups WHERE id = ? LIMIT 1');
+            $groupPermissions->execute([$groupId]);
+            $groupOwner = groupPolicy((string)($groupPermissions->fetchColumn() ?: ''))['owner_id'] ?? '';
+            if ((string)$groupOwner !== (string)$planContext['owner_id']) jsonResponse(false, 'Можна використовувати лише claims активного простору.', [], 403);
+        } else manageableGroup($pdo, $groupId, (string)$_SESSION['user_id'], false);
+    }
 }
 
 try {

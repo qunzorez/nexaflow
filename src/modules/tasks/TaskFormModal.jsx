@@ -31,7 +31,7 @@ export default function TaskFormModal({
   onClose,
 }) {
   const [description, setDescription] = useState(editing?.description || "");
-  const canManage = ["admin", "owner", "manager"].includes(data.user?.workspace_role || data.user?.role);
+  const canManage = ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role);
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";

@@ -33,7 +33,7 @@ function deliverDueReminder(PDO $pdo, string $userId, array $reminder): void
     sendTelegramReminderToUser($pdo, $userId, $reminder);
 }
 try {
-    $canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true);
+    $canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
     $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
     if ($isAdmin) {
         $projects = $pdo->query('SELECT p.id, p.name, p.description, p.owner_id, p.status, p.created_at, u.name AS owner_name, (SELECT COUNT(DISTINCT t.id) FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id WHERE (t.project_id = p.id OR tp.project_id = p.id)) AS task_count FROM projects p JOIN users u ON u.id = p.owner_id ORDER BY p.created_at DESC')->fetchAll();
@@ -44,7 +44,7 @@ try {
     }
     if ($isAdmin) {
         $users = $pdo->query('SELECT id, name, email, role FROM users ORDER BY name')->fetchAll();
-    } elseif ($planContext['workspace_role'] === 'manager') {
+    } elseif (in_array($planContext['workspace_role'], ['manager', 'project_lead'], true)) {
         $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
         $usersQuery = $pdo->prepare("SELECT id, name, email, role FROM users WHERE id IN ({$memberMarks}) ORDER BY name");
         $usersQuery->execute($planContext['member_ids']);

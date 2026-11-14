@@ -18,10 +18,12 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS client_members (client_id CHAR(32) NOT NU
 $columns = $pdo->query("SHOW COLUMNS FROM clients")->fetchAll(); $columnNames = array_column($columns, 'Field'); if (!in_array('module', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD module VARCHAR(40) NOT NULL DEFAULT 'accounting'"); if (!in_array('module_data', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD module_data TEXT NULL"); if (!in_array('services', $columnNames, true)) $pdo->exec("ALTER TABLE clients ADD services TEXT NULL");
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
-$canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true);
+$canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
+$isProjectLead = $planContext['workspace_role'] === 'project_lead';
 $clientAction = (string)($data['action'] ?? 'create');
 if ($method === 'POST' && in_array($clientAction, ['update', 'delete'], true)) {
     if (!$canManage) jsonResponse(false, 'Звичайний користувач може лише переглядати клієнтів.', [], 403);
+    if ($isProjectLead && $clientAction === 'delete') jsonResponse(false, 'Керівник проєкту може керувати клієнтами, але не видаляти їх.', [], 403);
     $clientId = trim((string)($data['id'] ?? ''));
     if (!in_array($user['role'], ['admin', 'owner'], true)) {
         $ownerMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
@@ -79,6 +81,12 @@ if ($method === 'GET') {
     // collations for group names and user IDs, making the joined SQL query fail.
     $availableUsers = [];
     $managerTeamIds = array_fill_keys($workspaceIds, true);
+    $manageableTeamIds = $managerTeamIds;
+    if ($isProjectLead) {
+        $invitedUsers = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE EXISTS (SELECT 1 FROM user_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted')");
+        $invitedUsers->execute([$userId, $userId]);
+        $manageableTeamIds = array_fill_keys(array_map('strval', $invitedUsers->fetchAll(PDO::FETCH_COLUMN)), true);
+    }
     if ($canManage) {
         $accountingGroupIds = [];
         foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
@@ -97,7 +105,7 @@ if ($method === 'GET') {
             $membershipQuery->execute(array_keys($accountingGroupIds));
             foreach ($membershipQuery->fetchAll() as $membership) {
                 $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-                $isAllowedManagerMember = $planContext['workspace_role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
+                $isAllowedManagerMember = $person && (!in_array($planContext['workspace_role'], ['manager', 'project_lead'], true) || isset($manageableTeamIds[(string)$person['id']]));
                 if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
                     $availableUsers[(string)$person['id']] = $person;
                 }
@@ -119,7 +127,7 @@ if ($method === 'GET') {
         $clientMembersQuery->execute($clientIds);
         foreach ($clientMembersQuery->fetchAll() as $membership) {
             $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-            $isAllowedManagerMember = $planContext['workspace_role'] !== 'manager' || isset($managerTeamIds[(string)$person['id']]);
+            $isAllowedManagerMember = $person && (!in_array($planContext['workspace_role'], ['manager', 'project_lead'], true) || isset($manageableTeamIds[(string)$person['id']]));
             if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
                 $availableByClient[(string)$membership['client_id']][] = $person;
             }
@@ -131,9 +139,9 @@ if ($method === 'GET') {
         }
         unset($clientAccountants);
     }
-    jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'permissions' => ['manage' => $canManage]]);
+    jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'permissions' => ['manage' => $canManage, 'delete' => !$isProjectLead]]);
 }
-if (!$canManage) jsonResponse(false, 'Створювати клієнтів можуть лише адміністратор або менеджер.', [], 403);
+if (!$canManage) jsonResponse(false, 'Створювати клієнтів можуть лише адміністратор, менеджер або керівник проєкту.', [], 403);
 $action = (string)($data['action'] ?? 'create');
 if ($action === 'delete') {
     $id = trim((string)($data['id'] ?? ''));

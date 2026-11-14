@@ -8,6 +8,7 @@ session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 
 $pdo = db();
+$userId = (string)$_SESSION['user_id'];
 $pdo->exec("CREATE TABLE IF NOT EXISTS client_members (client_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, assigned_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (client_id, user_id), INDEX idx_client_members_user (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 function projectInviteUrl(string $token): string
 {
@@ -22,7 +23,8 @@ $data = $method === 'POST' ? body() : [];
 $action = (string)($data['action'] ?? '');
 $currentUser = $current->fetch();
 $planContext = $currentUser ? workspacePlan($pdo, (string)$_SESSION['user_id'], (string)$currentUser['role']) : null;
-$canManage = $currentUser && in_array($planContext['workspace_role'] ?? '', ['admin', 'owner', 'manager'], true);
+$canManage = $currentUser && in_array($planContext['workspace_role'] ?? '', ['admin', 'owner', 'manager', 'project_lead'], true);
+$isProjectLead = ($planContext['workspace_role'] ?? '') === 'project_lead';
 $isAdmin = $currentUser && in_array($currentUser['role'], ['admin', 'owner'], true);
 if (!$currentUser || !$canManage) {
     jsonResponse(false, 'Недостатньо прав для керування командою.', [], 403);
@@ -32,19 +34,24 @@ try {
         if ($isAdmin) {
             $users = $pdo->query('SELECT id, name, email, role, created_at FROM users ORDER BY name')->fetchAll();
         } else {
-            $usersQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, u.role, u.created_at, (SELECT pgm.group_id FROM project_group_members pgm JOIN project_groups pgg ON pgg.id = pgm.group_id WHERE pgm.user_id = u.id AND pgg.project_id IS NULL LIMIT 1) AS group_id FROM users u LEFT JOIN project_invitations pi ON pi.email = u.email AND pi.invited_by = ? AND pi.status = 'accepted' LEFT JOIN user_invitations ui ON ui.email = u.email AND ui.invited_by = ? AND ui.status = 'accepted' WHERE pi.id IS NOT NULL OR ui.id IS NOT NULL ORDER BY u.created_at DESC");
-            $usersQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            $workspaceLeadIds = array_map('strval', $planContext['lead_actor_ids'] ?? []);
+            $inviterIds = $isProjectLead ? [$userId] : array_values(array_unique(array_merge([(string)$planContext['owner_id']], $workspaceLeadIds)));
+            $inviterMarks = implode(',', array_fill(0, count($inviterIds), '?'));
+            $usersQuery = $pdo->prepare("SELECT DISTINCT u.id, u.name, u.email, u.role, u.created_at, (SELECT pgm.group_id FROM project_group_members pgm JOIN project_groups pgg ON pgg.id = pgm.group_id WHERE pgm.user_id = u.id AND pgg.project_id IS NULL LIMIT 1) AS group_id, (EXISTS (SELECT 1 FROM project_invitations pi2 WHERE pi2.email = u.email AND pi2.invited_by = ? AND pi2.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui2 WHERE ui2.email = u.email AND ui2.invited_by = ? AND ui2.status = 'accepted')) AS manageable_by_actor FROM users u WHERE EXISTS (SELECT 1 FROM project_invitations pi WHERE pi.email = u.email AND pi.invited_by IN ({$inviterMarks}) AND pi.status = 'accepted') OR EXISTS (SELECT 1 FROM user_invitations ui WHERE ui.email = u.email AND ui.invited_by IN ({$inviterMarks}) AND ui.status = 'accepted') ORDER BY u.created_at DESC");
+            $usersQuery->execute(array_merge([$userId, $userId], $inviterIds, $inviterIds));
             $users = $usersQuery->fetchAll();
         }
         if ($isAdmin) {
             $pendingTeamInvites = $pdo->query("SELECT id, email, group_id, expires_at, invited_by, CASE WHEN expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'team' AS invite_type, NULL AS project_name FROM user_invitations WHERE status = 'pending' ORDER BY created_at DESC")->fetchAll();
             $pendingProjectInvites = $pdo->query("SELECT pi.id, pi.email, pi.group_id, pi.expires_at, pi.invited_by, CASE WHEN pi.expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'project' AS invite_type, p.name AS project_name FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.status = 'pending' ORDER BY pi.created_at DESC")->fetchAll();
         } else {
-            $pendingTeamQuery = $pdo->prepare("SELECT id, email, group_id, expires_at, invited_by, CASE WHEN expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'team' AS invite_type, NULL AS project_name FROM user_invitations WHERE invited_by = ? AND status = 'pending' ORDER BY created_at DESC");
-            $pendingTeamQuery->execute([$_SESSION['user_id']]);
+            $pendingActors = $isProjectLead ? [$userId] : array_values(array_unique(array_merge([(string)$planContext['owner_id']], array_map('strval', $planContext['lead_actor_ids'] ?? []))));
+            $pendingMarks = implode(',', array_fill(0, count($pendingActors), '?'));
+            $pendingTeamQuery = $pdo->prepare("SELECT id, email, group_id, expires_at, invited_by, CASE WHEN expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'team' AS invite_type, NULL AS project_name FROM user_invitations WHERE invited_by IN ({$pendingMarks}) AND status = 'pending' ORDER BY created_at DESC");
+            $pendingTeamQuery->execute($pendingActors);
             $pendingTeamInvites = $pendingTeamQuery->fetchAll();
-            $pendingProjectQuery = $pdo->prepare("SELECT pi.id, pi.email, pi.group_id, pi.expires_at, pi.invited_by, CASE WHEN pi.expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'project' AS invite_type, p.name AS project_name FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.invited_by = ? AND pi.status = 'pending' ORDER BY pi.created_at DESC");
-            $pendingProjectQuery->execute([$_SESSION['user_id']]);
+            $pendingProjectQuery = $pdo->prepare("SELECT pi.id, pi.email, pi.group_id, pi.expires_at, pi.invited_by, CASE WHEN pi.expires_at <= NOW() THEN 'expired' ELSE 'pending' END AS invite_status, 'project' AS invite_type, p.name AS project_name FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.invited_by IN ({$pendingMarks}) AND pi.status = 'pending' AND p.owner_id = ? ORDER BY pi.created_at DESC");
+            $pendingProjectQuery->execute(array_merge($pendingActors, [(string)$planContext['owner_id']]));
             $pendingProjectInvites = $pendingProjectQuery->fetchAll();
         }
         $pendingInvites = array_merge($pendingTeamInvites, $pendingProjectInvites);
@@ -54,7 +61,7 @@ try {
             $members = $pdo->query('SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id ORDER BY p.name, u.name')->fetchAll();
         } else {
             $projectsQuery = $pdo->prepare("SELECT DISTINCT p.id, p.name FROM projects p LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? WHERE p.owner_id = ? OR pm.user_id IS NOT NULL ORDER BY p.name");
-            $projectsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            $projectsQuery->execute([$_SESSION['user_id'], $planContext['owner_id']]);
             $projects = $projectsQuery->fetchAll();
             $membersQuery = $pdo->prepare("SELECT pm.project_id, pm.user_id, pm.role, p.name AS project_name, u.name AS user_name, u.email AS user_email FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN users u ON u.id = pm.user_id JOIN project_invitations pi ON pi.project_id = pm.project_id AND pi.email = u.email WHERE pi.invited_by = ? AND pi.status = 'accepted' ORDER BY p.name, u.name");
             $membersQuery->execute([$_SESSION['user_id']]);
@@ -63,13 +70,13 @@ try {
         if ($isAdmin) {
             $groups = $pdo->query("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name")->fetchAll();
         } else {
-            $groupsQuery = $pdo->prepare("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE (pg.project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?) OR p.owner_id = ? GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name");
-            $groupsQuery->execute([$_SESSION['user_id'], $planContext['owner_id'], $planContext['owner_id']]);
+            $groupsQuery = $pdo->prepare("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, COALESCE(p.name, 'Глобальна група') AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN projects p ON p.id = pg.project_id LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ? LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE (pg.project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) IN (?, ?)) OR p.owner_id = ? GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, p.name ORDER BY project_name, pg.name");
+            $groupsQuery->execute([$_SESSION['user_id'], $planContext['owner_id'], $_SESSION['user_id'], $planContext['owner_id']]);
             $groups = $groupsQuery->fetchAll();
         }
         foreach ($groups as &$group) $group = exposeGroupPolicy($group);
         unset($group);
-        $groups = array_values(array_filter($groups, static function ($group) use ($isAdmin): bool { return $group['project_id'] === null && ($isAdmin || $group['group_owner_id'] === (string)$_SESSION['user_id']); }));
+        $groups = array_values(array_filter($groups, static function ($group) use ($isAdmin, $isProjectLead, $planContext): bool { return $group['project_id'] === null && ($isAdmin || $group['group_owner_id'] === (string)$_SESSION['user_id'] || ($isProjectLead && $group['group_owner_id'] === (string)$planContext['owner_id'])); }));
         foreach ($users as &$teamUser) {
             $teamUser['group_id'] = '';
             foreach ($groups as $visibleGroup) {
@@ -82,8 +89,8 @@ try {
         if ($isAdmin) {
             $clients = $pdo->query('SELECT id, name, created_by FROM clients ORDER BY name')->fetchAll();
         } else {
-            $clientsQuery = $pdo->prepare('SELECT DISTINCT c.id, c.name, c.created_by FROM clients c LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.created_by = ? OR cm.user_id IS NOT NULL ORDER BY c.name');
-            $clientsQuery->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
+            $clientsQuery = $pdo->prepare('SELECT DISTINCT c.id, c.name, c.created_by FROM clients c LEFT JOIN client_members cm ON cm.client_id = c.id AND cm.user_id = ? WHERE c.created_by IN (' . implode(',', array_fill(0, count($planContext['member_ids']), '?')) . ') OR cm.user_id IS NOT NULL ORDER BY c.name');
+            $clientsQuery->execute(array_merge([$_SESSION['user_id']], $planContext['member_ids']));
             $clients = $clientsQuery->fetchAll();
         }
         $clientAssignments = [];
@@ -96,11 +103,20 @@ try {
         }
         foreach ($users as &$teamUser) $teamUser['client_ids'] = $clientAssignments[(string)$teamUser['id']] ?? [];
         unset($teamUser);
-        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'clients' => $clients, 'permissions' => ['admin' => $isAdmin]]);
+        $assignableGroups = $groups;
+        if ($isProjectLead) {
+            $assignableGroupsQuery = $pdo->prepare("SELECT pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions, 'Глобальна група' AS project_name, COUNT(DISTINCT pgm.user_id) AS member_count FROM project_groups pg LEFT JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE pg.project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ? GROUP BY pg.id, pg.project_id, pg.name, pg.role_name, pg.permissions");
+            $assignableGroupsQuery->execute([$planContext['owner_id']]);
+            $assignableGroups = $assignableGroupsQuery->fetchAll();
+            foreach ($assignableGroups as &$assignableGroup) $assignableGroup = exposeGroupPolicy($assignableGroup);
+            unset($assignableGroup);
+        }
+        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'assignable_groups' => $assignableGroups, 'clients' => $clients, 'permissions' => ['admin' => $isAdmin, 'project_lead' => $isProjectLead]]);
     }
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
     if ($action === 'create_project') {
+        if ($isProjectLead && ($data['invite_role'] ?? 'member') === 'manager') jsonResponse(false, 'Керівник проєкту може запрошувати учасників, але не призначати роль менеджера.', [], 403);
         requirePlanCapacity($planContext, 'projects');
         if (!empty($data['invite_emails']) && is_array($data['invite_emails'])) {
             $emailsToInvite = array_unique(array_filter(array_map(static fn($value): string => strtolower(trim((string)$value)), $data['invite_emails']), static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL)));
@@ -117,10 +133,11 @@ try {
         $description = trim((string)($data['description'] ?? ''));
         $status = in_array(($data['status'] ?? 'active'), ['active', 'draft', 'paused', 'completed'], true) ? (string)$data['status'] : 'active';
         $visibility = in_array(($data['visibility'] ?? 'team'), ['private', 'team'], true) ? (string)$data['visibility'] : 'team';
+        if ($isProjectLead && !empty($data['groups']) && is_array($data['groups'])) jsonResponse(false, 'Керівник проєкту не може створювати або призначати нові claims.', [], 403);
         $id = bin2hex(random_bytes(16));
         $pdo->beginTransaction();
         $insert = $pdo->prepare('INSERT INTO projects (id, name, description, owner_id, status, visibility) VALUES (?, ?, ?, ?, ?, ?)');
-        $insert->execute([$id, $name, $description, $_SESSION['user_id'], $status, $visibility]);
+        $insert->execute([$id, $name, $description, $planContext['owner_id'], $status, $visibility]);
         $member = $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, 'admin')");
         $member->execute([$id, $_SESSION['user_id']]);
         if ($canManage && !empty($data['members']) && is_array($data['members'])) {
@@ -128,6 +145,11 @@ try {
             foreach ($data['members'] as $selected) {
                 $memberId = trim((string)($selected['user_id'] ?? ''));
                 $memberRole = trim((string)($selected['role'] ?? 'member'));
+                if ($isProjectLead) {
+                    $memberCheck = $pdo->prepare("SELECT 1 FROM users u WHERE u.id = ? AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted')) LIMIT 1");
+                    $memberCheck->execute([$memberId, $userId, $userId]);
+                    if (!$memberCheck->fetchColumn() || in_array($memberRole, ['admin', 'manager'], true)) continue;
+                }
                 if ($memberId !== $_SESSION['user_id'] && in_array($memberRole, ['admin', 'manager', 'member', 'viewer'], true)) {
                     $addMember->execute([$id, $memberId, $memberRole]);
                 }
@@ -153,6 +175,7 @@ try {
         if ($canManage && !empty($data['invite_emails']) && is_array($data['invite_emails'])) {
             $inviteRole = trim((string)($data['invite_role'] ?? 'member'));
             if (!in_array($inviteRole, ['manager', 'member', 'viewer'], true)) $inviteRole = 'member';
+            if ($isProjectLead && $inviteRole === 'manager') jsonResponse(false, 'Керівник проєкту може запрошувати учасників, але не призначати роль менеджера.', [], 403);
             $revoke = $pdo->prepare("UPDATE project_invitations SET status = 'revoked' WHERE project_id = ? AND email = ? AND status = 'pending'");
             $inviteInsert = $pdo->prepare('INSERT INTO project_invitations (id, project_id, invited_by, email, role, token_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
             foreach ($data['invite_emails'] as $rawEmail) {
@@ -259,8 +282,8 @@ try {
         }
         $ownedClientsQuery = $isAdmin
             ? $pdo->query('SELECT id FROM clients')
-            : $pdo->prepare('SELECT id FROM clients WHERE created_by = ?');
-        if (!$isAdmin) $ownedClientsQuery->execute([$_SESSION['user_id']]);
+            : $pdo->prepare('SELECT id FROM clients WHERE created_by IN (' . implode(',', array_fill(0, count($planContext['member_ids']), '?')) . ')');
+        if (!$isAdmin) $ownedClientsQuery->execute($planContext['member_ids']);
         $manageableClientIds = array_map('strval', array_column($ownedClientsQuery->fetchAll(), 'id'));
         $selectedClientIds = array_values(array_intersect($requestedClientIds, $manageableClientIds));
         $previousAssignments = [];

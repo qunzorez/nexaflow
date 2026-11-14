@@ -12,7 +12,7 @@ export default function Team() {
 
   async function load() {
     const [result, me] = await Promise.all([api('/api/team.php'), api('/api/me.php')]);
-    if (!me.ok || !['admin', 'owner', 'manager'].includes(me.user.workspace_role || me.user.role)) {
+    if (!me.ok || !['admin', 'owner', 'manager', 'project_lead'].includes(me.user.workspace_role || me.user.role)) {
       navigate('/dashboard', { replace: true });
       return;
     }
@@ -30,7 +30,7 @@ export default function Team() {
 
   return <Layout page="Команда" user={currentUser}>
     <div className="content">
-      <ManagerTeamView data={data} onReload={load} isAdmin={Boolean(data.permissions?.admin)} currentUserId={currentUser?.id} subscription={currentUser?.subscription} />
+      <ManagerTeamView data={data} onReload={load} isAdmin={Boolean(data.permissions?.admin)} isProjectLead={Boolean(data.permissions?.project_lead)} currentUserId={currentUser?.id} subscription={currentUser?.subscription} />
     </div>
   </Layout>;
 }

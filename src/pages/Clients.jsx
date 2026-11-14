@@ -651,7 +651,7 @@ function Info({ label, value }) {
   );
 }
 function ClientViewModal({ client, onClose, user }) {
-  const isSimpleUser = user?.role === "user";
+  const isSimpleUser = (user?.workspace_role || user?.role) === "user";
   const servicePayoutAmount = (service) => service.is_package
     ? Number(service.package_responsible_amount ?? service.responsible_amount ?? 0)
     : Number(service.responsible_amount ?? 0);
@@ -934,13 +934,11 @@ export default function Clients() {
                           >
                             Редагувати
                           </button>
-                          <button
+                          {data.permissions?.delete !== false && <button
                             className="client-delete"
                             type="button"
                             onClick={() => remove(client)}
-                          >
-                            Видалити
-                          </button>
+                          >Видалити</button>}
                         </>
                       )}
                     </div>

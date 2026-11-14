@@ -6,7 +6,7 @@ import { isPlanLimitReached, planLimitHint } from '../../utils/planLimits.js';
 import './projects.css';
 import './projects-empty-fix.css';
 
-const canCreate = role => ['admin', 'owner', 'manager'].includes(role);
+const canCreate = role => ['admin', 'owner', 'manager', 'project_lead'].includes(role);
 
 export default function ProjectsModule({ user, projects, onCreated }) {
   const isManager = canCreate(user?.workspace_role || user?.role);

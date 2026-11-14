@@ -78,7 +78,7 @@ export default function Dashboard() {
     return <div className="loading-screen">Завантаження NexaFlow…</div>;
   const canManage = data.permissions.manage;
   const isAdmin = ["admin", "owner"].includes(data.user.role);
-  const isManager = data.user.workspace_role === "manager";
+  const isManager = ["manager", "project_lead"].includes(data.user.workspace_role);
   const hasAnalytics = Boolean(data.user.subscription?.features?.analytics);
   const taskLimitReached = isPlanLimitReached(data.user.subscription, "tasks_month");
   const projectLimitReached = isPlanLimitReached(data.user.subscription, "projects");

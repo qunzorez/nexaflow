@@ -38,7 +38,7 @@ if ($addedPackagePrices) {
   $pdo->exec("UPDATE service_packages p SET client_price = COALESCE((SELECT SUM(s.client_price) FROM service_catalog s WHERE s.package_id = p.id AND s.active = 1), 0), responsible_amount = COALESCE((SELECT SUM(s.responsible_amount) FROM service_catalog s WHERE s.package_id = p.id AND s.active = 1), 0)");
 }
 
-$canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager'], true);
+$canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
 $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
@@ -52,7 +52,7 @@ $moduleLabel = static fn(string $module): string => [
 ][$module] ?? 'Бухгалтерія';
 
 if ($method === 'GET') {
-    if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише менеджерам і адміністраторам.', [], 403);
+    if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише керівникам простору.', [], 403);
     requirePlanFeature($planContext, 'services');
     // Packages belong to the active team's manager account and are shared by that workspace.
     $packageQuery = $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages WHERE created_by = ? AND module IN (?, 'all') ORDER BY name");
@@ -70,6 +70,12 @@ if ($method === 'GET') {
     $usersQuery = $pdo->prepare("SELECT id, name, email, role FROM users WHERE role IN ('admin','owner','manager','user') AND id IN ({$memberMarks}) ORDER BY name, email");
     $usersQuery->execute($planContext['member_ids']);
     $users = $usersQuery->fetchAll();
+    if (($planContext['workspace_role'] ?? '') === 'project_lead') {
+        $invitedIdsQuery = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE EXISTS (SELECT 1 FROM user_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted')");
+        $invitedIdsQuery->execute([$userId, $userId]);
+        $invitedIds = array_fill_keys(array_map('strval', $invitedIdsQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+        $users = array_values(array_filter($users, static fn(array $person): bool => isset($invitedIds[(string)$person['id']])));
+    }
     foreach ($packages as &$package) {
         $package['module_label'] = $moduleLabel((string)$package['module']);
         $package['services'] = array_values(array_filter($items, static fn(array $item): bool => (string)$item['package_id'] === (string)$package['id']));
@@ -82,7 +88,7 @@ if ($method === 'GET') {
     jsonResponse(true, 'Послуги завантажено.', ['user' => $user, 'packages' => $packages, 'users' => $users, 'active_module' => $activeModule, 'is_admin' => $isAdmin, 'modules' => array_map(fn(string $value): array => ['value' => $value, 'label' => $moduleLabel($value)], $modules), 'permissions' => ['manage' => $canManage]]);
 }
 
-if (!$canManage) jsonResponse(false, 'Керувати послугами може лише менеджер або адміністратор.', [], 403);
+if (!$canManage) jsonResponse(false, 'Керувати послугами може лише керівник простору.', [], 403);
 requirePlanFeature($planContext, 'services');
 $action = (string)($data['action'] ?? '');
 $packageId = trim((string)($data['package_id'] ?? $data['id'] ?? ''));
