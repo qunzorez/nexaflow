@@ -6,9 +6,9 @@ function planDefinitions(): array
 {
     return [
         'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'services' => false, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'services' => true, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'services' => true, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'services' => true, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'managers' => 5, 'project_leads' => 5, 'moderators' => 5],
+        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'amount' => '7.99', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'services' => true, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'services' => true, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'amount' => '24.99', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'services' => true, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'managers' => 5, 'project_leads' => 5, 'moderators' => 5],
     ];
 }
 
@@ -16,6 +16,22 @@ function ensurePlanSchema(PDO $pdo): void
 {
     $exists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'plan_key'")->fetchColumn();
     if (!(int)$exists) $pdo->exec("ALTER TABLE users ADD plan_key VARCHAR(24) NOT NULL DEFAULT 'start'");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS plan_subscriptions (
+        id CHAR(32) NOT NULL PRIMARY KEY,
+        owner_id CHAR(32) NOT NULL,
+        plan_key VARCHAR(24) NOT NULL,
+        order_id VARCHAR(64) NOT NULL UNIQUE,
+        liqpay_subscription_id VARCHAR(100) NULL,
+        liqpay_payment_id VARCHAR(100) NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        currency CHAR(3) NOT NULL DEFAULT 'USD',
+        status VARCHAR(24) NOT NULL DEFAULT 'pending',
+        current_period_end DATETIME NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_plan_subscription_payment (liqpay_payment_id),
+        KEY idx_plan_subscription_owner (owner_id, status, current_period_end)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 }
 
 function workspacePlan(PDO $pdo, string $userId, string $role): array
@@ -31,6 +47,29 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     $planQuery->execute([$ownerId]);
     $planKey = (string)($planQuery->fetchColumn() ?: 'start');
     $plans = planDefinitions();
+    $subscription = null;
+    try {
+        $subscriptionQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1");
+        $subscriptionQuery->execute([$ownerId]);
+        $subscription = $subscriptionQuery->fetch() ?: null;
+        $accessQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end FROM plan_subscriptions WHERE owner_id = ? AND status IN ('active','cancelled') AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP) ORDER BY created_at DESC LIMIT 1");
+        $accessQuery->execute([$ownerId]);
+        $accessSubscription = $accessQuery->fetch() ?: null;
+        if ($accessSubscription) {
+            $planKey = (string)$accessSubscription['plan_key'];
+        } else {
+            $expiredQuery = $pdo->prepare("SELECT id FROM plan_subscriptions WHERE owner_id = ? AND status IN ('active','cancelled') AND current_period_end <= CURRENT_TIMESTAMP ORDER BY created_at DESC LIMIT 1");
+            $expiredQuery->execute([$ownerId]);
+            $expiredId = $expiredQuery->fetchColumn();
+            if ($expiredId) {
+                $pdo->prepare("UPDATE plan_subscriptions SET status = 'expired' WHERE id = ? AND status IN ('active','cancelled')")->execute([$expiredId]);
+                $pdo->prepare("UPDATE users SET plan_key = 'start' WHERE id = ?")->execute([$ownerId]);
+                $planKey = 'start';
+            }
+        }
+    } catch (Throwable $ignored) {
+        $subscription = null;
+    }
     if (!isset($plans[$planKey])) $planKey = 'start';
     $plan = $plans[$planKey];
     $ids = [$ownerId];
@@ -57,7 +96,7 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
-    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans];
+    return ['key' => $planKey, 'owner_id' => $ownerId, 'member_ids' => $ids, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription];
 }
 
 function requirePlanFeature(array $context, string $feature): void
@@ -103,5 +142,6 @@ function planSettingsPayload(array $context): array
     $labels = ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники'];
     $limits = [];
     foreach ($labels as $key => $label) $limits[] = ['key' => $key, 'label' => $label, 'limit' => $context['plan'][$key], 'used' => $context['counts'][$key]];
-    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
+    $subscription = $context['subscription'] ?? null;
+    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram']]], $context['plans'], array_keys($context['plans']))];
 }

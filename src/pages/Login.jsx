@@ -5,8 +5,10 @@ import { post } from '../services/api.js';
 import './auth.css';
 
 export default function Login({ initialMode = 'login' }) {
+  const requestedPlan = new URLSearchParams(window.location.search).get('plan') || window.localStorage.getItem('nexaflow.pending-plan') || '';
+  if (['growth', 'team', 'business'].includes(requestedPlan)) window.localStorage.setItem('nexaflow.pending-plan', requestedPlan);
   const [mode, setMode] = useState(initialMode);
-  const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: 'user', terms: false });
+  const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: requestedPlan ? 'manager' : 'user', terms: false });
   const [notice, setNotice] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
   const navigate = useNavigate();
@@ -35,7 +37,9 @@ export default function Login({ initialMode = 'login' }) {
       setNotice(`Акаунт створено. Лист підтвердження надіслано на ${email}. Підтвердьте email перед входом.`);
       return;
     }
-    navigate('/dashboard');
+    const planAfterLogin = requestedPlan || window.localStorage.getItem('nexaflow.pending-plan');
+    if (planAfterLogin && result.user?.role === 'manager') navigate(`/settings?plan=${encodeURIComponent(planAfterLogin)}`);
+    else navigate('/dashboard');
   }
 
   async function resend() {

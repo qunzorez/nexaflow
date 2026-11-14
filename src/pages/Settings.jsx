@@ -32,6 +32,52 @@ export default function Settings() {
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [payingPlan, setPayingPlan] = useState("");
+  const [cancelingPlan, setCancelingPlan] = useState(false);
+  const requestedPlan = new URLSearchParams(window.location.search).get("plan") || "";
+  async function startPlanCheckout(planKey) {
+    if (payingPlan) return;
+    setPayingPlan(planKey);
+    setError("");
+    setNotice("");
+    try {
+      const result = await post("/api/liqpay.php", { plan: planKey });
+      if (!result.ok || !result.checkout) throw new Error(result.message || "Не вдалося створити оплату.");
+      window.localStorage.removeItem("nexaflow.pending-plan");
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = result.checkout.url;
+      for (const [name, value] of Object.entries({ data: result.checkout.data, signature: result.checkout.signature })) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+    } catch (checkoutError) {
+      setError(checkoutError.message || "Не вдалося перейти до оплати.");
+      setPayingPlan("");
+    }
+  }
+  async function cancelPlanSubscription() {
+    if (!subscription?.key || cancelingPlan) return;
+    setCancelingPlan(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await post("/api/liqpay.php", { action: "cancel", plan: subscription.key });
+      if (!result.ok) throw new Error(result.message || "Не вдалося скасувати підписку.");
+      const profile = await api("/api/profile.php");
+      if (profile.ok) setSubscription(profile.subscription || null);
+      setNotice(result.message);
+    } catch (cancelError) {
+      setError(cancelError.message || "Не вдалося скасувати підписку.");
+    } finally {
+      setCancelingPlan(false);
+    }
+  }
   useEffect(() => {
     api("/api/profile.php").then((result) => {
       if (!result.ok) return;
@@ -46,8 +92,18 @@ export default function Settings() {
       setEmailEnabled(result.user.email_notifications_enabled === undefined ? true : Boolean(Number(result.user.email_notifications_enabled)));
       setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
       setBio(result.user.bio || "");
+      const billing = result.subscription?.billing;
+      if (new URLSearchParams(window.location.search).get("payment") === "return") {
+        if (billing?.status === "active") setNotice("Платіж підтверджено. Тариф «" + (result.subscription?.name || "") + "» активний.");
+        else setNotice("Повернулися з LiqPay. Чекаємо серверне підтвердження платежу — тариф оновиться автоматично.");
+      } else if (billing?.status === "pending") setNotice("Очікуємо завершення оплати тарифу.");
     });
   }, []);
+  useEffect(() => {
+    if (user?.role !== "manager" || !["growth", "team", "business"].includes(requestedPlan)) return;
+    startPlanCheckout(requestedPlan);
+    window.history.replaceState({}, "", "/settings");
+  }, [user?.role]);
   function chooseAvatar(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -335,11 +391,11 @@ export default function Settings() {
             <div className="subscription-meta">
               <div>
                 <span>Статус</span>
-                <strong><Icon name="check" />{subscription?.price === "Безкоштовно" ? " Активна" : " Очікує оплати"}</strong>
+                <strong><Icon name="check" />{subscription?.price === "Безкоштовно" ? " Активна" : ["active", "cancelled"].includes(subscription?.billing?.status) ? (subscription.billing.status === "cancelled" ? " Скасована · доступ до " : " Активна до ") + new Date(String(subscription.billing.current_period_end || "").replace(" ", "T") + "Z").toLocaleDateString("uk-UA") : subscription?.billing?.status === "pending" ? " Очікує підтвердження" : subscription?.billing?.status === "failed" ? " Платіж не пройшов" : " Не оплачено"}</strong>
               </div>
               <div>
                 <span>Оплата</span>
-                <b>{subscription?.price === "Безкоштовно" ? "Без оплати" : "Оплата не підключена"}</b>
+                <b>{subscription?.price === "Безкоштовно" ? "Без оплати" : ["active", "cancelled"].includes(subscription?.billing?.status) ? "LiqPay · щомісячна підписка" : subscription?.billing?.status === "pending" ? "LiqPay · очікується" : "Оберіть платний план нижче"}</b>
               </div>
             </div>
             <div className="plan-usage-grid">
@@ -364,15 +420,11 @@ export default function Settings() {
                 <small>{plan.limits.projects ?? "Без ліміту"} проєктів · {plan.limits.tasks_month ?? "Без ліміту"} задач/міс. · {plan.limits.clients ?? "Без ліміту"} клієнтів</small>
                 <small>{plan.features.calendar ? "Календар" : "Без календаря"} · {plan.features.analytics ? "Аналітика" : "Без аналітики"} · {plan.features.services ? "Послуги й пакети" : "Без керування послугами"} · {plan.features.telegram ? "Telegram" : "Без Telegram"}{plan.limits.moderators ? " · до 5 модераторів" : ""}{plan.limits.project_leads ? " · до 5 керівників проєктів" : ""}</small>
                 {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
+                {plan.key !== "start" && user?.role === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && subscription?.billing?.status === "active")} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? "Готуємо оплату…" : plan.key === subscription?.key && subscription?.billing?.status === "active" ? "Поточний план" : "Обрати план"}</button>}
               </article>)}
             </div>
-            <button
-              type="button"
-              className="outline-btn subscription-button"
-              disabled
-            >
-              Керувати підпискою
-            </button>
+            {user?.role === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
+            {user?.role !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
           </section>
           <div className="settings-actions">
             <button className="primary-action" disabled={emailSaving}>Зберегти зміни</button>
