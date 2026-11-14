@@ -53,16 +53,10 @@ $moduleLabel = static fn(string $module): string => [
 if ($method === 'GET') {
     if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише менеджерам і адміністраторам.', [], 403);
     requirePlanFeature($planContext, 'services');
-    $ownedOnly = filter_var($_GET['owned'] ?? false, FILTER_VALIDATE_BOOLEAN);
-    if ($ownedOnly) {
-        $packageQuery = $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages WHERE created_by = ? AND module IN (?, 'all') ORDER BY name");
-        $packageQuery->execute([$userId, $activeModule]);
-    } elseif ($isAdmin) {
-        $packageQuery = $pdo->query('SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages ORDER BY name');
-    } else {
-        $packageQuery = $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages WHERE module IN (?, 'all') ORDER BY name");
-        $packageQuery->execute([$activeModule]);
-    }
+    // Package ownership is scoped to the signed-in creator throughout the app,
+    // including client create/edit forms that consume this endpoint.
+    $packageQuery = $pdo->prepare("SELECT id, name, module, description, client_price, responsible_amount, active, created_at FROM service_packages WHERE created_by = ? AND module IN (?, 'all') ORDER BY name");
+    $packageQuery->execute([$userId, $activeModule]);
     $packages = $packageQuery->fetchAll();
     $packageIds = array_column($packages, 'id');
     $items = [];

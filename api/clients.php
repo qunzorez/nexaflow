@@ -170,6 +170,7 @@ $services = array_values(array_filter(array_map(static function ($service): arra
     ];
 }, (array)($data['services'] ?? [])), static fn(array $service): bool => $service['name'] !== ''));
 $existingAccountantIds = [];
+$existingPackageKeys = [];
 if ($action === 'update' && $id !== '') {
     $existingServicesQuery = $pdo->prepare('SELECT services FROM clients WHERE id = ? LIMIT 1');
     $existingServicesQuery->execute([$id]);
@@ -177,6 +178,20 @@ if ($action === 'update' && $id !== '') {
     foreach ($existingServices as $existingService) {
         $existingAccountantId = trim((string)($existingService['accountant_id'] ?? ''));
         if ($existingAccountantId !== '') $existingAccountantIds[$existingAccountantId] = true;
+        $existingPackageId = trim((string)($existingService['package_id'] ?? ''));
+        if ($existingPackageId !== '') $existingPackageKeys[$existingPackageId . '|' . trim((string)($existingService['name'] ?? ''))] = true;
+    }
+}
+$packageIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['package_id'] ?? ''), $services))));
+if ($packageIds) {
+    $packageMarks = implode(',', array_fill(0, count($packageIds), '?'));
+    $ownedPackagesQuery = $pdo->prepare("SELECT id FROM service_packages WHERE created_by = ? AND id IN ({$packageMarks})");
+    $ownedPackagesQuery->execute(array_merge([$userId], $packageIds));
+    $ownedPackageIds = array_fill_keys(array_map('strval', $ownedPackagesQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+    foreach ($services as $service) {
+        $packageId = (string)$service['package_id'];
+        if ($packageId === '' || isset($ownedPackageIds[$packageId])) continue;
+        if (!isset($existingPackageKeys[$packageId . '|' . $service['name']])) jsonResponse(false, 'Можна додавати лише пакети, створені вами.', ['code' => 'package_not_owned'], 403);
     }
 }
 $requestedAccountantIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['accountant_id'] ?? ''), $services))));
