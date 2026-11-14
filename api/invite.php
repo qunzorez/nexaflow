@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/plans.php';
 require __DIR__ . '/mailer.php';
 
 session_start();
@@ -40,6 +41,23 @@ $actorRoleQuery->execute([$_SESSION['user_id']]);
 $actorRole = (string)$actorRoleQuery->fetchColumn();
 $actorRoleQuery->closeCursor();
 $actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
+$planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], $actorRole);
+if (!$actorAdmin) {
+    $alreadyMember = false;
+    $emailUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+    $emailUser->execute([$email]);
+    $existingId = (string)($emailUser->fetchColumn() ?: '');
+    if ($existingId !== '') $alreadyMember = in_array($existingId, $planContext['member_ids'], true);
+    if (!$alreadyMember) requirePlanCapacity($planContext, 'participants');
+    if ($role === 'manager') {
+        $managerLimit = (int)($planContext['plan']['project_leads'] ?? 0);
+        $memberMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+        $managerQuery = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($memberMarks) AND pm.role = 'manager'");
+        $managerQuery->execute($planContext['member_ids']);
+        $managerCount = max(1, (int)$managerQuery->fetchColumn());
+        if (!$alreadyMember && $managerCount >= $managerLimit) jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $managerLimit, 'current' => $managerCount, 'plan' => $planContext['key']], 403);
+    }
+}
 
 if ($projectId === '' && $groupId !== '') {
     $groupProject = $pdo->prepare('SELECT project_id FROM project_groups WHERE id = ? LIMIT 1');

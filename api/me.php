@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/plans.php';
 
 session_start();
 if (empty($_SESSION['user_id'])) {
@@ -15,4 +16,6 @@ $query = $pdo->prepare('SELECT id, name, email, role, avatar_url FROM users WHER
 $query->execute([$_SESSION['user_id']]);
 $user = $query->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
+$planContext = workspacePlan($pdo, (string)$user['id'], (string)$user['role']);
+$user['subscription'] = planSettingsPayload($planContext);
 jsonResponse(true, 'Користувач авторизований.', ['user' => $user]);

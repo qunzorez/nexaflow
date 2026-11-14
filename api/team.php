@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/plans.php';
 require __DIR__ . '/mailer.php';
 
 session_start();
@@ -25,6 +26,7 @@ $isAdmin = $currentUser && in_array($currentUser['role'], ['admin', 'owner'], tr
 if (!$currentUser || !$canManage) {
     jsonResponse(false, 'Недостатньо прав для керування командою.', [], 403);
 }
+$planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], (string)$currentUser['role']);
 
 try {
     if ($method === 'GET') {
@@ -87,6 +89,19 @@ try {
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
     if ($action === 'create_project') {
+        requirePlanCapacity($planContext, 'projects');
+        if (!empty($data['invite_emails']) && is_array($data['invite_emails'])) {
+            $emailsToInvite = array_unique(array_filter(array_map(static fn($value): string => strtolower(trim((string)$value)), $data['invite_emails']), static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL)));
+            if ($emailsToInvite) requirePlanCapacity($planContext, 'participants', count($emailsToInvite));
+            if (!$isAdmin && ($data['invite_role'] ?? 'member') === 'manager') {
+                $leadLimit = (int)$planContext['plan']['project_leads'];
+                $ownerMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+                $leadCount = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($ownerMarks) AND pm.role = 'manager'");
+                $leadCount->execute($planContext['member_ids']);
+                $currentLeads = (int)$leadCount->fetchColumn();
+                if ($currentLeads + count($emailsToInvite) > $leadLimit) jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => $leadLimit, 'current' => $currentLeads, 'plan' => $planContext['key']], 403);
+            }
+        }
         $name = trim((string)($data['name'] ?? ''));
         if ($name === '') jsonResponse(false, 'Введіть назву проєкту.', [], 422);
         $description = trim((string)($data['description'] ?? ''));
@@ -173,6 +188,18 @@ try {
         if ($projectId === '' || $targetUserId === '' || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) {
             jsonResponse(false, 'Оберіть проєкт, користувача та коректну роль.', [], 422);
         }
+        if (!$isAdmin && $role === 'manager' && $planContext['plan']['project_leads'] !== null) {
+            $oldProjectRole = $pdo->prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
+            $oldProjectRole->execute([$projectId, $targetUserId]);
+            $wasProjectLead = $oldProjectRole->fetchColumn() === 'manager';
+            if (!$wasProjectLead) {
+                $ownerMarks = implode(',', array_fill(0, count($planContext['member_ids']), '?'));
+                $leadCount = $pdo->prepare("SELECT COUNT(DISTINCT pm.user_id) FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE p.owner_id IN ($ownerMarks) AND pm.role = 'manager'");
+                $leadCount->execute($planContext['member_ids']);
+                $currentLeads = (int)$leadCount->fetchColumn();
+                if ($currentLeads >= (int)$planContext['plan']['project_leads']) jsonResponse(false, 'Ліміт керівників проєктів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'project_leads', 'limit' => (int)$planContext['plan']['project_leads'], 'current' => $currentLeads, 'plan' => $planContext['key']], 403);
+            }
+        }
 
         // A manager may only change roles in projects they own. Administrators
         // retain global management access, but the target project and user must
@@ -224,6 +251,16 @@ try {
         $userId = trim((string)($data['user_id'] ?? ''));
         $role = trim((string)($data['role'] ?? 'user'));
         if ($userId === '' || !in_array($role, ['admin', 'manager', 'user'], true)) jsonResponse(false, 'Оберіть коректну глобальну роль.', [], 422);
+        if ($role === 'manager' && $planContext['plan']['managers'] !== null) {
+            $existingRole = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+            $existingRole->execute([$userId]);
+            if ($existingRole->fetchColumn() !== 'manager') {
+                $managerCount = $pdo->prepare("SELECT COUNT(*) FROM users u WHERE u.role = 'manager' AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.invited_by = ? AND i.email = u.email AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.invited_by = ? AND i.email = u.email AND i.status = 'accepted'))");
+                $managerCount->execute([$planContext['owner_id'], $planContext['owner_id']]);
+                $currentManagers = (int)$managerCount->fetchColumn() + 1;
+                if ($currentManagers >= (int)$planContext['plan']['managers']) jsonResponse(false, 'Ліміт менеджерів вашого плану вичерпано.', ['code' => 'plan_limit_reached', 'metric' => 'managers', 'limit' => (int)$planContext['plan']['managers'], 'current' => $currentManagers, 'plan' => $planContext['key']], 403);
+            }
+        }
         $update = $pdo->prepare('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
         $update->execute([$role, $userId]);
         jsonResponse(true, 'Глобальну роль оновлено.');
