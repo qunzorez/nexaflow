@@ -31,7 +31,13 @@ if (!$invite && $generalInvite) {
         if (!empty($generalInvite['group_id'])) {
             $groupMember = $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)');
             $groupMember->execute([$generalInvite['group_id'], $userId]);
+            $groupNameQuery = $pdo->prepare('SELECT name FROM project_groups WHERE id = ? LIMIT 1');
+            $groupNameQuery->execute([$generalInvite['group_id']]);
+            $groupName = (string)$groupNameQuery->fetchColumn();
+            $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'group_assigned', ?, ?, 'group', ?)")
+                ->execute([bin2hex(random_bytes(16)), $userId, $generalInvite['invited_by'], 'Вас додано до групи', "Вас додано до групи «{$groupName}».", $generalInvite['group_id']]);
         }
+        if (!$existingGeneral) notifyNewAccountAdmins($pdo, $userId, $name);
         $done = $pdo->prepare("UPDATE user_invitations SET status = 'accepted', accepted_at = NOW() WHERE id = ?");
         $done->execute([$generalInvite['id']]);
         $pdo->commit();
@@ -74,6 +80,15 @@ try {
         $groupMember = $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)');
         $groupMember->execute([$invite['group_id'], $userId]);
     }
+    if (!$existingUser) notifyNewAccountAdmins($pdo, $userId, $name);
+    $groupNotice = '';
+    if (!empty($invite['group_id'])) {
+        $groupNameQuery = $pdo->prepare('SELECT name FROM project_groups WHERE id = ? LIMIT 1');
+        $groupNameQuery->execute([$invite['group_id']]);
+        $groupNotice = ' до групи «' . (string)$groupNameQuery->fetchColumn() . '»';
+    }
+    $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_assigned', ?, ?, 'project', ?)")
+        ->execute([bin2hex(random_bytes(16)), $userId, $invite['invited_by'], $groupNotice !== '' ? 'Вас додано до групи проєкту' : 'Вас додано до проєкту', "Вас додано{$groupNotice} у проєкті «{$invite['project_name']}».", $invite['project_id']]);
     $done = $pdo->prepare("UPDATE project_invitations SET status = 'accepted', accepted_at = NOW() WHERE id = ?");
     $done->execute([$invite['id']]);
     $pdo->commit();
@@ -87,4 +102,13 @@ try {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log($error->getMessage());
     jsonResponse(false, 'Не вдалося прийняти запрошення.', [], 500);
+}
+
+function notifyNewAccountAdmins(PDO $pdo, string $userId, string $name): void
+{
+    $admins = $pdo->query("SELECT id FROM users WHERE role IN ('admin', 'owner') AND id <> " . $pdo->quote($userId))->fetchAll();
+    $insert = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'user_created', ?, ?, 'user', ?)");
+    foreach ($admins as $admin) {
+        $insert->execute([bin2hex(random_bytes(16)), $admin['id'], $userId, 'Новий користувач', "До NexaFlow приєднався користувач {$name}.", $userId]);
+    }
 }

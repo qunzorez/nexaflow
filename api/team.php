@@ -171,7 +171,9 @@ try {
             }
         }
         $pdo->commit();
-        $notificationUsers = $pdo->query('SELECT id FROM users')->fetchAll();
+        $notificationUsersQuery = $pdo->prepare('SELECT user_id AS id FROM project_members WHERE project_id = ? UNION SELECT pgm.user_id AS id FROM project_group_members pgm JOIN project_groups pg ON pg.id = pgm.group_id WHERE pg.project_id = ?');
+        $notificationUsersQuery->execute([$id, $id]);
+        $notificationUsers = $notificationUsersQuery->fetchAll();
         $notificationInsert = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_created', ?, ?, 'project', ?)");
         foreach ($notificationUsers as $recipient) {
             $notificationInsert->execute([bin2hex(random_bytes(16)), $recipient['id'], $_SESSION['user_id'], 'Створено новий проєкт', "Проєкт «{$name}» додано до робочого простору.", $id]);
@@ -216,8 +218,18 @@ try {
         $targetCheck = $pdo->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
         $targetCheck->execute([$targetUserId]);
         if (!$targetCheck->fetchColumn()) jsonResponse(false, 'Користувача не знайдено.', [], 404);
+        $previousRoleQuery = $pdo->prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
+        $previousRoleQuery->execute([$projectId, $targetUserId]);
+        $previousRole = $previousRoleQuery->fetchColumn();
         $upsert = $pdo->prepare('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), updated_at = CURRENT_TIMESTAMP');
         $upsert->execute([$projectId, $targetUserId, $role]);
+        if ($targetUserId !== (string)$_SESSION['user_id'] && ($previousRole === false || $previousRole !== $role)) {
+            $projectNameQuery = $pdo->prepare('SELECT name FROM projects WHERE id = ?');
+            $projectNameQuery->execute([$projectId]);
+            $projectName = (string)$projectNameQuery->fetchColumn();
+            $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_assigned', ?, ?, 'project', ?)")
+                ->execute([bin2hex(random_bytes(16)), $targetUserId, $_SESSION['user_id'], 'Вас додано до проєкту', "Вас додано до проєкту «{$projectName}».", $projectId]);
+        }
         jsonResponse(true, 'Роль користувача оновлено.');
     }
 
@@ -236,13 +248,26 @@ try {
         if (!$isAdmin) $ownedClientsQuery->execute([$_SESSION['user_id']]);
         $manageableClientIds = array_map('strval', array_column($ownedClientsQuery->fetchAll(), 'id'));
         $selectedClientIds = array_values(array_intersect($requestedClientIds, $manageableClientIds));
+        $previousAssignments = [];
         if ($manageableClientIds) {
             $marks = implode(',', array_fill(0, count($manageableClientIds), '?'));
+            $previousQuery = $pdo->prepare("SELECT client_id FROM client_members WHERE user_id = ? AND client_id IN ({$marks})");
+            $previousQuery->execute(array_merge([$targetUserId], $manageableClientIds));
+            $previousAssignments = array_map('strval', $previousQuery->fetchAll(PDO::FETCH_COLUMN));
             $delete = $pdo->prepare("DELETE FROM client_members WHERE user_id = ? AND client_id IN ({$marks})");
             $delete->execute(array_merge([$targetUserId], $manageableClientIds));
         }
         $insert = $pdo->prepare('INSERT IGNORE INTO client_members (client_id, user_id, assigned_by) VALUES (?, ?, ?)');
         foreach ($selectedClientIds as $clientId) $insert->execute([$clientId, $targetUserId, $_SESSION['user_id']]);
+        if ($targetUserId !== (string)$_SESSION['user_id']) {
+            $clientNameQuery = $pdo->prepare('SELECT name FROM clients WHERE id = ? LIMIT 1');
+            $notifyClient = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'client_assigned', ?, ?, 'client', ?)");
+            foreach (array_diff($selectedClientIds, $previousAssignments) as $clientId) {
+                $clientNameQuery->execute([$clientId]);
+                $clientName = (string)$clientNameQuery->fetchColumn();
+                $notifyClient->execute([bin2hex(random_bytes(16)), $targetUserId, $_SESSION['user_id'], 'Вам надали доступ до клієнта', "Вам надали доступ до клієнта «{$clientName}».", $clientId]);
+            }
+        }
         jsonResponse(true, 'Доступ до клієнтів оновлено.');
     }
 

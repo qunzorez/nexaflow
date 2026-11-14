@@ -28,11 +28,13 @@ $data = $method === 'POST' ? body() : [];
 
 try {
     if ($method === 'GET') {
-        $query = $pdo->prepare('SELECT id, type, title, message, content_html, entity_type, entity_id, is_read, is_banner, banner_dismissed_at, banner_view_count, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 40');
-        $query->execute([$userId]);
+        $adminView = in_array($user['role'], ['admin', 'owner'], true);
+        $visibility = "(? = 1 OR n.type <> 'user_created') AND (n.type <> 'project_created' OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = n.entity_id AND pm.user_id = n.user_id) OR EXISTS (SELECT 1 FROM project_groups pg JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE pg.project_id = n.entity_id AND pgm.user_id = n.user_id))";
+        $query = $pdo->prepare("SELECT n.id, n.type, n.title, n.message, n.content_html, n.entity_type, n.entity_id, n.is_read, n.is_banner, n.banner_dismissed_at, n.banner_view_count, n.created_at FROM notifications n WHERE n.user_id = ? AND {$visibility} ORDER BY n.created_at DESC LIMIT 40");
+        $query->execute([$userId, $adminView ? 1 : 0]);
         $notifications = $query->fetchAll();
-        $unreadQuery = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
-        $unreadQuery->execute([$userId]);
+        $unreadQuery = $pdo->prepare("SELECT COUNT(*) FROM notifications n WHERE n.user_id = ? AND n.is_read = 0 AND {$visibility}");
+        $unreadQuery->execute([$userId, $adminView ? 1 : 0]);
         $audienceCounts = $pdo->query("SELECT role, COUNT(*) AS total FROM users GROUP BY role")->fetchAll();
         jsonResponse(true, 'Сповіщення завантажено.', ['notifications' => $notifications, 'unread' => (int)$unreadQuery->fetchColumn(), 'can_broadcast' => in_array($user['role'], ['admin', 'owner'], true), 'audience_counts' => $audienceCounts]);
     }

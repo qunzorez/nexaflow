@@ -76,8 +76,24 @@ if ($projectId === '') {
     try {
         $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE email = ? AND status = 'pending'")->execute([$email]);
         $token = bin2hex(random_bytes(32));
+        $invitationId = bin2hex(random_bytes(16));
         $insert = $pdo->prepare('INSERT INTO user_invitations (id, invited_by, email, role, group_id, token_hash, expires_at) VALUES (?, ?, ?, \'user\', ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
-        $insert->execute([bin2hex(random_bytes(16)), $_SESSION['user_id'], $email, $groupId !== '' ? $groupId : null, hash('sha256', $token)]);
+        $insert->execute([$invitationId, $_SESSION['user_id'], $email, $groupId !== '' ? $groupId : null, hash('sha256', $token)]);
+        $existingInviteUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $existingInviteUser->execute([$email]);
+        $existingInviteUser = $existingInviteUser->fetch();
+        if ($existingInviteUser && $existingInviteUser['id'] !== $_SESSION['user_id']) {
+            $groupName = '';
+            if ($groupId !== '') {
+                $groupNameQuery = $pdo->prepare('SELECT name FROM project_groups WHERE id = ? LIMIT 1');
+                $groupNameQuery->execute([$groupId]);
+                $groupName = (string)$groupNameQuery->fetchColumn();
+            }
+            $title = $groupName !== '' ? 'Запрошення до групи' : 'Запрошення до команди';
+            $message = $groupName !== '' ? "Вас запросили до групи «{$groupName}». Перевірте лист із запрошенням, щоб приєднатися." : 'Вас запросили до команди NexaFlow. Перевірте лист із запрошенням, щоб приєднатися.';
+            $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'team_invite', ?, ?, 'invitation', ?)")
+                ->execute([bin2hex(random_bytes(16)), $existingInviteUser['id'], $_SESSION['user_id'], $title, $message, $invitationId]);
+        }
         $url = invitationUrl($token);
         $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
         $logo = htmlspecialchars(appUrl('/assets/logo-color-text.png'), ENT_QUOTES, 'UTF-8');

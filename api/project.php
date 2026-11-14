@@ -60,17 +60,27 @@ if ($method === 'POST' && $action === 'assign_global_group') {
     $memberId = trim((string)($data['user_id'] ?? ''));
     $groupId = trim((string)($data['group_id'] ?? ''));
     if ($memberId === '') jsonResponse(false, 'Користувача не вказано.', [], 422);
+    $previousGroupQuery = $pdo->prepare('SELECT pg.id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
+    $previousGroupQuery->execute([$memberId]);
+    $previousGroupIds = array_map('strval', $previousGroupQuery->fetchAll(PDO::FETCH_COLUMN));
+    $selectedGroupName = '';
     if ($groupId !== '') {
-        $groupCheck = $pdo->prepare('SELECT id FROM project_groups WHERE id = ? AND project_id IS NULL LIMIT 1');
+        $groupCheck = $pdo->prepare('SELECT id, name FROM project_groups WHERE id = ? AND project_id IS NULL LIMIT 1');
         $groupCheck->execute([$groupId]);
-        if (!$groupCheck->fetch()) jsonResponse(false, 'Глобальну групу не знайдено.', [], 422);
+        $selectedGroup = $groupCheck->fetch();
+        if (!$selectedGroup) jsonResponse(false, 'Глобальну групу не знайдено.', [], 422);
+        $selectedGroupName = (string)$selectedGroup['name'];
     }
     $ownedMemberships = $pdo->prepare('SELECT pg.id, pg.permissions FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE gm.user_id = ? AND pg.project_id IS NULL');
     $ownedMemberships->execute([$memberId]);
     foreach ($ownedMemberships->fetchAll() as $membership) {
         if ($actorAdmin || (groupPolicy($membership['permissions'])['owner_id'] ?? '') === $userId) $pdo->prepare('DELETE FROM project_group_members WHERE group_id = ? AND user_id = ?')->execute([$membership['id'], $memberId]);
     }
-    if ($groupId !== '') $pdo->prepare('INSERT INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
+    if ($groupId !== '') $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
+    if ($memberId !== $userId && $groupId !== '' && !in_array($groupId, $previousGroupIds, true)) {
+        $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'group_assigned', ?, ?, 'group', ?)")
+            ->execute([bin2hex(random_bytes(16)), $memberId, $userId, 'Вас додано до групи', "Вас додано до групи «{$selectedGroupName}».", $groupId]);
+    }
     jsonResponse(true, $groupId === '' ? 'Групу користувача скасовано.' : 'Групу користувача оновлено.');
 }
 if ($projectId === '') jsonResponse(false, 'Проєкт не знайдено.', [], 422);
@@ -163,9 +173,23 @@ if ($action === 'add_member') {
         if (!$groupCheck->fetch()) jsonResponse(false, 'Обрана група не належить цьому проєкту.', [], 422);
         $role = 'member';
     }
+    $wasMemberQuery = $pdo->prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
+    $wasMemberQuery->execute([$projectId, $memberId]);
+    $wasMember = (bool)$wasMemberQuery->fetchColumn();
     $pdo->prepare('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), updated_at = CURRENT_TIMESTAMP')->execute([$projectId, $memberId, $role]);
     $pdo->prepare('DELETE pgm FROM project_group_members pgm JOIN project_groups pg ON pg.id = pgm.group_id WHERE pg.project_id = ? AND pgm.user_id = ?')->execute([$projectId, $memberId]);
-    if ($groupId !== '') $pdo->prepare('INSERT INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
+    if ($groupId !== '') $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
+    if (!$wasMember && $memberId !== $userId) {
+        $title = $groupId !== '' ? 'Вас додано до групи проєкту' : 'Вас додано до проєкту';
+        $groupLabel = '';
+        if ($groupId !== '') {
+            $groupNameQuery = $pdo->prepare('SELECT name FROM project_groups WHERE id = ? LIMIT 1');
+            $groupNameQuery->execute([$groupId]);
+            $groupLabel = ' до групи «' . (string)$groupNameQuery->fetchColumn() . '»';
+        }
+        $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_assigned', ?, ?, 'project', ?)")
+            ->execute([bin2hex(random_bytes(16)), $memberId, $userId, $title, "Вас додано{$groupLabel} у проєкті «{$project['name']}».", $projectId]);
+    }
     jsonResponse(true, 'Користувача додано до проєкту.');
 }
 if ($action === 'remove_member') {
