@@ -74,12 +74,12 @@ if ($action === 'resend') {
     $safeTitle = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeMessage = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $html = '<!doctype html><html lang="uk"><body style="margin:0;padding:32px 12px;background:#f2f7f4;font-family:Arial,sans-serif;color:#17201e"><div style="max-width:560px;margin:auto;padding:32px;background:#fff;border:1px solid #dce9e1;border-radius:18px"><div style="color:#168b68;font-size:20px;font-weight:bold">NexaFlow</div><h1 style="font-size:24px;margin:24px 0 12px">' . $safeTitle . '</h1><p style="color:#718078;line-height:1.6">' . $safeMessage . '</p><a href="' . $url . '" style="display:inline-block;margin-top:12px;padding:13px 20px;background:#168b68;color:#fff;border-radius:9px;text-decoration:none;font-weight:bold">Прийняти запрошення →</a><p style="margin-top:22px;color:#98a59e;font-size:12px">Посилання дійсне 7 днів.</p></div></body></html>';
+    // Invitations are transactional emails and must not depend on the recipient's
+    // optional notification preferences.
     $existingUserQuery = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
     $existingUserQuery->execute([$invite['email']]);
     $existingUserId = (string)($existingUserQuery->fetchColumn() ?: '');
-    $sent = $existingUserId !== ''
-        ? sendUserNotificationEmail($pdo, $existingUserId, (string)$invite['email'], $subject, $plain, $html)
-        : sendProjectEmail((string)$invite['email'], $subject, $plain, $html);
+    $sent = sendProjectEmail((string)$invite['email'], $subject, $plain, $html);
     if ($existingUserId !== '' && $existingUserId !== (string)$_SESSION['user_id']) {
         $pdo->prepare('INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([bin2hex(random_bytes(16)), $existingUserId, $_SESSION['user_id'], $notificationType, $title, $message, $entityType, $entityId]);
@@ -205,9 +205,7 @@ try {
     if ($existingUser && $existingUser['id'] !== $_SESSION['user_id']) {
         $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, 'project_invite', ?, ?, 'project', ?)")->execute([bin2hex(random_bytes(16)), $existingUser['id'], $_SESSION['user_id'], 'Запрошення до нового проєкту', "Вас запросили до проєкту «{$project['name']}». Відкрийте лист і натисніть «Приєднатись до проєкту».", $projectId]);
     }
-    $sent = $existingUser
-        ? sendUserNotificationEmail($pdo, (string)$existingUser['id'], $email, $subject, $message, $htmlMessage)
-        : sendProjectEmail($email, $subject, $message, $htmlMessage);
+    $sent = sendProjectEmail($email, $subject, $message, $htmlMessage);
     jsonResponse(true, $sent ? 'Запрошення відправлено на email.' : 'Запрошення створено, але хостинг не підтвердив відправку email.', ['sent' => $sent, 'expires_in_days' => 7]);
 } catch (Throwable $error) {
     error_log($error->getMessage());
