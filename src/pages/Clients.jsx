@@ -116,9 +116,9 @@ function officialDateForService(name = "", period = "Місяць") {
   else result.setMonth(result.getMonth() + 1, 20);
   return result.toISOString().slice(0, 10);
 }
-const servicePriceDefaultsKey = "nexaflow.accounting.servicePriceDefaults";
-const readServicePriceDefaults = () => {
-  try { return JSON.parse(window.localStorage.getItem(servicePriceDefaultsKey) || "{}"); } catch { return {}; }
+const servicePriceDefaultsKey = (userId) => `nexaflow.accounting.servicePriceDefaults:${userId || "anonymous"}`;
+const readServicePriceDefaults = (userId) => {
+  try { return JSON.parse(window.localStorage.getItem(servicePriceDefaultsKey(userId)) || "{}"); } catch { return {}; }
 };
 const responsibleAmountFor = (price, percent) => Math.max(0, Math.round(Number(price || 0) * Number(percent || 0) / 100 * 100) / 100);
 export function downloadClientInvoice(client) {
@@ -279,7 +279,7 @@ function FieldTip({ children }) {
     <span className={`client-field-tooltip${open ? " is-open" : ""}`} role="tooltip">{children}</span>
   </span>;
 }
-export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [] }) {
+export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [], currentUserId = "" }) {
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const formElementRef = useRef(null);
@@ -298,7 +298,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     );
   const updateService = (index, field, value) => set("services", (form.services || []).map((service, itemIndex) => {
     if (itemIndex !== index) return service;
-    if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults()[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
+    if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults(currentUserId)[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
     if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
     if (field === "price" && service.responsible_mode === "percent") return { ...service, price: value, responsible_amount: responsibleAmountFor(value, service.responsible_percent) };
     if (field === "responsible_mode") return { ...service, responsible_mode: value, responsible_amount: value === "percent" ? responsibleAmountFor(service.price, service.responsible_percent) : service.responsible_amount };
@@ -348,15 +348,15 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   const serviceTotal = (form.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0);
   const rememberServicePrice = (name, price) => {
     if (form.module !== "accounting" || !name) return;
-    const defaults = readServicePriceDefaults();
+    const defaults = readServicePriceDefaults(currentUserId);
     defaults[name] = price === "" ? 0 : price;
-    window.localStorage.setItem(servicePriceDefaultsKey, JSON.stringify(defaults));
+    window.localStorage.setItem(servicePriceDefaultsKey(currentUserId), JSON.stringify(defaults));
   };
   const rememberServicePrices = () => {
     if (form.module !== "accounting") return;
-    const defaults = readServicePriceDefaults();
+    const defaults = readServicePriceDefaults(currentUserId);
     (form.services || []).forEach((service) => { if (service.name && service.price !== "") defaults[service.name] = service.price; });
-    window.localStorage.setItem(servicePriceDefaultsKey, JSON.stringify(defaults));
+    window.localStorage.setItem(servicePriceDefaultsKey(currentUserId), JSON.stringify(defaults));
   };
   const content = (
     <div
@@ -961,6 +961,7 @@ export default function Clients() {
           form={form}
           setForm={setForm}
           editing={editing}
+          currentUserId={data.user?.id || ""}
           availableUsers={data?.available_users || []}
           availableUsersByClient={data?.available_users_by_client || {}}
           onSave={save}
