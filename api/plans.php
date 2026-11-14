@@ -241,6 +241,32 @@ function planClaimRoleCount(PDO $pdo, array $context, string $roleName): int
     return (int)$query->fetchColumn();
 }
 
+function planRoleLimitOverages(PDO $pdo, array $context, string $targetPlanKey): array
+{
+    $plans = $context['plans'] ?? planDefinitions();
+    if (!isset($plans[$targetPlanKey])) return [];
+    $counts = [
+        'managers' => (int)($context['counts']['managers'] ?? 1),
+        'project_leads' => planProjectLeadCount($pdo, $context),
+        'moderators' => planClaimRoleCount($pdo, $context, 'Модератор'),
+    ];
+    $overages = [];
+    foreach ($counts as $metric => $used) {
+        $limit = $plans[$targetPlanKey][$metric] ?? null;
+        if ($limit !== null && $used > (int)$limit) $overages[] = ['metric' => $metric, 'used' => $used, 'limit' => (int)$limit];
+    }
+    return $overages;
+}
+
+function requirePlanRoleCapacity(PDO $pdo, array $context, string $targetPlanKey): void
+{
+    $overages = planRoleLimitOverages($pdo, $context, $targetPlanKey);
+    if (!$overages) return;
+    $labels = ['managers' => 'менеджерів', 'project_leads' => 'керівників проєктів', 'moderators' => 'модераторів'];
+    $details = array_map(static fn(array $item): string => ($labels[$item['metric']] ?? $item['metric']) . ': ' . $item['used'] . ' із ' . $item['limit'], $overages);
+    jsonResponse(false, 'Не можна перейти на цей план: кількість ролей перевищує його ліміти (' . implode('; ', $details) . '). Спершу змініть або зніміть зайві ролі в розділі «Команда».', ['code' => 'plan_role_limit_exceeded', 'roles' => $overages, 'target_plan' => $targetPlanKey], 409);
+}
+
 function acquirePlanCapacityLock(array $context, string $metric): void
 {
     global $pdo, $heldPlanCapacityLocks;

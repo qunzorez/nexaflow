@@ -122,6 +122,7 @@ $workspaceOwnerId = (string)$planContext['owner_id'];
 ensurePlanSchema($pdo);
 $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if (in_array($requestAction, ['', 'select_plan'], true) && !$billingEnabled) {
+    requirePlanRoleCapacity($pdo, $planContext, $planKey);
     $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, $workspaceOwnerId]);
     jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату наразі вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
 }
@@ -189,6 +190,7 @@ if ($requestAction === 'cancel') {
     }
 }
 if ($requestAction !== '') jsonResponse(false, 'Невідома дія.', [], 422);
+requirePlanRoleCapacity($pdo, $planContext, $planKey);
 $amount = (string)$plans[$planKey]['amount'];
 $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
 $currentQuery->execute([$workspaceOwnerId]);
