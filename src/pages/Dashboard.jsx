@@ -225,7 +225,7 @@ export default function Dashboard() {
                     <strong>{task.title}</strong>
                     <small>{task.project_name || "Без проєкту"}</small>
                   </div>
-                  <time>{reminderLabel(task.reminder_at)}</time>
+                  <time>{task.dashboard_reminder_kind === "deadline" ? "Дедлайн завтра" : reminderLabel(task.reminder_at)}</time>
                   <span className="reminder-arrow"><Icon name="right" /></span>
                 </button>
               ))}
