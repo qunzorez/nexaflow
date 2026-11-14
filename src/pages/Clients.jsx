@@ -282,7 +282,15 @@ function FieldTip({ children }) {
 export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [], currentUserId = "" }) {
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [duplicateNotice, setDuplicateNotice] = useState("");
+  const duplicateNoticeTimer = useRef(null);
   const formElementRef = useRef(null);
+  const showDuplicateNotice = (message) => {
+    setDuplicateNotice(message);
+    window.clearTimeout(duplicateNoticeTimer.current);
+    duplicateNoticeTimer.current = window.setTimeout(() => setDuplicateNotice(""), 3800);
+  };
+  useEffect(() => () => window.clearTimeout(duplicateNoticeTimer.current), []);
   const set = (field, value) =>
     setForm((current) => {
       const nameInput = formElementRef.current?.elements?.namedItem("name");
@@ -299,7 +307,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   const updateService = (index, field, value) => {
     const services = form.services || [];
     if (field === "name" && value && services.some((service, itemIndex) => itemIndex !== index && !service.is_package && !service.package_id && service.name.trim().toLocaleLowerCase("uk") === value.trim().toLocaleLowerCase("uk"))) {
-      window.alert(`Послугу «${value}» уже додано до цього клієнта.`);
+      showDuplicateNotice(`Послугу «${value}» уже додано до цього клієнта.`);
       return;
     }
     set("services", services.map((service, itemIndex) => {
@@ -317,7 +325,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
     if (!packageItem) return;
     if ((form.services || []).some((service) => String(service.package_id || "") === String(packageItem.id))) {
-      window.alert(`Пакет «${packageItem.name}» уже додано до цього клієнта.`);
+      showDuplicateNotice(`Пакет «${packageItem.name}» уже додано до цього клієнта.`);
       return;
     }
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
@@ -621,7 +629,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
       </section>
     </div>
   );
-  return pageMode ? content : createPortal(content, document.body);
+  return <>{pageMode ? content : createPortal(content, document.body)}{duplicateNotice && createPortal(<div className="form-notice" role="status">{duplicateNotice}</div>, document.body)}</>;
 }
 function Info({ label, value }) {
   return (
