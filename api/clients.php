@@ -182,6 +182,18 @@ if ($action === 'update' && $id !== '') {
         if ($existingPackageId !== '') $existingPackageKeys[$existingPackageId . '|' . trim((string)($existingService['name'] ?? ''))] = true;
     }
 }
+$seenServiceKeys = [];
+foreach ($services as $service) {
+    $packageId = (string)$service['package_id'];
+    $serviceKey = $packageId !== ''
+        ? 'package:' . $packageId
+        : 'service:' . mb_strtolower(trim((string)$service['name']), 'UTF-8');
+    if (isset($seenServiceKeys[$serviceKey])) {
+        $duplicateLabel = $packageId !== '' ? (string)($service['package_name'] ?: $service['name']) : (string)$service['name'];
+        jsonResponse(false, '«' . $duplicateLabel . '» уже додано до клієнта. Приберіть повторну позицію.', ['code' => 'duplicate_client_service'], 422);
+    }
+    $seenServiceKeys[$serviceKey] = true;
+}
 $packageIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['package_id'] ?? ''), $services))));
 if ($packageIds) {
     $packageMarks = implode(',', array_fill(0, count($packageIds), '?'));

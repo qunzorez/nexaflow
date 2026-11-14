@@ -296,19 +296,30 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
         ? form.special_taxes.filter((item) => item !== value)
         : [...form.special_taxes, value],
     );
-  const updateService = (index, field, value) => set("services", (form.services || []).map((service, itemIndex) => {
-    if (itemIndex !== index) return service;
-    if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults(currentUserId)[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
-    if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
-    if (field === "price" && service.responsible_mode === "percent") return { ...service, price: value, responsible_amount: responsibleAmountFor(value, service.responsible_percent) };
-    if (field === "responsible_mode") return { ...service, responsible_mode: value, responsible_amount: value === "percent" ? responsibleAmountFor(service.price, service.responsible_percent) : service.responsible_amount };
-    if (field === "responsible_percent") return { ...service, responsible_percent: value, responsible_amount: responsibleAmountFor(service.price, value) };
-    return { ...service, [field]: value };
-  }));
+  const updateService = (index, field, value) => {
+    const services = form.services || [];
+    if (field === "name" && value && services.some((service, itemIndex) => itemIndex !== index && !service.is_package && !service.package_id && service.name.trim().toLocaleLowerCase("uk") === value.trim().toLocaleLowerCase("uk"))) {
+      window.alert(`Послугу «${value}» уже додано до цього клієнта.`);
+      return;
+    }
+    set("services", services.map((service, itemIndex) => {
+      if (itemIndex !== index) return service;
+      if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults(currentUserId)[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
+      if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
+      if (field === "price" && service.responsible_mode === "percent") return { ...service, price: value, responsible_amount: responsibleAmountFor(value, service.responsible_percent) };
+      if (field === "responsible_mode") return { ...service, responsible_mode: value, responsible_amount: value === "percent" ? responsibleAmountFor(service.price, service.responsible_percent) : service.responsible_amount };
+      if (field === "responsible_percent") return { ...service, responsible_percent: value, responsible_amount: responsibleAmountFor(service.price, value) };
+      return { ...service, [field]: value };
+    }));
+  };
   const addService = () => set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
   const addPackage = () => {
     const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
     if (!packageItem) return;
+    if ((form.services || []).some((service) => String(service.package_id || "") === String(packageItem.id))) {
+      window.alert(`Пакет «${packageItem.name}» уже додано до цього клієнта.`);
+      return;
+    }
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
     set("services", [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
     setSelectedPackageId("");
