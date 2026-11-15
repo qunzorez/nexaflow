@@ -3,7 +3,6 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home3/nexaflow/public_html/
     - /usr/bin/test -f dist/index.html
-    - /bin/sh tools/deploy-php.sh tools/deployment-preflight.php $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/dist $DEPLOYPATH/api/support-private
     - /bin/cp -R dist/. $DEPLOYPATH/dist/
     - /bin/cp .htaccess $DEPLOYPATH/.htaccess
