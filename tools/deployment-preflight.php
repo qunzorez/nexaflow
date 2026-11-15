@@ -11,7 +11,9 @@ if (PHP_VERSION_ID < 80000) {
     exit(2);
 }
 
-foreach (['pdo_mysql', 'curl', 'fileinfo', 'mbstring'] as $extension) {
+// fileinfo is used by web uploads and is enabled for the site's PHP Selector profile,
+// but cPanel's standalone CLI binaries do not load that profile.
+foreach (['pdo_mysql', 'curl', 'mbstring'] as $extension) {
     if (!extension_loaded($extension)) {
         fwrite(STDERR, "Production PHP is missing the required extension: {$extension}.\n");
         exit(3);
