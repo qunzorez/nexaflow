@@ -17,19 +17,25 @@ import ClientCreatePage from "./pages/ClientCreatePage.jsx";
 import ClientEditPage from "./pages/ClientEditPage.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Services from "./pages/Services.jsx";
+import Landing from "./pages/Landing.jsx";
+import PlanFeatureRoute from "./components/PlanFeatureRoute.jsx";
+import Support from "./pages/Support.jsx";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login initialMode="login" />} />
+      <Route path="/register" element={<Login initialMode="register" />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/team" element={<Team />} />
       <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/clients" element={<Clients />} />
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
-      <Route path="/calendar" element={<Calendar />} />
-      <Route path="/services" element={<Services />} />
+      <Route path="/calendar" element={<PlanFeatureRoute feature="calendar"><Calendar /></PlanFeatureRoute>} />
+      <Route path="/support" element={<PlanFeatureRoute feature="support"><Support /></PlanFeatureRoute>} />
+      <Route path="/services" element={<PlanFeatureRoute feature="services"><Services /></PlanFeatureRoute>} />
       <Route path="/projects" element={<Projects />} />
       <Route path="/projects/new" element={<ProjectCreatePage />} />
       <Route path="/projects/:id" element={<ProjectEditPage />} />

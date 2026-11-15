@@ -15,6 +15,9 @@ const roleNames = {
 };
 export default function Settings() {
   const [user, setUser] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const activeWorkspaceRole = user?.workspace_role || user?.role || "user";
+  const canManageSubscription = user?.role === "admin" || ["owner", "manager"].includes(activeWorkspaceRole);
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const [phone, setPhone] = useState("");
@@ -31,10 +34,104 @@ export default function Settings() {
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [payingPlan, setPayingPlan] = useState("");
+  const [cancelingPlan, setCancelingPlan] = useState(false);
+  const [verifyingPlan, setVerifyingPlan] = useState(false);
+  const requestedPlan = new URLSearchParams(window.location.search).get("plan") || "";
+  async function startPlanCheckout(planKey) {
+    if (payingPlan) return;
+    setPayingPlan(planKey);
+    setError("");
+    setNotice("");
+    try {
+      const result = await post("/api/liqpay.php", { action: "select_plan", plan: planKey });
+      if (!result.ok) throw new Error(result.message || "Не вдалося обрати план.");
+      if (result.plan_selected) {
+        window.localStorage.removeItem("nexaflow.pending-plan");
+        const profile = await api("/api/profile.php");
+        if (profile.ok) {
+          setSubscription(profile.subscription || null);
+          setUser(current => current ? { ...current, subscription: profile.subscription || null } : current);
+        }
+        setNotice(result.message || "План підключено без списання коштів.");
+        setPayingPlan("");
+        return;
+      }
+      if (!result.checkout) throw new Error(result.message || "Не вдалося створити оплату.");
+      window.localStorage.removeItem("nexaflow.pending-plan");
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = result.checkout.url;
+      for (const [name, value] of Object.entries({ data: result.checkout.data, signature: result.checkout.signature })) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+    } catch (checkoutError) {
+      setError(checkoutError.message || "Не вдалося перейти до оплати.");
+      setPayingPlan("");
+    }
+  }
+  async function cancelPlanSubscription() {
+    if (!subscription?.key || cancelingPlan) return;
+    setCancelingPlan(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await post("/api/liqpay.php", { action: "cancel", plan: subscription.key });
+      if (!result.ok) throw new Error(result.message || "Не вдалося скасувати підписку.");
+      const profile = await api("/api/profile.php");
+      if (profile.ok) {
+        setSubscription(profile.subscription || null);
+        setUser(current => current ? { ...current, subscription: profile.subscription || null } : current);
+      }
+      setNotice(result.message);
+    } catch (cancelError) {
+      setError(cancelError.message || "Не вдалося скасувати підписку.");
+    } finally {
+      setCancelingPlan(false);
+    }
+  }
+  async function verifyPlanPayment() {
+    if (verifyingPlan) return;
+    setVerifyingPlan(true);
+    setError("");
+    try {
+      const result = await post("/api/liqpay.php", { action: "verify" });
+      const profile = await api("/api/profile.php");
+      if (profile.ok) {
+        setSubscription(profile.subscription || null);
+        setUser(current => current ? { ...current, subscription: profile.subscription || null } : current);
+      }
+      setNotice(result.message || "Перевірку платежу завершено.");
+    } catch (verificationError) {
+      setError(verificationError.message || "Не вдалося перевірити платіж.");
+    } finally {
+      setVerifyingPlan(false);
+    }
+  }
   useEffect(() => {
-    api("/api/profile.php").then((result) => {
+    api("/api/profile.php").then(async (result) => {
       if (!result.ok) return;
-      setUser(result.user);
+      const isPaymentReturn = new URLSearchParams(window.location.search).get("payment") === "return";
+      let paymentCheck = null;
+      if (isPaymentReturn && (result.user?.workspace_role || result.user?.role) === "manager" && result.subscription?.billing?.status === "pending") {
+        try {
+          paymentCheck = await post("/api/liqpay.php", { action: "verify" });
+          if (paymentCheck.status === "active" || paymentCheck.status === "failed") {
+            const refreshed = await api("/api/profile.php");
+            if (refreshed.ok) result = refreshed;
+          }
+        } catch (verificationError) {
+          paymentCheck = { ok: false, message: verificationError.message };
+        }
+      }
+      setUser({ ...result.user, subscription: result.subscription || null });
+      setSubscription(result.subscription || null);
       setName(result.user.name);
       setAvatar(result.user.avatar_url || "");
       setPhone(result.user.phone || "");
@@ -44,8 +141,19 @@ export default function Settings() {
       setEmailEnabled(result.user.email_notifications_enabled === undefined ? true : Boolean(Number(result.user.email_notifications_enabled)));
       setTelegramConnectUrl(result.user.telegram_connect_url || "https://t.me/nexaflows_bot");
       setBio(result.user.bio || "");
+      const billing = result.subscription?.billing;
+      if (isPaymentReturn) {
+        if (billing?.status === "active") setNotice("Платіж підтверджено. Тариф «" + (result.subscription?.name || "") + "» активний.");
+        else if (billing?.status === "failed") setNotice("Платіж не пройшов. Можете повторити спробу, обравши план нижче.");
+        else setNotice(paymentCheck?.message || "Повернулися з LiqPay. Платіж ще обробляється; оновіть сторінку трохи пізніше.");
+      } else if (billing?.status === "pending") setNotice("Очікуємо завершення оплати тарифу.");
     });
   }, []);
+  useEffect(() => {
+    if (user?.role !== "manager" || !["growth", "team", "business"].includes(requestedPlan)) return;
+    startPlanCheckout(requestedPlan);
+    window.history.replaceState({}, "", "/settings");
+  }, [user?.role]);
   function chooseAvatar(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -74,7 +182,9 @@ export default function Settings() {
       new_password: form.get("new_password"),
     });
     if (!result.ok) return setError(result.message);
-    setUser(result.user);
+    const nextSubscription = result.subscription || subscription;
+    setUser({ ...result.user, subscription: nextSubscription });
+    setSubscription(nextSubscription);
     setAvatar(result.user.avatar_url || "");
     setPhone(result.user.phone || "");
     setTelegramTag(result.user.telegram_tag || "");
@@ -195,14 +305,14 @@ export default function Settings() {
             <div className="telegram-connect-box">
               <div>
                 <strong>Telegram-сповіщення</strong>
-                <small>Отримуйте задачі та повідомлення прямо в Telegram.</small>
+                <small>{subscription?.features.telegram ? "Отримуйте задачі та повідомлення прямо в Telegram." : "Telegram-сповіщення доступні починаючи з плану «Зростання»."}</small>
               </div>
               <label className="telegram-toggle">
-                <input type="checkbox" checked={telegramEnabled} onChange={(event) => setTelegramEnabled(event.target.checked)} />
+                <input type="checkbox" checked={telegramEnabled} disabled={!subscription?.features.telegram} onChange={(event) => setTelegramEnabled(event.target.checked)} />
                 <span />
                 <b>{telegramEnabled ? "Увімкнено" : "Вимкнено"}</b>
               </label>
-              <a className="outline-btn telegram-bot-link" href={telegramConnectUrl} target="_blank" rel="noreferrer">Підключити Telegram <Icon name="forward" /></a>
+              <a className={`outline-btn telegram-bot-link${subscription?.features.telegram ? "" : " is-disabled"}`} href={subscription?.features.telegram ? telegramConnectUrl : undefined} aria-disabled={!subscription?.features.telegram} tabIndex={subscription?.features.telegram ? 0 : -1} target="_blank" rel="noreferrer">Підключити Telegram <Icon name="forward" /></a>
             </div>
             <div className="telegram-connect-box email-notification-box">
               <div>
@@ -216,60 +326,13 @@ export default function Settings() {
               </label>
             </div>
           </section>
-          <section
-            className={`panel password-card${showPasswordFields ? " is-open" : ""}`}
-          >
-            <div className="settings-section-title password-section-heading">
-              <div>
-                <h2>
-                  <span className="settings-section-icon"><Icon name="security" /></span>Безпека
-                </h2>
-                <p>Змініть пароль, якщо потрібно.</p>
-              </div>
-              <button
-                type="button"
-                className={`settings-switch${showPasswordFields ? " is-on" : ""}`}
-                aria-expanded={showPasswordFields}
-                onClick={() => setShowPasswordFields((value) => !value)}
-              >
-                <span />
-                {showPasswordFields ? "Сховати" : "Змінити пароль"}
-              </button>
-            </div>
-            {showPasswordFields && (
-              <>
-                <label>
-                  Поточний пароль
-                  <input
-                    type="password"
-                    name="current_password"
-                    autoComplete="current-password"
-                    placeholder="Введіть поточний пароль"
-                  />
-                </label>
-                <label>
-                  Новий пароль
-                  <input
-                    type="password"
-                    name="new_password"
-                    minLength="8"
-                    autoComplete="new-password"
-                    placeholder="Мінімум 8 символів"
-                  />
-                </label>
-                <small className="settings-hint">
-                  Залиште поля порожніми, якщо не хочете змінювати пароль.
-                </small>
-              </>
-            )}
-          </section>
-          <section className="panel account-info-card">
+          <section className={`panel account-security-card${showPasswordFields ? " is-open" : ""}`}>
             <div className="settings-section-title">
               <div>
                 <h2>
-                  <span className="settings-section-icon"><Icon name="sparkle" /></span>Про акаунт
+                  <span className="settings-section-icon"><Icon name="security" /></span>Акаунт і безпека
                 </h2>
-                <p>Ваш поточний статус у NexaFlow.</p>
+                <p>Інформація облікового запису та керування паролем.</p>
               </div>
             </div>
             <div className="account-info-list">
@@ -286,8 +349,52 @@ export default function Settings() {
                 <strong className="account-verified"><Icon name="check" /> Підтверджено</strong>
               </div>
             </div>
+            <div className="account-password-section">
+              <div className="password-section-heading">
+                <div>
+                  <strong>Пароль</strong>
+                  <small>Оновлюйте його, щоб захистити свій акаунт.</small>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-switch${showPasswordFields ? " is-on" : ""}`}
+                  aria-expanded={showPasswordFields}
+                  onClick={() => setShowPasswordFields((value) => !value)}
+                >
+                  <span />
+                  {showPasswordFields ? "Сховати" : "Змінити пароль"}
+                </button>
+              </div>
+              {showPasswordFields && <div className="password-fields">
+                <label>Поточний пароль<input type="password" name="current_password" autoComplete="current-password" placeholder="Введіть поточний пароль" /></label>
+                <label>Новий пароль<input type="password" name="new_password" minLength="8" autoComplete="new-password" placeholder="Мінімум 8 символів" /></label>
+                <small className="settings-hint">Залиште поля порожніми, якщо не хочете змінювати пароль.</small>
+              </div>}
+            </div>
           </section>
-          <section className="panel subscription-card">
+          {!canManageSubscription && <section className="panel subscription-card subscription-member-summary">
+            <div className="subscription-main">
+              <div className="settings-section-title">
+                <div>
+                  <h2><span className="settings-section-icon"><Icon name="subscription" /></span>Тариф простору</h2>
+                  <p>Поточний рівень доступу у вашому робочому просторі.</p>
+                </div>
+              </div>
+              <div className={`subscription-current-plan plan-tier-${subscription?.key || "start"}${subscription?.billing?.status === "active" ? " is-paid" : ""}`}>
+                <div className="subscription-current-icon"><Icon name="subscription" /></div>
+                <div className="subscription-current-copy">
+                  <span className="subscription-current-eyebrow">ВАШ ПОТОЧНИЙ ТАРИФ</span>
+                  <strong>{subscription?.name || "Старт"}</strong>
+                  <small>{subscription?.price || "Безкоштовно"}</small>
+                </div>
+                <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
+                  {subscription?.billing?.status === "active" ? "Оплачено" : subscription?.key === "start" ? "Безкоштовний план" : "Доступ надано менеджером"}
+                </span>
+              </div>
+              <small className="billing-manager-note">Обрати або змінити тариф може лише менеджер робочого простору.</small>
+            </div>
+          </section>}
+          {canManageSubscription && <section className="panel subscription-card">
             <div className="subscription-main">
               <div className="settings-section-title">
                 <div>
@@ -297,11 +404,23 @@ export default function Settings() {
                   <p>Керуйте доступом до можливостей NexaFlow.</p>
                 </div>
               </div>
-              <div className="subscription-plan">
-                <strong>Стартовий план</strong>
-                <span>Поточний план</span>
+              <div className={`subscription-current-plan plan-tier-${subscription?.key || "start"}${subscription?.billing?.status === "active" ? " is-paid" : ""}`}>
+                <div className="subscription-current-icon"><Icon name="subscription" /></div>
+                <div className="subscription-current-copy">
+                  <span className="subscription-current-eyebrow">ВАШ ПОТОЧНИЙ ПЛАН</span>
+                  <strong>{subscription?.name || "Старт"}</strong>
+                  <small>{subscription?.price || "Безкоштовно"}{subscription?.billing?.status === "active" ? " · щомісячна підписка" : ""}</small>
+                </div>
+                <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
+                  {subscription?.billing_enabled === false ? (subscription?.key === "start" ? "Безкоштовний план" : "Активний · без списань") : subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : subscription?.key === "start" ? "Безкоштовний план" : "Потрібна оплата"}
+                </span>
               </div>
-              <div className="subscription-module-select">
+              {subscription?.pending_plan && <div className="subscription-pending-plan">
+                <span><Icon name="subscription" /></span>
+                <div><strong>Очікує активації: {subscription.pending_plan.name}</strong><small>{subscription.pending_plan.price} · тариф увімкнеться після остаточного підтвердження LiqPay</small></div>
+                {(user?.workspace_role || user?.role) === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
+              </div>}
+              {user?.role === "admin" && <div className="subscription-module-select">
                 <div className="subscription-module-label">
                   <span><Icon name="sparkle" /></span>
                   <div>
@@ -327,26 +446,65 @@ export default function Settings() {
                   </select>
                   <span><Icon name="down" /></span>
                 </label>
-              </div>
+              </div>}
             </div>
             <div className="subscription-meta">
               <div>
-                <span>Статус</span>
-                <strong><Icon name="check" /> Активна</strong>
+                <span>{subscription?.billing?.status === "cancelled" ? "Доступ до" : "Наступне оновлення"}</span>
+                <strong>{subscription?.billing_enabled === false ? (subscription?.key === "start" ? "Не застосовується" : "Щомісячне списання вимкнено") : ["active", "cancelled"].includes(subscription?.billing?.status) && subscription?.billing?.current_period_end ? new Date(String(subscription.billing.current_period_end).replace(" ", "T") + "Z").toLocaleDateString("uk-UA") : subscription?.billing?.status === "pending" ? "Після підтвердження платежу" : subscription?.billing?.status === "failed" ? "Спробуйте оплатити ще раз" : "Немає активних оплат"}</strong>
               </div>
               <div>
-                <span>Оплата</span>
-                <b>Поки без оплати</b>
+                <span>Спосіб оплати</span>
+                <b>{subscription?.billing_enabled === false ? "Онлайн-оплата поки не підключена" : ["active", "cancelled"].includes(subscription?.billing?.status) ? "LiqPay · щомісяця" : subscription?.billing?.status === "pending" ? "LiqPay · очікується" : "Не потрібна"}</b>
               </div>
             </div>
-            <button
-              type="button"
-              className="outline-btn subscription-button"
-              disabled
-            >
-              Керувати підпискою
-            </button>
-          </section>
+            <div className="plan-usage-grid">
+              {(subscription?.limits || []).map((item) => {
+                const ratio = item.limit ? Math.min(100, Math.round(item.used / item.limit * 100)) : 0;
+                return <div className="plan-usage" key={item.key}>
+                  <div><span>{item.label}</span><strong>{item.used} / {item.limit ?? "∞"}</strong></div>
+                  <i><b style={{ width: `${item.limit ? ratio : 0}%` }} /></i>
+                </div>;
+              })}
+            </div>
+            <div className="plan-feature-list">
+              <span className={subscription?.features.calendar ? "enabled" : "locked"}>{subscription?.features.calendar ? "✓" : "×"} Календар</span>
+              <span className={subscription?.features.analytics ? "enabled" : "locked"}>{subscription?.features.analytics ? "✓" : "×"} Аналітика</span>
+              <span className={subscription?.features.services || subscription?.services_per_client ? "enabled" : "locked"}>{subscription?.features.services ? "✓ Створення послуг і пакетів" : subscription?.services_per_client ? `✓ До ${subscription.services_per_client} послуг на клієнта · без пакетів` : "× Створення послуг і пакетів"}</span>
+              <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
+              <span className={subscription?.features.support ? "enabled" : "locked"}>{subscription?.features.support ? "✓" : "×"} Онлайн-підтримка</span>
+            </div>
+            {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план — ми відкриємо його можливості без списання коштів.</span></div>}
+            <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
+            <div className="plan-comparison-grid">
+              {(subscription?.available_plans || []).map((plan) => <article className={`plan-tier plan-tier-${plan.key}${plan.key === subscription?.key ? " current" : ""}`} key={plan.key}>
+                <header className="plan-tier-heading">
+                  <span className="plan-tier-icon"><Icon name={plan.key === "business" ? "briefcase" : plan.key === "team" ? "users" : plan.key === "growth" ? "chart" : "sparkle"} /></span>
+                  <div><strong>{plan.name}</strong><span>{plan.price}</span></div>
+                  {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
+                </header>
+                <p className="plan-tier-audience">{plan.limits.participants === 49 ? "До 50 учасників загалом" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
+                <div className="plan-tier-metrics">
+                  <span><strong>{plan.limits.projects ?? "∞"}</strong><small>проєктів</small></span>
+                  <span><strong>{plan.limits.tasks_month ?? "∞"}</strong><small>задач / міс.</small></span>
+                  <span><strong>{plan.limits.clients ?? "∞"}</strong><small>клієнтів</small></span>
+                </div>
+                <div className="plan-tier-details">
+                  <div className="plan-tier-features">
+                    <span className={plan.features.calendar ? "available" : "unavailable"}>{plan.features.calendar ? "✓" : "–"} Календар</span>
+                    <span className={plan.features.analytics ? "available" : "unavailable"}>{plan.features.analytics ? "✓" : "–"} Аналітика</span>
+                    <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "– Послуги"}</span>
+                    <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "–"} Telegram</span>
+                    <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "– Онлайн-підтримка"}</span>
+                  </div>
+                  {(plan.limits.project_leads > 0 || plan.limits.moderators > 0) && <small className="plan-tier-roles">{plan.limits.project_leads > 0 ? `${plan.limits.project_leads === 1 ? "1 керівник проєкту" : `До ${plan.limits.project_leads} керівників проєктів`}` : ""}{plan.limits.project_leads > 0 && plan.limits.moderators > 0 ? " · " : ""}{plan.limits.moderators > 0 ? `До ${plan.limits.moderators} модераторів` : ""}</small>}
+                </div>
+                {plan.key !== "start" && (user?.workspace_role || user?.role) === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
+              </article>)}
+            </div>
+            {subscription?.billing_enabled && (user?.workspace_role || user?.role) === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
+            {(user?.workspace_role || user?.role) !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
+          </section>}
           <div className="settings-actions">
             <button className="primary-action" disabled={emailSaving}>Зберегти зміни</button>
           </div>

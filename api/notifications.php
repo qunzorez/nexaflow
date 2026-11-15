@@ -28,11 +28,13 @@ $data = $method === 'POST' ? body() : [];
 
 try {
     if ($method === 'GET') {
-        $query = $pdo->prepare('SELECT id, type, title, message, content_html, entity_type, entity_id, is_read, is_banner, banner_dismissed_at, banner_view_count, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 40');
-        $query->execute([$userId]);
+        $adminView = in_array($user['role'], ['admin', 'owner'], true);
+        $visibility = "(? = 1 OR n.type <> 'user_created') AND (n.type <> 'project_created' OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = n.entity_id AND pm.user_id = n.user_id) OR EXISTS (SELECT 1 FROM project_groups pg JOIN project_group_members pgm ON pgm.group_id = pg.id WHERE pg.project_id = n.entity_id AND pgm.user_id = n.user_id))";
+        $query = $pdo->prepare("SELECT n.id, n.type, n.title, n.message, n.content_html, n.entity_type, n.entity_id, n.is_read, n.is_banner, n.banner_dismissed_at, n.banner_view_count, n.created_at FROM notifications n WHERE n.user_id = ? AND {$visibility} ORDER BY n.created_at DESC LIMIT 40");
+        $query->execute([$userId, $adminView ? 1 : 0]);
         $notifications = $query->fetchAll();
-        $unreadQuery = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
-        $unreadQuery->execute([$userId]);
+        $unreadQuery = $pdo->prepare("SELECT COUNT(*) FROM notifications n WHERE n.user_id = ? AND n.is_read = 0 AND {$visibility}");
+        $unreadQuery->execute([$userId, $adminView ? 1 : 0]);
         $audienceCounts = $pdo->query("SELECT role, COUNT(*) AS total FROM users GROUP BY role")->fetchAll();
         jsonResponse(true, 'Сповіщення завантажено.', ['notifications' => $notifications, 'unread' => (int)$unreadQuery->fetchColumn(), 'can_broadcast' => in_array($user['role'], ['admin', 'owner'], true), 'audience_counts' => $audienceCounts]);
     }
@@ -70,6 +72,59 @@ try {
         jsonResponse(true, 'Показ банера зафіксовано.');
     }
 
+    if ($action === 'broadcast_prepare') {
+        if (!in_array($user['role'], ['admin', 'owner'], true)) jsonResponse(false, 'Тільки адміністратор може відправляти повідомлення всім користувачам.', [], 403);
+        $audiences = $data['audiences'] ?? ['all'];
+        if (!is_array($audiences)) $audiences = [$audiences];
+        $audiences = array_values(array_unique(array_filter(array_map('strval', $audiences), static fn(string $value): bool => in_array($value, ['all', 'admin', 'manager', 'user'], true))));
+        if (!$audiences) $audiences = ['all'];
+        if (in_array('all', $audiences, true)) {
+            $ids = $pdo->query('SELECT id FROM users ORDER BY id')->fetchAll(PDO::FETCH_COLUMN);
+        } else {
+            $marks = implode(',', array_fill(0, count($audiences), '?'));
+            $idsQuery = $pdo->prepare("SELECT id FROM users WHERE role IN ({$marks}) ORDER BY id");
+            $idsQuery->execute($audiences);
+            $ids = $idsQuery->fetchAll(PDO::FETCH_COLUMN);
+        }
+        jsonResponse(true, 'Підготовлено отримувачів.', ['recipient_ids' => array_map('strval', $ids), 'recipients' => count($ids)]);
+    }
+
+    if ($action === 'broadcast_batch') {
+        if (!in_array($user['role'], ['admin', 'owner'], true)) jsonResponse(false, 'Тільки адміністратор може відправляти повідомлення всім користувачам.', [], 403);
+        $ids = array_slice(array_values(array_unique(array_filter(array_map('strval', is_array($data['recipient_ids'] ?? null) ? $data['recipient_ids'] : [])))), 0, 10);
+        $title = trim((string)($data['title'] ?? ''));
+        $message = trim((string)($data['message'] ?? ''));
+        $contentHtml = trim((string)($data['html'] ?? ''));
+        $isBanner = !empty($data['is_banner']) ? 1 : 0;
+        $sendEmail = !empty($data['send_email']);
+        if (!$ids) jsonResponse(false, 'У пакеті немає отримувачів.', [], 422);
+        if ($title === '' || ($message === '' && $contentHtml === '')) jsonResponse(false, 'Вкажіть заголовок і текст повідомлення.', [], 422);
+        if ($message === '') $message = trim(preg_replace('/\s+/', ' ', strip_tags($contentHtml)) ?? '');
+        if (mb_strlen($title) > 180) $title = mb_substr($title, 0, 180);
+        $preferenceColumn = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email_notifications_enabled'")->fetchColumn();
+        if (!$preferenceColumn) $pdo->exec('ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1');
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $recipientsQuery = $pdo->prepare("SELECT id, email, email_notifications_enabled FROM users WHERE id IN ({$marks})");
+        $recipientsQuery->execute($ids);
+        $recipients = $recipientsQuery->fetchAll();
+        $insert = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, content_html, is_banner) VALUES (?, ?, ?, 'broadcast', ?, ?, ?, ?)");
+        $emailSent = 0;
+        $emailSkipped = 0;
+        foreach ($recipients as $recipient) {
+            $insert->execute([bin2hex(random_bytes(16)), $recipient['id'], $userId, $title, $message, $contentHtml !== '' ? $contentHtml : null, $isBanner]);
+            if (!$sendEmail) continue;
+            $recipientEmail = strtolower(trim((string)$recipient['email']));
+            if ((int)$recipient['email_notifications_enabled'] !== 1 || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
+                $emailSkipped++;
+                continue;
+            }
+            if (sendUserNotificationEmail($pdo, (string)$recipient['id'], $recipientEmail, $title . ' — NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) $emailSent++;
+            else $emailSkipped++;
+            usleep(250000);
+        }
+        jsonResponse(true, 'Пакет опрацьовано.', ['processed' => count($recipients), 'email_sent' => $emailSent, 'email_skipped' => $emailSkipped]);
+    }
+
     if ($action === 'broadcast') {
         if (!in_array($user['role'], ['admin', 'owner'], true)) jsonResponse(false, 'Тільки адміністратор може відправляти повідомлення всім користувачам.', [], 403);
         $title = trim((string)($data['title'] ?? ''));
@@ -85,25 +140,40 @@ try {
         if ($title === '' || ($message === '' && $contentHtml === '')) jsonResponse(false, 'Вкажіть заголовок і текст повідомлення.', [], 422);
         if ($message === '') $message = trim(preg_replace('/\s+/', ' ', strip_tags($contentHtml)) ?? '');
         if (mb_strlen($title) > 180) $title = mb_substr($title, 0, 180);
+        $emailPreferenceColumn = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email_notifications_enabled'")->fetchColumn();
+        if (!$emailPreferenceColumn) $pdo->exec('ALTER TABLE users ADD email_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1');
         if (in_array('all', $audiences, true)) {
-            $users = $pdo->query('SELECT id, email FROM users')->fetchAll();
+            $users = $pdo->query('SELECT id, email, email_notifications_enabled FROM users ORDER BY id')->fetchAll();
         } else {
             $placeholders = implode(',', array_fill(0, count($audiences), '?'));
-            $usersQuery = $pdo->prepare("SELECT id, email FROM users WHERE role IN ({$placeholders})");
+            $usersQuery = $pdo->prepare("SELECT id, email, email_notifications_enabled FROM users WHERE role IN ({$placeholders}) ORDER BY id");
             $usersQuery->execute($audiences);
             $users = $usersQuery->fetchAll();
         }
         $insert = $pdo->prepare("INSERT INTO notifications (id, user_id, sender_id, type, title, message, content_html, is_banner) VALUES (?, ?, ?, 'broadcast', ?, ?, ?, ?)");
         $emailSent = 0;
+        $emailSkipped = 0;
         foreach ($users as $recipient) {
             $insert->execute([bin2hex(random_bytes(16)), $recipient['id'], $userId, $title, $message, $contentHtml !== '' ? $contentHtml : null, $isBanner]);
-            if ($sendEmail && sendUserNotificationEmail($pdo, (string)$recipient['id'], (string)$recipient['email'], $title . ' — NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) {
-                $emailSent++;
+            if ($sendEmail) {
+                $recipientEmail = strtolower(trim((string)$recipient['email']));
+                if ((int)$recipient['email_notifications_enabled'] !== 1 || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
+                    $emailSkipped++;
+                    continue;
+                }
+                if (sendUserNotificationEmail($pdo, (string)$recipient['id'], $recipientEmail, $title . ' — NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) {
+                    $emailSent++;
+                } else {
+                    $emailSkipped++;
+                    continue;
+                }
+                // Avoid bursting messages into shared hosting mail transports.
+                usleep(250000);
             }
         }
         $audienceNames = ['all' => 'всім користувачам', 'admin' => 'адміністраторам', 'manager' => 'менеджерам', 'user' => 'користувачам'];
         $audienceName = implode(', ', array_map(static fn(string $value): string => $audienceNames[$value], $audiences));
-        jsonResponse(true, "Повідомлення відправлено {$audienceName}.", ['recipients' => count($users), 'audiences' => $audiences, 'email_requested' => $sendEmail, 'email_sent' => $emailSent]);
+        jsonResponse(true, "Повідомлення відправлено {$audienceName}.", ['recipients' => count($users), 'audiences' => $audiences, 'email_requested' => $sendEmail, 'email_sent' => $emailSent, 'email_skipped' => $emailSkipped, 'email_delivery_confirmed' => false]);
     }
 
     jsonResponse(false, 'Невідома дія.', [], 400);

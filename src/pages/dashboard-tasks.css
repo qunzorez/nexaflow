@@ -7,6 +7,13 @@
 .dashboard-task-tools select { width: 125px; flex: 0 0 125px; padding: 9px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .dashboard-tasks-panel .dashboard-task-list { height: 280px; max-height: 280px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
 .dashboard-tasks-panel .dashboard-task-row { min-height: 56px; box-sizing: border-box; }
+.dashboard-tasks-panel .dashboard-task-row .task-status { flex: none; border-radius: 999px; padding: 5px 8px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.dashboard-tasks-panel .dashboard-task-row .status-todo { background: #f1f4f2; color: #68776f; }
+.dashboard-tasks-panel .dashboard-task-row .status-in_progress { background: #e8f1ff; color: #557bb4; }
+.dashboard-tasks-panel .dashboard-task-row .status-review { background: #f0eafd; color: #725bc2; }
+.dashboard-tasks-panel .dashboard-task-row .status-done { background: #e5f5eb; color: #23815e; }
+.dashboard-tasks-panel .dashboard-task-row .status-cancelled { background: #fff0ed; color: #c66d5a; }
+.dashboard-tasks-panel .dashboard-task-row .status-archived { background: #eceff0; color: #65716c; }
 .team-time-panel { min-width: 0; }
 .team-time-tools { display: flex; gap: 8px; margin-top: 15px; }
 .team-time-tools label { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; color: #819088; background: #fbfdfb; }

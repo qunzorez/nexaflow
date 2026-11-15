@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
+import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import DateTimePicker from "../components/DateTimePicker.jsx";
 import SearchableSelect from "../components/SearchableSelect.jsx";
 import "./clients.css";
@@ -116,9 +117,9 @@ function officialDateForService(name = "", period = "Місяць") {
   else result.setMonth(result.getMonth() + 1, 20);
   return result.toISOString().slice(0, 10);
 }
-const servicePriceDefaultsKey = "nexaflow.accounting.servicePriceDefaults";
-const readServicePriceDefaults = () => {
-  try { return JSON.parse(window.localStorage.getItem(servicePriceDefaultsKey) || "{}"); } catch { return {}; }
+const servicePriceDefaultsKey = (userId) => `nexaflow.accounting.servicePriceDefaults:${userId || "anonymous"}`;
+const readServicePriceDefaults = (userId) => {
+  try { return JSON.parse(window.localStorage.getItem(servicePriceDefaultsKey(userId)) || "{}"); } catch { return {}; }
 };
 const responsibleAmountFor = (price, percent) => Math.max(0, Math.round(Number(price || 0) * Number(percent || 0) / 100 * 100) / 100);
 export function downloadClientInvoice(client) {
@@ -168,6 +169,7 @@ export function serviceTaskPayload(client, service, clientId) {
     : "";
   return {
     action: "create",
+    workspace_owner_id: client.workspace_owner_id || "",
     title: `${service.name} — ${client.name}`,
     description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}.${packageDetails}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
     client_ids: normalizedClientId ? [normalizedClientId] : [],
@@ -279,10 +281,22 @@ function FieldTip({ children }) {
     <span className={`client-field-tooltip${open ? " is-open" : ""}`} role="tooltip">{children}</span>
   </span>;
 }
-export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [] }) {
+export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAddService, pageMode = false, availableUsers = [], availableUsersByClient = {}, clientId = "", servicePackages = [], currentUserId = "", subscription = null }) {
+  const clientCreationLimitReached = !editing && isPlanLimitReached(subscription, "clients");
   const [savingServiceIndex, setSavingServiceIndex] = useState(null);
   const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [duplicateNotice, setDuplicateNotice] = useState("");
+  const duplicateNoticeTimer = useRef(null);
   const formElementRef = useRef(null);
+  const showDuplicateNotice = (message) => {
+    setDuplicateNotice(message);
+    window.clearTimeout(duplicateNoticeTimer.current);
+    duplicateNoticeTimer.current = window.setTimeout(() => setDuplicateNotice(""), 3800);
+  };
+  useEffect(() => () => window.clearTimeout(duplicateNoticeTimer.current), []);
+  const clientServiceLimit = subscription?.services_per_client ?? null;
+  const standaloneServiceCount = (form.services || []).filter((service) => !service.is_package && !service.package_id).length;
+  const serviceLimitReached = clientServiceLimit !== null && standaloneServiceCount >= Number(clientServiceLimit);
   const set = (field, value) =>
     setForm((current) => {
       const nameInput = formElementRef.current?.elements?.namedItem("name");
@@ -296,19 +310,36 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
         ? form.special_taxes.filter((item) => item !== value)
         : [...form.special_taxes, value],
     );
-  const updateService = (index, field, value) => set("services", (form.services || []).map((service, itemIndex) => {
-    if (itemIndex !== index) return service;
-    if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults()[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
-    if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
-    if (field === "price" && service.responsible_mode === "percent") return { ...service, price: value, responsible_amount: responsibleAmountFor(value, service.responsible_percent) };
-    if (field === "responsible_mode") return { ...service, responsible_mode: value, responsible_amount: value === "percent" ? responsibleAmountFor(service.price, service.responsible_percent) : service.responsible_amount };
-    if (field === "responsible_percent") return { ...service, responsible_percent: value, responsible_amount: responsibleAmountFor(service.price, value) };
-    return { ...service, [field]: value };
-  }));
-  const addService = () => set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  const updateService = (index, field, value) => {
+    const services = form.services || [];
+    if (field === "name" && value && services.some((service, itemIndex) => itemIndex !== index && !service.is_package && !service.package_id && service.name.trim().toLocaleLowerCase("uk") === value.trim().toLocaleLowerCase("uk"))) {
+      showDuplicateNotice(`Послугу «${value}» уже додано до цього клієнта.`);
+      return;
+    }
+    set("services", services.map((service, itemIndex) => {
+      if (itemIndex !== index) return service;
+      if (field === "name") return { ...service, name: value, price: value ? (readServicePriceDefaults(currentUserId)[value] ?? 0) : 0, official_due_date: value ? officialDateForService(value, service.period) : "" };
+      if (field === "period") return { ...service, period: value, official_due_date: service.name ? officialDateForService(service.name, value) : "" };
+      if (field === "price" && service.responsible_mode === "percent") return { ...service, price: value, responsible_amount: responsibleAmountFor(value, service.responsible_percent) };
+      if (field === "responsible_mode") return { ...service, responsible_mode: value, responsible_amount: value === "percent" ? responsibleAmountFor(service.price, service.responsible_percent) : service.responsible_amount };
+      if (field === "responsible_percent") return { ...service, responsible_percent: value, responsible_amount: responsibleAmountFor(service.price, value) };
+      return { ...service, [field]: value };
+    }));
+  };
+  const addService = () => {
+    if (serviceLimitReached) {
+      showDuplicateNotice(`У плані «${subscription.name}» дозволено до ${clientServiceLimit} послуг на одного клієнта.`);
+      return;
+    }
+    set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+  };
   const addPackage = () => {
     const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
     if (!packageItem) return;
+    if ((form.services || []).some((service) => String(service.package_id || "") === String(packageItem.id))) {
+      showDuplicateNotice(`Пакет «${packageItem.name}» уже додано до цього клієнта.`);
+      return;
+    }
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
     set("services", [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
     setSelectedPackageId("");
@@ -348,15 +379,15 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   const serviceTotal = (form.services || []).reduce((sum, service) => sum + Number(service.price || 0), 0);
   const rememberServicePrice = (name, price) => {
     if (form.module !== "accounting" || !name) return;
-    const defaults = readServicePriceDefaults();
+    const defaults = readServicePriceDefaults(currentUserId);
     defaults[name] = price === "" ? 0 : price;
-    window.localStorage.setItem(servicePriceDefaultsKey, JSON.stringify(defaults));
+    window.localStorage.setItem(servicePriceDefaultsKey(currentUserId), JSON.stringify(defaults));
   };
   const rememberServicePrices = () => {
     if (form.module !== "accounting") return;
-    const defaults = readServicePriceDefaults();
+    const defaults = readServicePriceDefaults(currentUserId);
     (form.services || []).forEach((service) => { if (service.name && service.price !== "") defaults[service.name] = service.price; });
-    window.localStorage.setItem(servicePriceDefaultsKey, JSON.stringify(defaults));
+    window.localStorage.setItem(servicePriceDefaultsKey(currentUserId), JSON.stringify(defaults));
   };
   const content = (
     <div
@@ -574,9 +605,9 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
             {form.module === "accounting" && <fieldset className="client-services-fieldset">
               <legend>Необхідні бухгалтерські послуги</legend>
               <p className="client-field-hint">Додайте послуги для цього клієнта та їхню вартість.</p>
-              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>Оберіть послугу — дата заповниться автоматично за відомим строком.</small></div><button type="button" className="primary-action" onClick={addService}><Icon name="plus" /> Додати послугу</button></div>
+              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>{clientServiceLimit !== null ? `До ${clientServiceLimit} послуг на клієнта в плані «${subscription.name}».` : "Оберіть послугу — дата заповниться автоматично за відомим строком."}</small></div><button type="button" className="primary-action" disabled={serviceLimitReached} onClick={addService}><Icon name="plus" /> {serviceLimitReached ? "Ліміт послуг досягнуто" : "Додати послугу"}</button></div>
               {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн` }))} value={selectedPackageId} onChange={setSelectedPackageId} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
-              <div className="client-services-list-label">Додані послуги <span>{(form.services || []).length}</span></div>
+              <div className="client-services-list-label">Додані послуги <span>{standaloneServiceCount}{clientServiceLimit !== null ? ` / ${clientServiceLimit}` : ""}</span></div>
               <div className="client-services-list">
                 {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}${service.is_package ? ` client-package-card price-tier-${packageTier(service)}` : ""}`} key={`${index}-${service.name}`}>
                   <div className={`client-service-row${service.is_package ? " is-package" : ""}`}>
@@ -601,8 +632,8 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               <button type="button" className="outline-btn" onClick={onClose}>
                 Скасувати
               </button>
-              <button className={`primary-action client-submit-action ${editing ? "is-save" : "is-create"}`}>
-                {editing ? "Зберегти зміни" : "Створити клієнта"}
+              <button className={`primary-action client-submit-action ${editing ? "is-save" : "is-create"}`} disabled={clientCreationLimitReached} title={clientCreationLimitReached ? planLimitHint(subscription, "clients") : undefined}>
+                {editing ? "Зберегти зміни" : clientCreationLimitReached ? "Ліміт клієнтів досягнуто" : "Створити клієнта"}
               </button>
             </div>
           </form>
@@ -610,7 +641,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
       </section>
     </div>
   );
-  return pageMode ? content : createPortal(content, document.body);
+  return <>{pageMode ? content : createPortal(content, document.body)}{duplicateNotice && createPortal(<div className="form-notice" role="status">{duplicateNotice}</div>, document.body)}</>;
 }
 function Info({ label, value }) {
   return (
@@ -621,7 +652,7 @@ function Info({ label, value }) {
   );
 }
 function ClientViewModal({ client, onClose, user }) {
-  const isSimpleUser = user?.role === "user";
+  const isSimpleUser = (user?.workspace_role || user?.role) === "user";
   const servicePayoutAmount = (service) => service.is_package
     ? Number(service.package_responsible_amount ?? service.responsible_amount ?? 0)
     : Number(service.responsible_amount ?? 0);
@@ -749,6 +780,7 @@ export default function Clients() {
   }
   if (!data)
     return <div className="loading-screen">Завантаження клієнтів…</div>;
+  const clientLimitReached = isPlanLimitReached(data.user?.subscription, "clients");
   const filtered = data.clients.filter((client) => {
     const text =
       `${client.name} ${client.legal_form} ${client.tax_system}`.toLowerCase();
@@ -791,9 +823,11 @@ export default function Clients() {
             <button
               className="primary-action client-create-action"
               type="button"
+              disabled={clientLimitReached}
+              title={clientLimitReached ? planLimitHint(data.user.subscription, "clients") : undefined}
               onClick={openCreate}
             >
-              <Icon name="plus" /> Новий клієнт
+              <Icon name="plus" /> {clientLimitReached ? "Ліміт клієнтів досягнуто" : "Новий клієнт"}
             </button>
           )}
         </section>
@@ -901,13 +935,11 @@ export default function Clients() {
                           >
                             Редагувати
                           </button>
-                          <button
+                          {data.permissions?.delete !== false && <button
                             className="client-delete"
                             type="button"
                             onClick={() => remove(client)}
-                          >
-                            Видалити
-                          </button>
+                          >Видалити</button>}
                         </>
                       )}
                     </div>
@@ -961,6 +993,8 @@ export default function Clients() {
           form={form}
           setForm={setForm}
           editing={editing}
+          currentUserId={data.user?.id || ""}
+          subscription={data.user?.subscription}
           availableUsers={data?.available_users || []}
           availableUsersByClient={data?.available_users_by_client || {}}
           onSave={save}

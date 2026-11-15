@@ -74,3 +74,6 @@ input[type="datetime-local"]:invalid,
 input[type="time"]:invalid {
   box-shadow: none;
 }
+
+.plan-limit-disabled, .plan-limit-disabled:hover, button:disabled.primary-action, button:disabled.outline-btn { opacity: .5 !important; filter: grayscale(.55); cursor: not-allowed !important; box-shadow: none !important; pointer-events: auto; }
+.plan-limit-message { color: #7c6750; background: #fff8e9; border: 1px solid #f0dfb5; border-radius: 10px; padding: 12px 14px; font-size: 12px; line-height: 1.5; }

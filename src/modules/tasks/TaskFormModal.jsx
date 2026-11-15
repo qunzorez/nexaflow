@@ -19,6 +19,7 @@ export default function TaskFormModal({
   data,
   editing,
   error,
+  createDisabled = false,
   projectIds,
   assigneeIds,
   clientIds,
@@ -30,7 +31,7 @@ export default function TaskFormModal({
   onClose,
 }) {
   const [description, setDescription] = useState(editing?.description || "");
-  const canManage = ["admin", "owner", "manager"].includes(data.user?.role);
+  const canManage = ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role);
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -161,8 +162,8 @@ export default function TaskFormModal({
               </label>
             )}
             <div className="task-form-actions">
-              <button className="primary-action">
-                {editing ? "Зберегти зміни" : "Створити задачу"}
+              <button className="primary-action" disabled={createDisabled} title={createDisabled ? "Вичерпано місячний ліміт задач у вашому плані." : undefined}>
+                {editing ? "Зберегти зміни" : createDisabled ? "Ліміт задач досягнуто" : "Створити задачу"}
               </button>
               <button type="button" className="outline-btn" onClick={onClose}>
                 Скасувати

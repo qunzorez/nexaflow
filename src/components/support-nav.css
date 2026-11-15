@@ -1,0 +1,3 @@
+.nav-item .support-unread-badge{background:#fde8e7;color:#c62828;animation:support-unread-flash 1.15s ease-in-out infinite}
+@keyframes support-unread-flash{0%,100%{background:#fde8e7;color:#c62828;box-shadow:0 0 0 0 #dc262633;transform:scale(1)}50%{background:#dc2626;color:#fff;box-shadow:0 0 0 4px #dc26261c;transform:scale(1.08)}}
+@media(prefers-reduced-motion:reduce){.nav-item .support-unread-badge{animation:none;background:#dc2626;color:#fff}}
