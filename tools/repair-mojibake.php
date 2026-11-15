@@ -22,7 +22,7 @@ $columns = [
 function repaired(string $value): ?string
 {
     if (!str_contains($value, 'Ð') && !str_contains($value, 'Ñ') && !str_contains($value, 'Ã')) return null;
-    $decoded = mb_convert_encoding($value, 'ISO-8859-1', 'UTF-8');
+    $decoded = mb_convert_encoding($value, 'Windows-1252', 'UTF-8');
     if (!mb_check_encoding($decoded, 'UTF-8')) return null;
     $before = preg_match_all('/[А-Яа-яІіЇїЄєҐґ]/u', $value);
     $after = preg_match_all('/[А-Яа-яІіЇїЄєҐґ]/u', $decoded);
