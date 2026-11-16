@@ -49,6 +49,62 @@ function dentalAudit(PDO $pdo, string $actor, string $type, string $id, string $
     $pdo->prepare('INSERT INTO dental_financial_audit (id, actor_id, entity_type, entity_id, action, details) VALUES (?, ?, ?, ?, ?, ?)')
         ->execute([dentalId(), $actor, $type, $id, $action, dentalJson($details)]);
 }
+function dentalConsumeServiceMaterials(PDO $pdo, string $ownerId, string $userId, string $serviceId, string $planItemId, string $performedId, array $provided): float
+{
+    if ($serviceId === '') return 0.0;
+    $templateQuery = $pdo->prepare('SELECT t.id, t.inventory_item_id, t.expected_quantity, i.name AS item_name FROM dental_erp_service_material_templates t JOIN dental_erp_inventory_items i ON i.owner_id = t.owner_id AND i.id = t.inventory_item_id WHERE t.owner_id = ? AND t.service_id = ? AND t.is_active = 1 ORDER BY t.created_at FOR UPDATE');
+    $templateQuery->execute([$ownerId, $serviceId]);
+    $templates = $templateQuery->fetchAll();
+    if (!$templates) return 0.0;
+    $usage = [];
+    foreach ($provided as $line) {
+        if (!is_array($line)) throw new RuntimeException('Некоректні фактичні матеріали процедури.');
+        $linePlanItemId = trim((string)($line['treatment_plan_item_id'] ?? ''));
+        $lineServiceId = trim((string)($line['service_id'] ?? ''));
+        $matches = $planItemId !== '' ? $linePlanItemId === $planItemId : ($linePlanItemId === '' && $lineServiceId === $serviceId);
+        if (!$matches) continue;
+        $itemId = trim((string)($line['inventory_item_id'] ?? ''));
+        if (isset($usage[$itemId])) throw new RuntimeException('Матеріал повторюється у списку фактичного використання.');
+        $quantity = (string)($line['quantity'] ?? '');
+        if (!is_numeric($quantity) || (float)$quantity < 0 || (float)$quantity > 9999999999.9999) throw new RuntimeException('Вкажіть коректну фактичну кількість матеріалу.');
+        $usage[$itemId] = (float)$quantity;
+    }
+    $requiredIds = array_fill_keys(array_map(static fn(array $row): string => (string)$row['inventory_item_id'], $templates), true);
+    foreach ($usage as $itemId => $_) if (!isset($requiredIds[$itemId])) throw new RuntimeException('У фактичних матеріалах є позиція, якої немає у шаблоні процедури.');
+    foreach ($templates as $template) if (!array_key_exists((string)$template['inventory_item_id'], $usage)) throw new RuntimeException('Підтвердьте фактичне використання матеріалів для кожної послуги.');
+
+    $locationQuery = $pdo->prepare('SELECT id FROM dental_erp_inventory_locations WHERE owner_id = ? AND is_active = 1 ORDER BY (name = \'Основний склад\') DESC, created_at LIMIT 1');
+    $locationQuery->execute([$ownerId]);
+    $locationId = (string)($locationQuery->fetchColumn() ?: '');
+    if ($locationId === '') throw new RuntimeException('Для списання матеріалів не налаштовано складське місце.');
+    $batchQuery = $pdo->prepare('SELECT id, available_quantity, purchase_unit_cost FROM dental_erp_inventory_batches WHERE owner_id = ? AND item_id = ? AND location_id = ? AND is_blocked = 0 AND available_quantity > 0 AND (expiration_date IS NULL OR expiration_date >= CURRENT_DATE) ORDER BY (expiration_date IS NULL) ASC, expiration_date ASC, received_at ASC, id ASC FOR UPDATE');
+    $batchUpdate = $pdo->prepare('UPDATE dental_erp_inventory_batches SET available_quantity = available_quantity - ? WHERE id = ? AND owner_id = ? AND available_quantity >= ?');
+    $movementInsert = $pdo->prepare("INSERT INTO dental_erp_stock_movements (id, owner_id, item_id, batch_id, location_id, movement_type, quantity, unit_cost, source_type, source_id, idempotency_key, note, actor_id) VALUES (?, ?, ?, ?, ?, 'consumption', ?, ?, 'performed_service', ?, ?, ?, ?)");
+    $materialInsert = $pdo->prepare('INSERT INTO dental_erp_performed_service_materials (id, owner_id, performed_service_id, template_id, inventory_item_id, batch_id, stock_movement_id, quantity, unit_cost, total_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    $totalCost = 0.0;
+    foreach ($templates as $template) {
+        $itemId = (string)$template['inventory_item_id']; $remaining = (float)$usage[$itemId];
+        if ($remaining <= 0) continue;
+        $batchQuery->execute([$ownerId, $itemId, $locationId]); $batches = $batchQuery->fetchAll();
+        $available = array_sum(array_map(static fn(array $batch): float => (float)$batch['available_quantity'], $batches));
+        if ($available + 0.0000001 < $remaining) throw new RuntimeException('Недостатній придатний залишок матеріалу «' . $template['item_name'] . '». Перевірте партії або отримайте товар.');
+        foreach ($batches as $batch) {
+            if ($remaining <= 0.0000001) break;
+            $used = min($remaining, (float)$batch['available_quantity']);
+            $usedText = number_format($used, 4, '.', ''); $unitCost = number_format((float)$batch['purchase_unit_cost'], 4, '.', '');
+            $lineCost = round($used * (float)$unitCost, 4); $movementId = dentalId();
+            $batchUpdate->execute([$usedText, $batch['id'], $ownerId, $usedText]);
+            if ($batchUpdate->rowCount() !== 1) throw new RuntimeException('Залишок партії змінився. Оновіть картку та повторіть підтвердження.');
+            $movementKey = 'service:' . $performedId . ':' . $batch['id'];
+            $movementInsert->execute([$movementId, $ownerId, $itemId, $batch['id'], $locationId, $usedText, $unitCost, $performedId, $movementKey, 'Матеріал списано під час підтвердження послуги.', $userId]);
+            $materialInsert->execute([dentalId(), $ownerId, $performedId, $template['id'], $itemId, $batch['id'], $movementId, $usedText, $unitCost, number_format($lineCost, 4, '.', '')]);
+            $totalCost += $lineCost; $remaining -= $used;
+        }
+    }
+    $pdo->prepare('INSERT INTO dental_erp_audit (id, owner_id, actor_id, entity_type, entity_id, action, details) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([dentalId(), $ownerId, $userId, 'performed_service', $performedId, 'materials_consumed', dentalJson(['cost' => number_format($totalCost, 4, '.', '')])]);
+    return round($totalCost, 4);
+}
 function dentalPatient(PDO $pdo, array $context, array $user, string $patientId, string $claim = 'read'): array
 {
     if (!preg_match('/^[a-f0-9]{32}$/i', $patientId)) jsonResponse(false, 'Некоректний ID пацієнта.', [], 422);
@@ -107,6 +163,11 @@ function dentalRecalculateInvoice(PDO $pdo, string $invoiceId): void
 $schema = file_get_contents(__DIR__ . '/../database/dentistry_care.sql');
 if ($schema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічних даних.', [], 500);
 foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $schema) ?: [])) as $statement) $pdo->exec($statement);
+$erpSchema = file_get_contents(__DIR__ . '/../database/dentistry_erp.sql');
+if ($erpSchema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічної ERP.', [], 500);
+foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $erpSchema) ?: [])) as $statement) $pdo->exec($statement);
+$pdo->prepare('INSERT IGNORE INTO dental_erp_inventory_locations (id, owner_id, name) VALUES (?, ?, ?)')->execute([md5($ownerId . '|dental-location|main'), $ownerId, 'Основний склад']);
+require_once __DIR__ . '/dentistry-erp-ledger.php';
 $planItemColumns = array_column($pdo->query('SHOW COLUMNS FROM dental_treatment_plan_items')->fetchAll(), 'Field');
 if (!in_array('completed_quantity', $planItemColumns, true)) {
     $pdo->exec('ALTER TABLE dental_treatment_plan_items ADD completed_quantity SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER quantity');
@@ -318,6 +379,8 @@ if ($action === 'update_treatment_plan') {
 if ($action === 'perform_treatment_plans') {
     $appointmentId = trim((string)($data['appointment_id'] ?? ''));
     $planIds = array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($data['treatment_plan_ids'] ?? [])))));
+    $materialUsage = $data['material_usage'] ?? [];
+    if (!is_array($materialUsage)) jsonResponse(false, 'Некоректні дані фактичного використання матеріалів.', [], 422);
     if (!$planIds) jsonResponse(false, 'Оберіть один або кілька планів лікування.', [], 422);
     foreach ($planIds as $planId) if (!preg_match('/^[a-f0-9]{32}$/i', $planId)) jsonResponse(false, 'Некоректний список планів лікування.', [], 422);
     $appointment = dentalAppointment($pdo, $appointmentId, $patientId, true);
@@ -350,6 +413,14 @@ if ($action === 'perform_treatment_plans') {
             $lineCents = $unitCents * $quantity;
             $performedId = dentalId();
             $insertPerformed->execute([$performedId, $patientId, $appointmentId, $doctorId, $item['service_id'], $item['service_name'], $item['id'], $item['tooth_number'], $quantity, dentalMoney($unitCents), dentalMoney($lineCents), $performedAt, $userId]);
+        $materialCost = dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)($item['service_id'] ?? ''), (string)$item['id'], $performedId, $materialUsage);
+        if ($materialCost > 0) {
+            $costCents = (int)round($materialCost * 100);
+            if ($costCents > 0) dentalErpPostJournal($pdo, $ownerId, $userId, 'procedure_materials', $performedId, $performedAt, 'Списання матеріалів · ' . $item['service_name'], [
+                ['account' => 'material_expense', 'debit_cents' => $costCents, 'credit_cents' => 0],
+                ['account' => 'inventory', 'debit_cents' => 0, 'credit_cents' => $costCents],
+            ]);
+        }
             $performedIds[] = $performedId;
             $totalCents += $lineCents;
             $pdo->prepare("UPDATE dental_treatment_plan_items SET completed_quantity = quantity, status = 'completed' WHERE id = ?")->execute([$item['id']]);
@@ -367,6 +438,10 @@ if ($action === 'perform_treatment_plans') {
         $amount = dentalMoney($totalCents);
         $pdo->prepare("INSERT INTO dental_invoices (id, invoice_number, patient_id, subtotal, total_amount, remaining_amount, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'issued', ?)")
             ->execute([$invoiceId, $invoiceNumber, $patientId, $amount, $amount, $amount, $userId]);
+        dentalErpPostJournal($pdo, $ownerId, $userId, 'patient_invoice', $invoiceId, date('Y-m-d'), 'Рахунок пацієнта ' . $invoiceNumber, [
+            ['account' => 'receivable', 'debit_cents' => $totalCents, 'credit_cents' => 0],
+            ['account' => 'service_income', 'debit_cents' => 0, 'credit_cents' => $totalCents],
+        ]);
         $insertInvoiceItem = $pdo->prepare('INSERT INTO dental_invoice_items (id, invoice_id, performed_service_id, service_name, tooth_number, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         $performedQuery = $pdo->prepare('SELECT id, service_name, tooth_number, quantity, unit_price, total_price FROM dental_performed_services WHERE id = ? AND patient_id = ?');
         foreach ($performedIds as $performedId) {
@@ -397,6 +472,8 @@ if ($action === 'perform_service') {
     $tooth = isset($data['tooth_number']) && (int)$data['tooth_number'] > 0 ? (int)$data['tooth_number'] : null;
     if ($tooth !== null && !in_array($tooth, $allowedTeeth, true)) jsonResponse(false, 'Некоректний номер зуба.', [], 422);
     $planItemId = trim((string)($data['treatment_plan_item_id'] ?? ''));
+    $materialUsage = $data['material_usage'] ?? [];
+    if (!is_array($materialUsage)) jsonResponse(false, 'Некоректні дані фактичного використання матеріалів.', [], 422);
     $unitCents = dentalCents($catalog['client_price']); $totalCents = $unitCents * $quantity;
     $performedId = dentalId();
     $pdo->beginTransaction();
@@ -418,6 +495,7 @@ if ($action === 'perform_service') {
         $doctorId = (string)($appointment['assignee_id'] ?: $userId);
         $pdo->prepare('INSERT INTO dental_performed_services (id, patient_id, appointment_id, doctor_id, service_id, service_name, treatment_plan_item_id, tooth_number, quantity, unit_price, total_price, performed_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([$performedId, $patientId, $appointmentId, $doctorId, $catalog['id'], $catalog['name'], $planItemId ?: null, $tooth, $quantity, dentalMoney($unitCents), dentalMoney($totalCents), $dateTime($data['performed_at'] ?? $appointment['due_date']), $userId]);
+        dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)$catalog['id'], $planItemId, $performedId, $materialUsage);
         dentalAudit($pdo, $userId, 'performed_service', $performedId, 'created', ['appointment_id' => $appointmentId, 'total_price' => dentalMoney($totalCents)]);
         $pdo->commit();
         jsonResponse(true, 'Виконану послугу збережено окремо від оплати.', ['id' => $performedId, 'unit_price' => dentalMoney($unitCents), 'total_price' => dentalMoney($totalCents)]);
@@ -448,6 +526,10 @@ if ($action === 'create_invoice') {
             ->execute([$invoiceId, $invoiceNumber, $patientId, dentalMoney($totalCents), dentalMoney($totalCents), dentalMoney($totalCents), $userId]);
         $insert = $pdo->prepare('INSERT INTO dental_invoice_items (id, invoice_id, performed_service_id, service_name, tooth_number, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         foreach ($services as $service) $insert->execute([dentalId(), $invoiceId, $service['id'], $service['service_name'], $service['tooth_number'], $service['quantity'], $service['unit_price'], $service['total_price']]);
+        dentalErpPostJournal($pdo, $ownerId, $userId, 'patient_invoice', $invoiceId, date('Y-m-d'), 'Рахунок пацієнта ' . $invoiceNumber, [
+            ['account' => 'receivable', 'debit_cents' => $totalCents, 'credit_cents' => 0],
+            ['account' => 'service_income', 'debit_cents' => 0, 'credit_cents' => $totalCents],
+        ]);
         dentalAudit($pdo, $userId, 'invoice', $invoiceId, 'issued', ['invoice_number' => $invoiceNumber, 'total_amount' => dentalMoney($totalCents)]);
         $pdo->commit();
         jsonResponse(true, 'Рахунок створено з виконаних послуг.', ['id' => $invoiceId, 'invoice_number' => $invoiceNumber, 'total_amount' => dentalMoney($totalCents)]);
@@ -462,12 +544,17 @@ if ($action === 'cancel_invoice') {
     $invoiceId = trim((string)($data['id'] ?? ''));
     $pdo->beginTransaction();
     try {
-        $query = $pdo->prepare('SELECT id, paid_amount, status FROM dental_invoices WHERE id = ? AND patient_id = ? FOR UPDATE');
+        $query = $pdo->prepare('SELECT id, total_amount, paid_amount, status FROM dental_invoices WHERE id = ? AND patient_id = ? FOR UPDATE');
         $query->execute([$invoiceId, $patientId]); $invoice = $query->fetch();
         if (!$invoice) throw new RuntimeException('Рахунок не знайдено.');
         if ((float)$invoice['paid_amount'] > 0) throw new RuntimeException('Спочатку зареєструйте повернення оплати, потім скасовуйте рахунок.');
         if ($invoice['status'] !== 'cancelled') {
             $pdo->prepare("UPDATE dental_invoices SET status = 'cancelled', remaining_amount = 0 WHERE id = ?")->execute([$invoiceId]);
+            $amountCents = dentalCents($invoice['total_amount']);
+            if ($amountCents > 0) dentalErpPostJournal($pdo, $ownerId, $userId, 'patient_invoice_cancel', $invoiceId, date('Y-m-d'), 'Сторно скасованого рахунку пацієнта', [
+                ['account' => 'service_income', 'debit_cents' => $amountCents, 'credit_cents' => 0],
+                ['account' => 'receivable', 'debit_cents' => 0, 'credit_cents' => $amountCents],
+            ]);
             dentalAudit($pdo, $userId, 'invoice', $invoiceId, 'cancelled');
         }
         $pdo->commit();
@@ -540,6 +627,18 @@ if ($action === 'create_payment' || $action === 'refund_payment') {
         $insertAllocation = $pdo->prepare('INSERT INTO dental_payment_allocations (id, payment_id, invoice_id, amount) VALUES (?, ?, ?, ?)');
         foreach ($lockedInvoices as [$invoiceId, $cents]) $insertAllocation->execute([dentalId(), $paymentId, $invoiceId, dentalMoney($cents)]);
         foreach (array_unique(array_column($lockedInvoices, 0)) as $invoiceId) dentalRecalculateInvoice($pdo, (string)$invoiceId);
+        if ($type === 'payment') {
+            $unallocatedCents = $amountCents - $allocationCents;
+            $lines = [['account' => 'cash', 'debit_cents' => $amountCents, 'credit_cents' => 0]];
+            if ($allocationCents > 0) $lines[] = ['account' => 'receivable', 'debit_cents' => 0, 'credit_cents' => $allocationCents];
+            if ($unallocatedCents > 0) $lines[] = ['account' => 'patient_advance', 'debit_cents' => 0, 'credit_cents' => $unallocatedCents];
+        } else {
+            $lines = [];
+            if ($allocationCents > 0) $lines[] = ['account' => 'receivable', 'debit_cents' => $allocationCents, 'credit_cents' => 0];
+            if ($allocationCents === 0) $lines[] = ['account' => 'patient_advance', 'debit_cents' => $amountCents, 'credit_cents' => 0];
+            $lines[] = ['account' => 'cash', 'debit_cents' => 0, 'credit_cents' => $amountCents];
+        }
+        dentalErpPostJournal($pdo, $ownerId, $userId, $type === 'refund' ? 'patient_refund' : 'patient_payment', $paymentId, $dateTime($dateValue ?: date('Y-m-d H:i:s')), $type === 'refund' ? 'Повернення пацієнту' : 'Оплата пацієнта', $lines);
         dentalAudit($pdo, $userId, 'payment', $paymentId, $type === 'refund' ? 'refunded' : 'received', ['amount' => dentalMoney($amountCents), 'allocations' => $lockedInvoices]);
         $pdo->commit();
         jsonResponse(true, $type === 'refund' ? 'Повернення коштів зареєстровано.' : 'Оплату зареєстровано.', ['id' => $paymentId, 'amount' => dentalMoney($amountCents), 'advance' => dentalMoney($type === 'payment' ? max(0, $amountCents - $allocationCents) : 0)]);
@@ -567,8 +666,13 @@ if ($action === 'allocate_advance') {
         $invoiceQuery->execute([$invoiceId, $patientId]); $invoice = $invoiceQuery->fetch();
         if (!$invoice || $invoice['status'] === 'cancelled') throw new RuntimeException('Рахунок не знайдено або скасовано.');
         if ($amountCents > (int)round((float)$invoice['remaining_amount'] * 100)) throw new RuntimeException('Зарахування перевищує борг за рахунком.');
-        $pdo->prepare('INSERT INTO dental_payment_allocations (id, payment_id, invoice_id, amount) VALUES (?, ?, ?, ?)')->execute([dentalId(), $paymentId, $invoiceId, dentalMoney($amountCents)]);
+        $allocationId = dentalId();
+        $pdo->prepare('INSERT INTO dental_payment_allocations (id, payment_id, invoice_id, amount) VALUES (?, ?, ?, ?)')->execute([$allocationId, $paymentId, $invoiceId, dentalMoney($amountCents)]);
         dentalRecalculateInvoice($pdo, $invoiceId);
+        dentalErpPostJournal($pdo, $ownerId, $userId, 'advance_allocation', $allocationId, date('Y-m-d'), 'Зарахування авансу пацієнта', [
+            ['account' => 'patient_advance', 'debit_cents' => $amountCents, 'credit_cents' => 0],
+            ['account' => 'receivable', 'debit_cents' => 0, 'credit_cents' => $amountCents],
+        ]);
         dentalAudit($pdo, $userId, 'payment', $paymentId, 'advance_allocated', ['invoice_id' => $invoiceId, 'amount' => dentalMoney($amountCents)]);
         $pdo->commit();
         jsonResponse(true, 'Аванс зараховано на рахунок.');

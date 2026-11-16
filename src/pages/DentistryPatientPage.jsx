@@ -7,6 +7,7 @@ import { api, post } from "../services/api.js";
 import { apiUrl } from "../config.js";
 import { DentalToothChart } from "./Clients.jsx";
 import "./dentistry-patient.css";
+import "./dentistry-material-usage.css";
 
 const money = value => `${Number(value || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} грн`;
 const dateTime = value => {
@@ -61,6 +62,7 @@ export default function DentistryPatientPage() {
   const [patient, setPatient] = useState(null);
   const [teamUsers, setTeamUsers] = useState([]);
   const [care, setCare] = useState(null);
+  const [erpData, setErpData] = useState(null);
   const [services, setServices] = useState([]);
   const [tab, setTab] = useState(requestedTab || initialDraft.tab || tabs[0]);
   const [invoicePage, setInvoicePage] = useState(1);
@@ -69,6 +71,7 @@ export default function DentistryPatientPage() {
   const [planTeeth, setPlanTeeth] = useState(initialDraft.planTeeth || []);
   const [performed, setPerformed] = useState(initialDraft.performed || emptyPerformed);
   const [selectedPlanIds, setSelectedPlanIds] = useState(initialDraft.selectedPlanIds || []);
+  const [materialUsage, setMaterialUsage] = useState(initialDraft.materialUsage || {});
   const [payment, setPayment] = useState(initialDraft.payment || emptyPayment);
   const [advanceAllocation, setAdvanceAllocation] = useState(initialDraft.advanceAllocation || { payment_id: "", invoice_id: "", amount: "" });
   const [documentFile, setDocumentFile] = useState(null);
@@ -85,6 +88,7 @@ export default function DentistryPatientPage() {
     setPlanTeeth(draft.planTeeth || []);
     setPerformed(draft.performed || emptyPerformed);
     setSelectedPlanIds(draft.selectedPlanIds || []);
+    setMaterialUsage(draft.materialUsage || {});
     setPayment(draft.payment || emptyPayment);
     setAdvanceAllocation(draft.advanceAllocation || { payment_id: "", invoice_id: "", amount: "" });
     setLoadedDraftFor(id);
@@ -93,9 +97,9 @@ export default function DentistryPatientPage() {
   useEffect(() => {
     if (loadedDraftFor !== id) return;
     try {
-      sessionStorage.setItem(`dentistry-patient-draft:${id}`, JSON.stringify({ tab, record, plan, planTeeth, performed, selectedPlanIds, payment, advanceAllocation }));
+      sessionStorage.setItem(`dentistry-patient-draft:${id}`, JSON.stringify({ tab, record, plan, planTeeth, performed, selectedPlanIds, materialUsage, payment, advanceAllocation }));
     } catch { /* Draft saving should never block patient care. */ }
-  }, [id, loadedDraftFor, tab, record, plan, planTeeth, performed, selectedPlanIds, payment, advanceAllocation]);
+  }, [id, loadedDraftFor, tab, record, plan, planTeeth, performed, selectedPlanIds, materialUsage, payment, advanceAllocation]);
 
   const refresh = useCallback(async () => {
     const [clientsResult, careResult, serviceResult] = await Promise.all([
@@ -114,6 +118,7 @@ export default function DentistryPatientPage() {
   }, [id, navigate]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { let active = true; api("/api/dentistry-erp.php?action=overview").then(result => { if (active) setErpData(result.ok ? result : null); }); return () => { active = false; }; }, [id]);
   useEffect(() => {
     let refreshing = false;
     const refreshWhenVisible = async () => {
@@ -139,6 +144,10 @@ export default function DentistryPatientPage() {
   const availableAdvances = useMemo(() => (care?.payments || []).filter(item => item.payment_type === "payment" && Number(item.amount) > Number(item.allocated_amount || 0)), [care]);
   const performablePlans = useMemo(() => (care?.treatment_plans || []).filter(item => item.status === "active" && (item.items || []).some(row => row.status !== "completed" && Number(row.quantity) > Number(row.completed_quantity || 0))), [care]);
   const selectedPlans = useMemo(() => performablePlans.filter(item => selectedPlanIds.includes(item.id)), [performablePlans, selectedPlanIds]);
+  const planMaterialRequirements = useMemo(() => selectedPlans.flatMap(selectedPlan => (selectedPlan.items || []).filter(row => Number(row.quantity) > Number(row.completed_quantity || 0)).flatMap(row => {
+    const remaining = Math.max(0, Number(row.quantity) - Number(row.completed_quantity || 0));
+    return (erpData?.service_material_templates || []).filter(template => String(template.service_id) === String(row.service_id)).map(template => ({ key: `${row.id}:${template.inventory_item_id}`, planItemId: row.id, serviceId: row.service_id, itemId: template.inventory_item_id, name: template.item_name, unit: template.unit_symbol, expectedQuantity: Number(template.expected_quantity) * remaining, available: Number((erpData?.items || []).find(item => String(item.id) === String(template.inventory_item_id))?.available_stock || 0) }));
+  })), [selectedPlans, erpData]);
   const planExecutionEstimate = useMemo(() => selectedPlans.reduce((total, item) => total + (item.items || []).reduce((sum, row) => {
     const remaining = Math.max(0, Number(row.quantity) - Number(row.completed_quantity || 0));
     return sum + Number(row.planned_price || 0) * remaining;
@@ -184,11 +193,13 @@ export default function DentistryPatientPage() {
 
   async function performService(event) {
     event.preventDefault();
-    const result = await runAction("perform_treatment_plans", { appointment_id: performed.appointment_id, treatment_plan_ids: selectedPlanIds });
+    const material_usage = planMaterialRequirements.map(line => ({ treatment_plan_item_id: line.planItemId, service_id: line.serviceId, inventory_item_id: line.itemId, quantity: materialUsage[line.key] ?? String(line.expectedQuantity) }));
+    const result = await runAction("perform_treatment_plans", { appointment_id: performed.appointment_id, treatment_plan_ids: selectedPlanIds, material_usage });
     if (result) {
       setNotice(`Прийом завершено. Рахунок ${result.invoice_number} на ${money(result.total_amount)} сформовано автоматично.`);
       setPerformed(emptyPerformed);
       setSelectedPlanIds([]);
+      setMaterialUsage({});
     }
   }
 
@@ -289,9 +300,11 @@ export default function DentistryPatientPage() {
             </span>
           </label>) : <p className="dentistry-muted-empty">Немає активних планів із послугами, що очікують виконання.</p>}
         </fieldset>
+        {selectedPlanIds.length > 0 && !erpData && <div className="dentistry-care-alert error" role="alert">Не вдалося завантажити шаблони матеріалів. Оновіть сторінку перед підтвердженням послуг.</div>}
+        {planMaterialRequirements.length > 0 && <fieldset className="dentistry-material-usage"><legend>Фактично використані матеріали</legend><p>Змініть кількість до фактичної. Система спише її зі складу за партіями з найближчим терміном придатності.</p>{planMaterialRequirements.map(line => <label key={line.key}><span><strong>{line.name}</strong><small>{selectedPlans.find(item => item.items?.some(row => row.id === line.planItemId))?.items?.find(row => row.id === line.planItemId)?.service_name} · очікувано {line.expectedQuantity} {line.unit} · доступно {line.available} {line.unit}</small></span><input type="number" min="0" max={line.available} step="0.0001" value={materialUsage[line.key] ?? String(line.expectedQuantity)} onChange={event => setMaterialUsage(current => ({ ...current, [line.key]: event.target.value }))} aria-label={`Фактично використано ${line.name}`} /></label>)}</fieldset>}
         <div className="dentistry-plan-total"><span>Сума автоматичного рахунку</span><strong>{money(planExecutionEstimate)}</strong></div>
         <p className="dentistry-appointment-finish-note">Після підтвердження послуги зафіксуються, плани оновляться, а рахунок буде створено автоматично. Прийом матиме статус «Завершено»; до архіву його можна перемістити окремо.</p>
-        <button className="primary-action" disabled={busy || !performed.appointment_id || !selectedPlanIds.length || planExecutionEstimate <= 0} type="submit">Підтвердити послуги й створити рахунок</button>
+        <button className="primary-action" disabled={busy || !erpData || !performed.appointment_id || !selectedPlanIds.length || planExecutionEstimate <= 0} type="submit">Підтвердити послуги й створити рахунок</button>
       </form><section className="dentistry-care-panel"><header><div><h2>Надані послуги</h2><p>Послуги зберігаються окремо, рахунок створюється під час підтвердження плану.</p></div></header>{care.performed_services?.map(item => <article className="dentistry-care-row" key={item.id}><span className="dentistry-row-icon done"><Icon name="check" /></span><div><strong>{item.service_name}{item.tooth_number ? ` · зуб ${item.tooth_number}` : ""}</strong><small>{dateTime(item.performed_at)} · {item.doctor_name || "Лікар"} · {item.quantity} од.{item.invoice_id ? ` · рахунок ${item.invoice_id}` : " · не виставлено"}</small></div><b>{money(item.total_price)}</b></article>)}{!care.performed_services?.length && <p className="dentistry-muted-empty">Виконаних послуг поки немає.</p>}</section></div>}
       {tab === "Рахунки" && <section className="dentistry-care-panel dentistry-invoices-panel"><header className="dentistry-invoice-list-header"><div><h2>Рахунки</h2><p>Рахунки за виконані послуги та збережені ціни.</p></div><div className="dentistry-invoice-header-actions"><span className="dentistry-invoice-count">{care.invoices?.length || 0} рахунків</span><button className="primary-action dentistry-create-invoice-button" type="button" disabled={busy || !uninvoiced.length} onClick={createInvoice}><Icon name="plus" /> Створити рахунок{uninvoiced.length ? ` · ${money(uninvoiced.reduce((sum, item) => sum + Number(item.total_price), 0))}` : ""}</button></div></header>
           {care.invoices?.length ? <div className="dentistry-invoice-list">{visibleInvoices.map(invoice => <article className="dentistry-invoice-row" key={invoice.id}><header><div><strong>{invoice.invoice_number}</strong><small>{dateTime(invoice.created_at)} · {({ issued: "Виставлений", partially_paid: "Частково оплачений", paid: "Оплачений", cancelled: "Скасований" })[invoice.status] || invoice.status}</small></div><b>{money(invoice.total_amount)}</b></header><div className="dentistry-invoice-items">{invoice.items?.map(item => <div key={item.id}><span>{item.service_name}{item.tooth_number ? ` · зуб ${item.tooth_number}` : ""} · {item.quantity} од.</span><b>{money(item.total_price)}</b></div>)}</div><footer><span>Оплачено: {money(invoice.paid_amount)} · Залишок: {money(invoice.remaining_amount)}</span><div className="dentistry-invoice-actions"><button type="button" className="outline-btn dentistry-print-invoice-button" onClick={() => printInvoice(invoice, patient)}><Icon name="document" /> Друк</button>{invoice.status !== "cancelled" && Number(invoice.paid_amount) === 0 && <button type="button" className="outline-btn" onClick={() => runAction("cancel_invoice", { id: invoice.id }, "Рахунок скасовано зі збереженням історії.")}>Скасувати рахунок</button>}</div></footer></article>)}</div> : <p className="dentistry-muted-empty">{uninvoiced.length ? "Є виконані послуги для рахунку. Натисніть «Створити рахунок»." : "Рахунків і послуг для виставлення поки немає."}</p>}

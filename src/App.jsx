@@ -25,6 +25,7 @@ import AppointmentEditPage from "./pages/AppointmentEditPage.jsx";
 import AppointmentDetailPage from "./pages/AppointmentDetailPage.jsx";
 import DentistryModuleRoute from "./components/DentistryModuleRoute.jsx";
 import DentistryPatientPage from "./pages/DentistryPatientPage.jsx";
+import DentistryERPPage from "./pages/DentistryERPPage.jsx";
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/patients/:id" element={<DentistryModuleRoute><DentistryPatientPage /></DentistryModuleRoute>} />
+      <Route path="/dentistry-erp" element={<DentistryModuleRoute><DentistryERPPage /></DentistryModuleRoute>} />
       <Route path="/calendar" element={<PlanFeatureRoute feature="calendar"><Calendar /></PlanFeatureRoute>} />
       <Route path="/appointments" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><Appointments /></DentistryModuleRoute></PlanFeatureRoute>} />
       <Route path="/appointments/:id" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><AppointmentDetailPage /></DentistryModuleRoute></PlanFeatureRoute>} />
