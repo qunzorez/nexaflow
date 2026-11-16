@@ -30,30 +30,17 @@ if ($planContext && ($planContext['workspace_role'] ?? '') === 'manager') {
 $canManage = $currentUser && in_array($planContext['workspace_role'] ?? '', ['admin', 'owner', 'manager', 'project_lead'], true);
 $isProjectLead = ($planContext['workspace_role'] ?? '') === 'project_lead';
 $isAdmin = $currentUser && in_array($currentUser['role'], ['admin', 'owner'], true);
-<<<<<<< Updated upstream
-if (!$currentUser) {
-=======
 if (!$currentUser || (!$canManage && !$isAdmin && !(($method === 'GET') || ($method === 'POST' && $action === 'leave_workspace')))) {
->>>>>>> Stashed changes
     jsonResponse(false, 'Недостатньо прав для керування командою.', [], 403);
 }
-if (!$canManage && !(($method === 'GET') || ($method === 'POST' && $action === 'leave_workspace'))) jsonResponse(false, 'Недостатньо прав для керування командою.', [], 403);
+if (!$canManage && !$isAdmin && !(($method === 'GET') || ($method === 'POST' && $action === 'leave_workspace'))) jsonResponse(false, 'Недостатньо прав для керування командою.', [], 403);
 try {
     if ($method === 'GET') {
-<<<<<<< Updated upstream
-        if (!$canManage) {
-            $ownerId = (string)($planContext['owner_id'] ?? '');
-            if ($ownerId === $userId || !in_array(($planContext['workspace_role'] ?? ''), ['user', 'project_lead'], true)) jsonResponse(false, 'Ви не є учасником чужого робочого простору.', [], 403);
-            $ownerQuery = $pdo->prepare('SELECT name FROM users WHERE id = ? LIMIT 1');
-            $ownerQuery->execute([$ownerId]);
-            jsonResponse(true, 'Інформацію про простір завантажено.', ['membership' => ['workspace_id' => $ownerId, 'workspace_name' => (string)($ownerQuery->fetchColumn() ?: 'Робочий простір'), 'workspace_role' => (string)($planContext['workspace_role'] ?? 'user')]]);
-=======
         if (!$canManage && !$isAdmin) {
             $activeWorkspace = null;
             foreach (($planContext['workspaces'] ?? []) as $workspace) if ((string)$workspace['id'] === (string)$planContext['owner_id']) { $activeWorkspace = $workspace; break; }
             if (!$activeWorkspace || !empty($activeWorkspace['is_own'])) jsonResponse(false, 'Немає простору, з якого можна вийти.', [], 403);
             jsonResponse(true, 'Інформацію про простір завантажено.', ['membership' => ['workspace_id' => (string)$planContext['owner_id'], 'workspace_name' => (string)$activeWorkspace['name'], 'workspace_role' => (string)($planContext['workspace_role'] ?? 'user')]]);
->>>>>>> Stashed changes
         }
         if ($isAdmin) {
             $users = $pdo->query('SELECT id, name, email, role, is_support_agent, created_at FROM users ORDER BY name')->fetchAll();
@@ -160,27 +147,6 @@ try {
         }
         $adminWorkspaces = [];
         $adminWorkspaceMembers = [];
-<<<<<<< Updated upstream
-        $selectedAdminWorkspace = '';
-        if ($isAdmin) {
-            $adminWorkspaces = $pdo->query("SELECT id, name, email FROM users WHERE role IN ('manager','admin','owner') ORDER BY name")->fetchAll();
-            $selectedAdminWorkspace = trim((string)($_GET['workspace_owner_id'] ?? ''));
-            if ($selectedAdminWorkspace !== '') {
-                $workspaceExists = false;
-                foreach ($adminWorkspaces as $workspace) if ((string)$workspace['id'] === $selectedAdminWorkspace) { $workspaceExists = true; break; }
-                if ($workspaceExists) {
-                    $leadIdsQuery = $pdo->prepare("SELECT DISTINCT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?");
-                    $leadIdsQuery->execute([$selectedAdminWorkspace]);
-                    $selectedActors = array_values(array_unique(array_merge([$selectedAdminWorkspace], array_map('strval', $leadIdsQuery->fetchAll(PDO::FETCH_COLUMN)))));
-                    $selectedMarks = implode(',', array_fill(0, count($selectedActors), '?'));
-                    $selectedMembersQuery = $pdo->prepare("SELECT DISTINCT u.id FROM users u WHERE u.id <> ? AND u.role NOT IN ('admin','owner') AND (EXISTS (SELECT 1 FROM user_invitations i WHERE LOWER(i.email) = LOWER(u.email) AND i.invited_by IN ({$selectedMarks}) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i JOIN projects p ON p.id = i.project_id WHERE LOWER(i.email) = LOWER(u.email) AND i.invited_by IN ({$selectedMarks}) AND p.owner_id = ? AND i.status = 'accepted'))");
-                    $selectedMembersQuery->execute(array_merge([$selectedAdminWorkspace], $selectedActors, $selectedActors, [$selectedAdminWorkspace]));
-                    $adminWorkspaceMembers = array_map('strval', $selectedMembersQuery->fetchAll(PDO::FETCH_COLUMN));
-                } else $selectedAdminWorkspace = '';
-            }
-        }
-        jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'assignable_groups' => $assignableGroups, 'clients' => $clients, 'admin_stats' => $adminStats, 'admin_workspaces' => $adminWorkspaces, 'admin_workspace_owner_id' => $selectedAdminWorkspace, 'admin_workspace_members' => $adminWorkspaceMembers, 'permissions' => ['admin' => $isAdmin, 'project_lead' => $isProjectLead]]);
-=======
         $adminWorkspaceMemberships = [];
         $adminWorkspaceGroups = [];
         $adminWorkspaceName = '';
@@ -237,54 +203,10 @@ try {
         $activeWorkspace = null;
         foreach (($planContext['workspaces'] ?? []) as $workspace) if ((string)$workspace['id'] === (string)$planContext['owner_id']) { $activeWorkspace = $workspace; break; }
         jsonResponse(true, 'Дані команди завантажено.', ['users' => $users, 'pending_invites' => $pendingInvites, 'projects' => $projects, 'members' => $members, 'groups' => $groups, 'assignable_groups' => $assignableGroups, 'clients' => $clients, 'admin_stats' => $adminStats, 'admin_workspaces' => $adminWorkspaces, 'admin_workspace_roster' => $adminWorkspaceRoster, 'admin_workspace_owner_id' => $selectedWorkspaceId, 'admin_workspace_name' => $adminWorkspaceName, 'admin_workspace_members' => $adminWorkspaceMembers, 'admin_workspace_memberships' => $adminWorkspaceMemberships, 'admin_workspace_groups' => $adminWorkspaceGroups, 'current_workspace' => ['id' => (string)$planContext['owner_id'], 'name' => (string)($activeWorkspace['name'] ?? ''), 'is_own' => (bool)($activeWorkspace['is_own'] ?? false), 'workspace_role' => (string)($planContext['workspace_role'] ?? '')], 'permissions' => ['admin' => $isAdmin, 'project_lead' => $isProjectLead]]);
->>>>>>> Stashed changes
     }
 
     if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
     if ($action === 'leave_workspace' || $action === 'remove_member') {
-<<<<<<< Updated upstream
-        $targetId = $action === 'leave_workspace' ? $userId : trim((string)($data['user_id'] ?? ''));
-        $workspaceOwnerId = (string)($planContext['owner_id'] ?? '');
-        if ($action === 'remove_member' && $isAdmin) {
-            $workspaceOwnerId = trim((string)($data['workspace_owner_id'] ?? ''));
-            $ownerRoleQuery = $pdo->prepare("SELECT role FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
-            $ownerRoleQuery->execute([$workspaceOwnerId]);
-            if (!$ownerRoleQuery->fetchColumn()) jsonResponse(false, 'Оберіть робочий простір.', [], 422);
-        } elseif ($action === 'remove_member' && ($planContext['workspace_role'] ?? '') !== 'manager') {
-            jsonResponse(false, 'Видаляти учасників може менеджер або адміністратор.', [], 403);
-        }
-        if ($targetId === '' || $targetId === $workspaceOwnerId || ($action === 'leave_workspace' && !in_array(($planContext['workspace_role'] ?? ''), ['user', 'project_lead'], true))) {
-            jsonResponse(false, 'Власник простору або менеджер не може вийти цим способом.', [], 422);
-        }
-        $targetQuery = $pdo->prepare('SELECT id, email, role FROM users WHERE id = ? LIMIT 1');
-        $targetQuery->execute([$targetId]);
-        $targetUser = $targetQuery->fetch();
-        if (!$targetUser || in_array((string)$targetUser['role'], ['admin', 'owner'], true)) jsonResponse(false, 'Цього користувача не можна прибрати з простору.', [], 403);
-        $workspaceQuery = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
-        $workspaceQuery->execute([$workspaceOwnerId]);
-        if (!$workspaceQuery->fetchColumn()) jsonResponse(false, 'Робочий простір не знайдено.', [], 404);
-        $leadQuery = $pdo->prepare("SELECT DISTINCT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?");
-        $leadQuery->execute([$workspaceOwnerId]);
-        $actorIds = array_values(array_unique(array_merge([$workspaceOwnerId], array_map('strval', $leadQuery->fetchAll(PDO::FETCH_COLUMN)))));
-        $actorMarks = implode(',', array_fill(0, count($actorIds), '?'));
-        $membershipCheck = $pdo->prepare("SELECT 1 FROM users u WHERE u.id = ? AND (EXISTS (SELECT 1 FROM user_invitations i WHERE LOWER(i.email) = LOWER(u.email) AND i.invited_by IN ({$actorMarks}) AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i JOIN projects p ON p.id = i.project_id WHERE LOWER(i.email) = LOWER(u.email) AND i.invited_by IN ({$actorMarks}) AND p.owner_id = ? AND i.status = 'accepted')) LIMIT 1");
-        $membershipCheck->execute(array_merge([$targetId], $actorIds, $actorIds, [$workspaceOwnerId]));
-        if (!$membershipCheck->fetchColumn()) jsonResponse(false, 'Користувач не є учасником цього простору.', [], 404);
-        $pdo->beginTransaction();
-        try {
-            $pdo->prepare('INSERT IGNORE INTO client_members (client_id, user_id, assigned_by) SELECT id, ?, ? FROM clients WHERE created_by = ?')->execute([$workspaceOwnerId, $workspaceOwnerId, $targetId]);
-            $pdo->prepare('DELETE cm FROM client_members cm JOIN clients c ON c.id = cm.client_id WHERE cm.user_id = ? AND c.created_by IN (?, ?)')->execute([$targetId, $workspaceOwnerId, $targetId]);
-            $pdo->prepare("DELETE pgm FROM project_group_members pgm JOIN project_groups pg ON pg.id = pgm.group_id WHERE pgm.user_id = ? AND pg.project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?")->execute([$targetId, $workspaceOwnerId]);
-            $pdo->prepare('DELETE pm FROM project_members pm JOIN projects p ON p.id = pm.project_id WHERE pm.user_id = ? AND p.owner_id = ?')->execute([$targetId, $workspaceOwnerId]);
-            $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE LOWER(email) = LOWER(?) AND invited_by IN ({$actorMarks}) AND status IN ('accepted','pending')")->execute(array_merge([(string)$targetUser['email']], $actorIds));
-            $pdo->prepare("UPDATE project_invitations pi JOIN projects p ON p.id = pi.project_id SET pi.status = 'revoked' WHERE LOWER(pi.email) = LOWER(?) AND pi.invited_by IN ({$actorMarks}) AND p.owner_id = ? AND pi.status IN ('accepted','pending')")->execute(array_merge([(string)$targetUser['email']], $actorIds, [$workspaceOwnerId]));
-            $pdo->commit();
-        } catch (Throwable $error) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            throw $error;
-        }
-        jsonResponse(true, $action === 'leave_workspace' ? 'Ви вийшли з робочого простору. Ваш обліковий запис і створені дані збережено.' : 'Учасника прибрано з робочого простору. Обліковий запис і створені дані збережено.');
-=======
         $workspaceOwnerId = (string)($planContext['owner_id'] ?? '');
         $targetId = $action === 'leave_workspace' ? $userId : trim((string)($data['user_id'] ?? ''));
         if ($action === 'remove_member' && $isAdmin) {
@@ -321,7 +243,6 @@ try {
         } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $error; }
         if ($action === 'leave_workspace' && (string)($_SESSION['active_workspace_id'] ?? '') === $workspaceOwnerId) unset($_SESSION['active_workspace_id']);
         jsonResponse(true, $action === 'leave_workspace' ? 'Ви вийшли з простору. Ваш обліковий запис і робочі дані збережено.' : 'Користувача прибрано з простору. Обліковий запис і створені дані збережено.');
->>>>>>> Stashed changes
     }
     if ($action === 'create_project') {
         if ($isProjectLead && ($data['invite_role'] ?? 'member') === 'manager') jsonResponse(false, 'Керівник проєкту може запрошувати учасників, але не призначати роль менеджера.', [], 403);
