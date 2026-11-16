@@ -54,6 +54,9 @@ export function clientTaxDeadlines(client, now = new Date()) {
   } else if (system === "ТОВ на загальній системі" || (system === "Загальна система" && client.legal_form === "ТОВ")) {
     const quarterly = Boolean(client.module_data?.tax_income_over_40m);
     add("Декларація з податку на прибуток і фінансова звітність", nextPeriodDeadline(now, quarterly ? "quarter" : "year", quarterly ? 40 : 60), quarterly ? "Квартальний період за доходу попереднього року понад 40 млн грн." : "Річний період за доходу попереднього року до 40 млн грн.");
+    let statisticsDate = nextWorkingDay(new Date(now.getFullYear(), 1, 28));
+    if (statisticsDate < now) statisticsDate = nextWorkingDay(new Date(now.getFullYear() + 1, 1, 28));
+    add("Річна фінансова звітність до Держстату", statisticsDate);
   }
   const isFop = client.legal_form === "ФОП";
   if (client.has_employees) {

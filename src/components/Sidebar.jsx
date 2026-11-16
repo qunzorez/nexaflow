@@ -166,16 +166,11 @@ export default function Sidebar({ user, open }) {
         </Link>}
         {activeClientModule !== "dentistry" && <Link className="nav-item" to="/tasks">
           <span><Icon name="tasks" /></span> Задачі <b>{counts.tasks}</b>
-<<<<<<< Updated upstream
         </Link>}
         {activeClientModule === "dentistry" && planFeatures.calendar && <Link className="nav-item" to="/appointments">
           <span><Icon name="calendar" /></span> Записи
         </Link>}
         {(canManage || (userRole === "user" && String(activeWorkspaceId) !== String(user?.id))) && (
-=======
-        </Link>
-        {(canManage || userRole === "user") && (
->>>>>>> Stashed changes
           <Link className="nav-item" to="/team">
             <span className="nav-icon">
               <Icon name="users" />

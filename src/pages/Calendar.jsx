@@ -134,13 +134,10 @@ export default function Calendar() {
         const isAppointment = Number(task.is_client_appointment) === 1;
         return { id: `task-${task.id}`, kind: isAppointment ? "appointment" : "task", title: task.title, subtitle: task.client_names || task.client_name || task.primary_project_name || "Без проєкту", date, time, archived: isAppointment && task.status === "archived", task };
       });
-<<<<<<< Updated upstream
-    return [...serviceEvents, ...taskEvents].filter(item => item.date && (!doctorFilter || !item.task || (item.task.assignee_ids || []).some(personId => String(personId) === String(doctorFilter)))).sort((a, b) => a.date - b.date);
+    return [...serviceEvents, ...taxEvents, ...taskEvents]
+      .filter(item => item.date && (!doctorFilter || !item.task || (item.task.assignee_ids || []).some(personId => String(personId) === String(doctorFilter))))
+      .sort((a, b) => a.date - b.date);
   }, [data, doctorFilter]);
-=======
-    return [...serviceEvents, ...taxEvents, ...taskEvents].filter(item => item.date).sort((a, b) => a.date - b.date);
-  }, [data]);
->>>>>>> Stashed changes
 
   const eventsByDay = useMemo(() => events.reduce((result, event) => {
     (result[dateKey(event.date)] ||= []).push(event);
