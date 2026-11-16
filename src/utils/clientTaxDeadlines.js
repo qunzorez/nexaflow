@@ -51,7 +51,7 @@ export function clientTaxDeadlines(client, now = new Date()) {
     add("Декларація про майновий стан і доходи ФОП", date, "", "yearly");
   } else if (system === "ТОВ на єдиному податку (3 група)" || system === "Єдиний податок, 3 група" || (system === "3 група" && client.legal_form === "ТОВ")) {
     add("Декларація платника ЄП (юрособа, квартал)", nextPeriodDeadline(now, "quarter", 40), "", "quarterly");
-  } else if (system === "ТОВ на загальній системі" || (system === "Загальна система" && client.legal_form === "ТОВ")) {
+  } else if (system === "ТОВ на загальній системі" || (system === "Загальна система" && ["ТОВ", "ПрАТ", "АТ"].includes(client.legal_form))) {
     const quarterly = Boolean(client.module_data?.tax_income_over_40m);
     add("Декларація з податку на прибуток і фінансова звітність", nextPeriodDeadline(now, quarterly ? "quarter" : "year", quarterly ? 40 : 60), quarterly ? "Квартальний період за доходу попереднього року понад 40 млн грн." : "Річний період за доходу попереднього року до 40 млн грн.", quarterly ? "quarterly" : "yearly");
     let statisticsDate = nextWorkingDay(new Date(now.getFullYear(), 1, 28));

@@ -866,6 +866,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                 value={form.has_excise}
                 onChange={(value) => set("has_excise", value)}
               />
+              {form.module === "accounting" && ["ТОВ", "ПрАТ", "АТ"].includes(form.legal_form) && (form.tax_system === "ТОВ на загальній системі" || form.tax_system === "Загальна система") && <label className={`client-toggle client-income-toggle${form.module_data?.tax_income_over_40m ? " is-active" : ""}`}><input type="checkbox" checked={Boolean(form.module_data?.tax_income_over_40m)} onChange={(event) => set("module_data", { ...form.module_data, tax_income_over_40m: event.target.checked })} /><span>Дохід за попередній рік понад 40 млн грн</span></label>}
               <Toggle
                 label="Наймані працівники"
                 value={form.has_employees}
@@ -886,7 +887,6 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                 </label>
               )}
             </div>
-            {form.module === "accounting" && form.legal_form === "ТОВ" && (form.tax_system === "ТОВ на загальній системі" || form.tax_system === "Загальна система") && <label className={`client-toggle${form.module_data?.tax_income_over_40m ? " is-active" : ""}`}><input type="checkbox" checked={Boolean(form.module_data?.tax_income_over_40m)} onChange={(event) => set("module_data", { ...form.module_data, tax_income_over_40m: event.target.checked })} /><span>Дохід за попередній рік понад 40 млн грн</span><small>Для квартального календаря податку на прибуток</small></label>}
             <fieldset>
               <legend>Специфічні податки</legend>
               <div className="tax-checkbox-grid">
