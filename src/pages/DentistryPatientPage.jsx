@@ -25,6 +25,7 @@ function printInvoice(invoice, patient) {
   popup.document.close();
 }
 const tabs = ["Огляд", "Прийоми", "Медична карта", "Зубна формула", "План лікування", "Виконані послуги", "Рахунки", "Оплати", "Документи"];
+const treatmentPlanStatusLabel = status => ({ active: "Активний", completed: "Завершений", cancelled: "Скасований", planned: "Заплановано", in_progress: "У процесі" }[status] || status);
 
 const emptyRecord = { id: "", appointment_id: "", complaints: "", diagnosis: "", examination: "", recommendations: "", tooth_numbers: [] };
 const emptyPlan = () => ({ title: "", comment: "", items: [{ service_id: "", quantity: 1, tooth_number: "", comment: "" }] });
@@ -125,6 +126,8 @@ export default function DentistryPatientPage() {
     const remaining = Math.max(0, Number(row.quantity) - Number(row.completed_quantity || 0));
     return sum + Number(row.planned_price || 0) * remaining;
   }, 0), 0), [selectedPlans]);
+  const activeTreatmentPlans = useMemo(() => (care?.treatment_plans || []).filter(item => item.status === "active"), [care]);
+  const otherTreatmentPlans = useMemo(() => (care?.treatment_plans || []).filter(item => item.status !== "active"), [care]);
   const planEstimate = useMemo(() => plan.items.reduce((total, item) => {
     const service = services.find(entry => String(entry.id) === String(item.service_id));
     return total + Number(service?.client_price || 0) * Math.max(1, Number(item.quantity || 1)) * Math.max(1, planTeeth.length);
@@ -246,7 +249,11 @@ export default function DentistryPatientPage() {
           <div className="dentistry-plan-total"><span>Орієнтовна сума плану</span><strong>{money(planEstimate)}</strong></div>
           <button className="primary-action" disabled={busy || !services.length || !plan.items.length} type="submit">Створити план</button>
         </form>
-        <section className="dentistry-care-panel"><header><div><h2>Плани пацієнта</h2><p>Виконання позицій оновлюється фактичними послугами.</p></div></header>{care.treatment_plans?.map(item => <article className="dentistry-plan-card" key={item.id}><header><div><strong>{item.title}</strong><small>{item.doctor_name || "Лікар"} · {dateTime(item.created_at)}</small></div><b>{money(item.estimated_total)}</b></header><div className="dentistry-plan-lines">{item.items?.map(row => <div key={row.id}><span>{row.service_name}{row.tooth_number ? ` · зуб ${row.tooth_number}` : ""} · {row.completed_quantity}/{row.quantity}</span><small>{money(row.planned_price)} · {row.status}</small></div>)}</div><footer><span>Статус: {item.status}</span>{item.status === "active" && <button type="button" onClick={() => runAction("update_treatment_plan", { id: item.id, status: "cancelled" }, "План скасовано.")}>Скасувати план</button>}</footer></article>)}</section>
+        <section className="dentistry-care-panel dentistry-patient-plans-panel"><header><div><h2>Плани пацієнта</h2><p>Активні плани відображаються тут, інші згорнуті нижче.</p></div><span className="dentistry-active-plan-count">{activeTreatmentPlans.length} активних</span></header>
+          {activeTreatmentPlans.map(item => <article className="dentistry-plan-card" key={item.id}><header><div><strong>{item.title}</strong><small>{item.doctor_name || "Лікар"} · {dateTime(item.created_at)}</small></div><b>{money(item.estimated_total)}</b></header><div className="dentistry-plan-lines">{item.items?.map(row => <div key={row.id}><span>{row.service_name}{row.tooth_number ? ` · зуб ${row.tooth_number}` : ""} · {row.completed_quantity}/{row.quantity}</span><small>{money(row.planned_price)} · {treatmentPlanStatusLabel(row.status)}</small></div>)}</div><footer><span>Статус: {treatmentPlanStatusLabel(item.status)}</span><button type="button" onClick={() => runAction("update_treatment_plan", { id: item.id, status: "cancelled" }, "План скасовано.")}>Скасувати план</button></footer></article>)}
+          {!activeTreatmentPlans.length && <p className="dentistry-muted-empty">Активних планів лікування немає.</p>}
+          {otherTreatmentPlans.length > 0 && <details className="dentistry-other-plans"><summary>Інші плани <span>{otherTreatmentPlans.length}</span></summary><div>{otherTreatmentPlans.map(item => <article className="dentistry-plan-card" key={item.id}><header><div><strong>{item.title}</strong><small>{item.doctor_name || "Лікар"} · {dateTime(item.created_at)}</small></div><b>{money(item.estimated_total)}</b></header><div className="dentistry-plan-lines">{item.items?.map(row => <div key={row.id}><span>{row.service_name}{row.tooth_number ? ` · зуб ${row.tooth_number}` : ""} · {row.completed_quantity}/{row.quantity}</span><small>{money(row.planned_price)} · {treatmentPlanStatusLabel(row.status)}</small></div>)}</div><footer><span>Статус: {treatmentPlanStatusLabel(item.status)}</span></footer></article>)}</div></details>}
+        </section>
       </div>}
       {tab === "Виконані послуги" && <div className="dentistry-care-grid"><form className="dentistry-care-panel dentistry-care-form" onSubmit={performService}>
         <header><div><h2>Завершити прийом і сформувати рахунок</h2><p>Оберіть прийом і один або кілька планів лікування. У рахунок потраплять усі послуги, що залишилися в цих планах.</p></div></header>
