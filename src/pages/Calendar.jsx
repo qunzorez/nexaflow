@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import Icon from "../components/Icon.jsx";
-import { api } from "../services/api.js";
-import { clientTaxDeadlines } from "../utils/clientTaxDeadlines.js";
+import { api, post } from "../services/api.js";
+import { clientTaxDeadlines, taxDeadlineTaskPayload } from "../utils/clientTaxDeadlines.js";
 import "./calendar.css";
 import "./calendar-appointments.css";
 
@@ -101,6 +101,8 @@ export default function Calendar() {
   });
   const [view, setView] = useState(() => VIEWS.some(option => option.id === searchParams.get("view")) ? searchParams.get("view") : "month");
   const [doctorFilter, setDoctorFilter] = useState("");
+  const taxSyncInProgress = useRef(false);
+  const taxSyncStarted = useRef(false);
 
   useEffect(() => {
     Promise.all([api("/api/clients.php"), api("/api/tasks.php?scope=calendar")]).then(([clientsResult, tasksResult]) => {
@@ -108,6 +110,32 @@ export default function Calendar() {
       setData({ ...clientsResult, tasks: tasksResult.ok ? (tasksResult.tasks || []) : [] });
     });
   }, [navigate]);
+
+  useEffect(() => {
+    if (!data || data.active_client_module === "dentistry" || taxSyncStarted.current || taxSyncInProgress.current) return;
+    const clients = (data.clients || []).filter(client => client.module !== "dentistry");
+    if (!clients.length) return;
+    taxSyncStarted.current = true;
+    taxSyncInProgress.current = true;
+    const existing = new Set((data.tasks || []).flatMap(task =>
+      (task.client_ids || []).map(clientId => `${clientId}:${task.title}:${task.recurrence_rule || "none"}`)
+    ));
+    const pending = clients.flatMap(client => clientTaxDeadlines(client).map(event => ({ client, event })))
+      .filter(({ client, event }) => !existing.has(`${client.id}:${event.title}:${event.recurrenceRule || "none"}`));
+    (async () => {
+      let created = false;
+      for (const { client, event } of pending) {
+        const result = await post("/api/tasks.php", taxDeadlineTaskPayload(client, event));
+        if (!result.ok) break;
+        created = true;
+      }
+      if (created) {
+        const [clientsResult, tasksResult] = await Promise.all([api("/api/clients.php"), api("/api/tasks.php?scope=calendar")]);
+        if (clientsResult.ok && tasksResult.ok) setData({ ...clientsResult, tasks: tasksResult.tasks || [] });
+      }
+      taxSyncInProgress.current = false;
+    })();
+  }, [data]);
 
   const events = useMemo(() => {
     if (!data) return [];
@@ -121,9 +149,6 @@ export default function Calendar() {
         const accountant = (data.available_users || []).find(person => String(person.id) === String(service.accountant_id));
         return { id: `service-${client.id}-${index}`, kind: "service", title: service.name, subtitle: client.name, date: internal, official, client, accountant: accountant || (service.accountant_name ? { name: service.accountant_name } : null) };
       }));
-    const taxEvents = (data.clients || []).flatMap(client => clientTaxDeadlines(client).map(event => ({
-      ...event, kind: "tax", subtitle: client.name, official: event.date,
-    })));
     const taskEvents = (data.tasks || [])
       .filter(task => task.due_date && (!['archived', 'cancelled'].includes(task.status) || (data.active_client_module === "dentistry" && Number(task.is_client_appointment) === 1 && task.status === "archived")))
       .map(task => {
@@ -134,7 +159,7 @@ export default function Calendar() {
         const isAppointment = Number(task.is_client_appointment) === 1;
         return { id: `task-${task.id}`, kind: isAppointment ? "appointment" : "task", title: task.title, subtitle: task.client_names || task.client_name || task.primary_project_name || "Без проєкту", date, time, archived: isAppointment && task.status === "archived", task };
       });
-    return [...serviceEvents, ...taxEvents, ...taskEvents]
+    return [...serviceEvents, ...taskEvents]
       .filter(item => item.date && (!doctorFilter || !item.task || (item.task.assignee_ids || []).some(personId => String(personId) === String(doctorFilter))))
       .sort((a, b) => a.date - b.date);
   }, [data, doctorFilter]);

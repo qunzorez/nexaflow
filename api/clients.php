@@ -269,14 +269,17 @@ $name = trim((string)($data['name'] ?? ''));
 $legalForm = trim((string)($data['legal_form'] ?? ''));
 $taxSystem = trim((string)($data['tax_system'] ?? ''));
 $allowedForms = ['ТОВ', 'ФОП', 'ПрАТ', 'АТ', 'Неприбуткова організація', 'Інше'];
-$allowedSystems = ['ФОП 1 група', 'ФОП 2 група', 'ФОП 3 група', 'ФОП на загальній системі', 'ТОВ на єдиному податку (3 група)', 'ТОВ на загальній системі', 'Загальна система', 'Єдиний податок 3 група', 'Єдиний податок 5 група', 'Єдиний податок 4 група', 'Без системи оподаткування'];
+$allowedSystems = ['1 група', '2 група', '3 група', '4 група', 'Загальна система', 'Без системи оподаткування', 'ФОП 1 група', 'ФОП 2 група', 'ФОП 3 група', 'ФОП на загальній системі', 'ТОВ на єдиному податку (3 група)', 'ТОВ на загальній системі', 'Єдиний податок 1 група', 'Єдиний податок 2 група', 'Єдиний податок 3 група', 'Єдиний податок 4 група', 'Єдиний податок, 3 група', 'Єдиний податок, 4 група', 'Неприбутковий статус'];
 if ($name === '' || !in_array($legalForm, $allowedForms, true) || !in_array($taxSystem, $allowedSystems, true)) jsonResponse(false, 'Заповніть назву, форму власності та систему оподаткування.', [], 422);
 $hasVat = !empty($data['has_vat']) ? 1 : 0; $hasExcise = !empty($data['has_excise']) ? 1 : 0; $hasEmployees = !empty($data['has_employees']) ? 1 : 0;
 $employeeCount = $hasEmployees ? max(1, (int)($data['employee_count'] ?? 0)) : null;
 $specialTaxes = array_values(array_intersect((array)($data['special_taxes'] ?? []), ['tourist', 'land', 'property', 'rent', 'environmental', 'transport', 'retail_excise', 'other']));
 $requestedModule = (string)($data['module'] ?? 'accounting');
 $module = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : 'accounting';
-$moduleData = json_encode((array)($data['module_data'] ?? []), JSON_UNESCAPED_UNICODE);
+$moduleDataValues = (array)($data['module_data'] ?? []);
+$globalAccountantIds = array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($moduleDataValues['accountant_ids'] ?? [])), static fn(string $value): bool => preg_match('/^[a-f0-9]{32}$/i', $value) === 1)));
+if ($module === 'accounting') $moduleDataValues['accountant_ids'] = $globalAccountantIds; else unset($moduleDataValues['accountant_ids']);
+$moduleData = json_encode($moduleDataValues, JSON_UNESCAPED_UNICODE);
 $services = array_values(array_filter(array_map(static function ($service) use ($pdo): array {
     if (!is_array($service)) return [];
     $allowedPeriods = ['Щогодини', 'Щодня', 'Щотижня', 'Місяць', 'Квартал', 'Рік', 'Разово'];
@@ -301,6 +304,7 @@ $services = array_values(array_filter(array_map(static function ($service) use (
         'period' => in_array((string)($service['period'] ?? 'Місяць'), $allowedPeriods, true) ? (string)$service['period'] : 'Місяць',
         'official_due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($service['official_due_date'] ?? '')) ? (string)$service['official_due_date'] : '',
         'accountant_id' => trim((string)($service['accountant_id'] ?? '')),
+        'accountant_ids' => array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($service['accountant_ids'] ?? [])), static fn(string $value): bool => preg_match('/^[a-f0-9]{32}$/i', $value) === 1))),
         'is_package' => $isPackage,
         'package_id' => $packageId,
         'package_name' => trim((string)($service['package_name'] ?? '')),
@@ -360,7 +364,7 @@ if ($packageIds) {
         if (!isset($existingPackageKeys[$packageId . '|' . $service['name']])) jsonResponse(false, 'Можна додавати лише пакети, створені вами.', ['code' => 'package_not_owned'], 403);
     }
 }
-$requestedAccountantIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['accountant_id'] ?? ''), $services))));
+$requestedAccountantIds = array_values(array_unique(array_filter(array_merge($globalAccountantIds, ...array_map(static fn(array $service): array => array_merge([(string)($service['accountant_id'] ?? '')], (array)($service['accountant_ids'] ?? [])), $services)))));
 if ($requestedAccountantIds) {
     $accountingGroupIds = [];
     foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
@@ -431,6 +435,10 @@ if ($action === 'update' && $id !== '') {
     if ($ownerId !== null) $updateValues[] = $ownerId;
     $updateValues[] = $id;
     $pdo->prepare($updateSql)->execute($updateValues);
+    if ($module === 'accounting' && $requestedAccountantIds) {
+        $assignMember = $pdo->prepare('INSERT IGNORE INTO client_members (client_id, user_id, assigned_by) VALUES (?, ?, ?)');
+        foreach ($requestedAccountantIds as $accountantId) $assignMember->execute([$id, $accountantId, $userId]);
+    }
     releasePlanCapacityLocks((string)$planContext['owner_id']);
     $savedClientQuery = $pdo->prepare('SELECT id, name FROM clients WHERE id = ? LIMIT 1');
     $savedClientQuery->execute([$id]);
@@ -446,12 +454,13 @@ if ($isAdmin && !empty($data['workspace_owner_id'])) {
     $ownerId = (string)$data['workspace_owner_id'];
 }
 $requestedClientMemberIds = array_values(array_unique(array_filter(array_map('strval', (array)($data['client_member_ids'] ?? [])))));
-$moduleDataValues = (array)($data['module_data'] ?? []);
 $doctorId = trim((string)($moduleDataValues['doctor_id'] ?? ''));
 if ($doctorId !== '') $requestedClientMemberIds[] = $doctorId;
+foreach ($globalAccountantIds as $accountantId) $requestedClientMemberIds[] = $accountantId;
 foreach ($services as $service) {
     $accountantId = trim((string)($service['accountant_id'] ?? ''));
     if ($accountantId !== '') $requestedClientMemberIds[] = $accountantId;
+    foreach ((array)($service['accountant_ids'] ?? []) as $serviceAccountantId) $requestedClientMemberIds[] = (string)$serviceAccountantId;
 }
 $requestedClientMemberIds = array_values(array_unique(array_filter($requestedClientMemberIds)));
 if ($requestedClientMemberIds) {

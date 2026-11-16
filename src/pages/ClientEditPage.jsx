@@ -43,8 +43,13 @@ export default function ClientEditPage() {
         employee_count: client.employee_count || "",
         special_taxes: client.special_taxes || [],
         module: client.module || "accounting",
-        module_data: client.module_data || {},
-        services: (client.services || []).map((service) => ({ ...service, is_package: Boolean(service.is_package || service.package_id) })),
+        module_data: {
+          ...(client.module_data || {}),
+          accountant_ids: client.module_data?.accountant_ids?.length
+            ? client.module_data.accountant_ids.map(String)
+            : [...new Set((client.services || []).flatMap(service => (service.accountant_ids || (service.accountant_id ? [service.accountant_id] : [])).map(String)))],
+        },
+        services: (client.services || []).map((service) => ({ ...service, accountant_ids: (service.accountant_ids || (service.accountant_id ? [service.accountant_id] : client.module_data?.accountant_ids || [])).map(String), is_package: Boolean(service.is_package || service.package_id) })),
       });
       originalAppointmentTaskIds.current = (client.services || []).map((service) => service.appointment_task_id).filter(Boolean);
     });

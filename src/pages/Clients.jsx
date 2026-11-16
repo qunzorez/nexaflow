@@ -28,19 +28,25 @@ export const legalForms = [
   "Неприбуткова організація",
   "Інше",
 ];
-export const taxSystems = [
-  "ФОП 1 група",
-  "ФОП 2 група",
-  "ФОП 3 група",
-  "ФОП на загальній системі",
-  "ТОВ на єдиному податку (3 група)",
-  "ТОВ на загальній системі",
-  "Єдиний податок 3 група",
-  "Єдиний податок 5 група",
-  "Єдиний податок 4 група",
-  "Загальна система",
-  "Без системи оподаткування",
-];
+export const taxSystems = ["1 група", "2 група", "3 група", "4 група", "Загальна система", "Без системи оподаткування"];
+const taxSystemsByLegalForm = {
+  ФОП: ["1 група", "2 група", "3 група", "4 група", "Загальна система"],
+  ТОВ: ["Єдиний податок, 3 група", "Єдиний податок, 4 група", "Загальна система"],
+  ПрАТ: ["Єдиний податок, 3 група", "Єдиний податок, 4 група", "Загальна система"],
+  АТ: ["Єдиний податок, 3 група", "Єдиний податок, 4 група", "Загальна система"],
+  "Неприбуткова організація": ["Неприбутковий статус", "Загальна система"],
+  Інше: ["Єдиний податок, 3 група", "Єдиний податок, 4 група", "Загальна система", "Неприбутковий статус"],
+};
+function canonicalTaxSystem(value, legalForm = "ФОП") {
+  const normalized = ({
+    "ФОП 1 група": "1 група", "ФОП 2 група": "2 група", "ФОП 3 група": "3 група",
+    "ФОП на загальній системі": "Загальна система", "ТОВ на загальній системі": "Загальна система",
+    "ТОВ на єдиному податку (3 група)": "3 група", "Єдиний податок 1 група": "1 група",
+    "Єдиний податок 2 група": "2 група", "Єдиний податок 3 група": "3 група",
+    "Єдиний податок 4 група": "4 група",
+  })[value] || value;
+  return legalForm !== "ФОП" && /^[34] група$/.test(normalized) ? `Єдиний податок, ${normalized}` : normalized;
+}
 export const serviceOptions = [
   "Ведення бухгалтерського обліку",
   "Податкова звітність",
@@ -252,13 +258,14 @@ export function serviceTaskPayload(client, service, clientId) {
   const packageDetails = service.is_package && (service.package_services || []).length
     ? `\nПакет містить послуги: ${service.package_services.join(", ")}.`
     : "";
+  const accountantIds = [...new Set((service.accountant_ids || (service.accountant_id ? [service.accountant_id] : client.module_data?.accountant_ids || [])).map(normalizeId).filter(Boolean))];
   return {
     action: "create",
     workspace_owner_id: client.workspace_owner_id || "",
     title: `${service.name} — ${client.name}`,
     description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}.${packageDetails}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
     client_ids: normalizedClientId ? [normalizedClientId] : [],
-    assignee_ids: normalizeId(service.accountant_id) ? [normalizeId(service.accountant_id)] : [],
+    assignee_ids: accountantIds,
     project_ids: [],
     status: "todo",
     priority: "normal",
@@ -283,6 +290,7 @@ export function serviceAppointmentTaskPayload(client, service, clientId) {
     reminderAt = `${appointmentDate.getFullYear()}-${pad(appointmentDate.getMonth() + 1)}-${pad(appointmentDate.getDate())}T${pad(appointmentDate.getHours())}:${pad(appointmentDate.getMinutes())}`;
   }
   const doctorId = normalizeId(client.module_data?.doctor_id);
+  const accountantIds = [...new Set((service.accountant_ids || (service.accountant_id ? [service.accountant_id] : client.module_data?.accountant_ids || [])).map(normalizeId).filter(Boolean))];
   const teeth = (service.tooth_numbers || []).join(", ");
   return {
     action: "create",
@@ -292,7 +300,7 @@ export function serviceAppointmentTaskPayload(client, service, clientId) {
     description: `Запис клієнта «${client.name}» на послугу «${service.name}».${teeth ? `\nЗуби: ${teeth}.` : ""}${client.module_data?.doctor ? `\nЛікар: ${client.module_data.doctor}.` : ""}`,
     client_name: client.name || "",
     client_ids: normalizeId(clientId) ? [normalizeId(clientId)] : [],
-    assignee_ids: doctorId ? [doctorId] : [],
+    assignee_ids: client.module === "accounting" ? accountantIds : (doctorId ? [doctorId] : []),
     project_ids: [],
     status: "todo",
     priority: "normal",
@@ -443,6 +451,24 @@ function AccountantSelect({ value, onChange, options, emptyMessage, placeholder 
     {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder={searchPlaceholder} /></div><div className="service-select-options">{!options.length ? <span>{emptyMessage}</span> : filtered.length ? filtered.map((person) => <button type="button" key={person.id} onClick={() => { onChange(person.id); setOpen(false); setSearch(""); }}>{person.name}{String(value) === String(person.id) && <Icon name="check" />}</button>) : <span>{notFoundMessage}</span>}</div></div>}
   </div>;
 }
+function AccountantMultiSelect({ value = [], onChange, options, emptyMessage, placeholder = "Оберіть бухгалтерів", searchPlaceholder = "Пошук бухгалтера…", notFoundMessage = "Бухгалтерів не знайдено" }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const selectRef = useRef(null);
+  const selectedIds = [...new Set((Array.isArray(value) ? value : []).map(String))];
+  const selectedNames = options.filter(person => selectedIds.includes(String(person.id))).map(person => person.name);
+  const filtered = options.filter(person => `${person.name} ${person.email}`.toLocaleLowerCase("uk").includes(search.toLocaleLowerCase("uk")));
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = event => { if (!selectRef.current?.contains(event.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  return <div ref={selectRef} className="service-select accountant-select accountant-multi-select">
+    <button type="button" className="service-select-trigger" onClick={() => setOpen(current => !current)}><span>{selectedNames.length ? selectedNames.join(", ") : placeholder}</span><Icon name="down" /></button>
+    {open && <div className="service-select-menu"><div className="service-select-search"><Icon name="search" /><input autoFocus value={search} onChange={event => setSearch(event.target.value)} placeholder={searchPlaceholder} /></div><div className="service-select-options">{!options.length ? <span>{emptyMessage}</span> : filtered.length ? filtered.map(person => <button type="button" key={person.id} aria-pressed={selectedIds.includes(String(person.id))} onClick={() => { const id = String(person.id); onChange(selectedIds.includes(id) ? selectedIds.filter(item => item !== id) : [...selectedIds, id]); }}><span>{person.name}</span>{selectedIds.includes(String(person.id)) && <Icon name="check" />}</button>) : <span>{notFoundMessage}</span>}</div></div>}
+  </div>;
+}
 function FieldTip({ children }) {
   const [open, setOpen] = useState(false);
   const tipId = useRef(`field-tip-${Math.random().toString(36).slice(2)}`);
@@ -568,7 +594,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
       showDuplicateNotice(`У плані «${subscription.name}» дозволено до ${clientServiceLimit} послуг на одного клієнта.`);
       return;
     }
-    set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: [], tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+    set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_ids: [...globalAccountantIds], accountant_id: globalAccountantIds[0] || "", internal_days_before: 5, parameters: [], tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
     if (form.module === "dentistry") setServicePickerIndex(0);
   };
   const addPackage = () => {
@@ -580,7 +606,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     }
     if (packageItem.module && packageItem.module !== form.module) set("module", packageItem.module);
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
-    const nextServices = [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
+    const nextServices = [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_ids: [...globalAccountantIds], accountant_id: globalAccountantIds[0] || "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
     set("services", nextServices);
     if (clientId) persistSelectedService(nextServices, 0, "package");
     setSelectedPackageId("");
@@ -620,6 +646,12 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   // Create and edit must use the same manager-scoped list. The per-client
   // membership list is narrower and made the edit form behave differently.
   const eligibleAccountants = availableUsers;
+  const globalAccountantIds = Array.isArray(form.module_data?.accountant_ids) ? form.module_data.accountant_ids.map(String) : [];
+  const setGlobalAccountants = (accountantIds) => setForm(current => ({
+    ...current,
+    module_data: { ...current.module_data, accountant_ids: accountantIds },
+    services: current.module === "accounting" ? (current.services || []).map(service => ({ ...service, accountant_ids: accountantIds, accountant_id: accountantIds[0] || "" })) : current.services,
+  }));
   const removeService = (index) => set("services", (form.services || []).filter((_, itemIndex) => itemIndex !== index));
   const packagePriceTiers = ["gray", "cyan", "blue", "purple", "red", "gold"];
   const packageTier = (service) => {
@@ -796,7 +828,12 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                 Форма власності
                 <select
                   value={form.legal_form}
-                  onChange={(event) => set("legal_form", event.target.value)}
+                  onChange={(event) => {
+                    const legalForm = event.target.value;
+                    const options = taxSystemsByLegalForm[legalForm] || taxSystems;
+                    const system = canonicalTaxSystem(form.tax_system, legalForm);
+                    setForm(current => ({ ...current, legal_form: legalForm, tax_system: options.includes(system) ? system : "Загальна система" }));
+                  }}
                 >
                   {legalForms.map((item) => (
                     <option key={item}>{item}</option>
@@ -806,16 +843,18 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
               {form.module === "accounting" && <label>
                 Система оподаткування
                 <select
-                  value={form.tax_system}
+                  value={canonicalTaxSystem(form.tax_system, form.legal_form)}
                   onChange={(event) => set("tax_system", event.target.value)}
                 >
-                  {[...new Set([...taxSystems, form.tax_system])].map((item) => (
+                  <option value="" disabled>Оберіть систему оподаткування</option>
+                  {(taxSystemsByLegalForm[form.legal_form] || taxSystems).map((item) => (
                     <option key={item}>{item}</option>
                   ))}
                 </select>
                 {form.module === "accounting" && <small className="client-tax-hint">Для цього режиму дедлайни декларацій з’являться в календарі. Додайте ПДВ, акциз, працівників і специфічні податки нижче, щоб бачити пов’язані строки.</small>}
               </label>}
             </div>
+            {form.module === "accounting" && <fieldset className="client-accountants-fieldset"><legend>Відповідальні бухгалтери</legend><p className="client-field-hint">Обрані бухгалтери автоматично додаються до всіх бухгалтерських послуг і пакетів та призначаються виконавцями задач.</p><AccountantMultiSelect value={globalAccountantIds} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={setGlobalAccountants} /><small>{globalAccountantIds.length ? `Обрано: ${globalAccountantIds.length}` : "Можна обрати одного або кількох бухгалтерів."}</small></fieldset>}
             {form.module === "accounting" && <><div className="client-toggles">
               <Toggle
                 label="ПДВ"
@@ -886,7 +925,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                   </div>
                   <div className="client-service-schedule">
                     <label><span className="client-field-label">Офіційна дата<FieldTip>Дата взята з офіційних джерел і типових строків. За потреби ви можете змінити її вручну.</FieldTip></span><DateTimePicker value={service.official_due_date || (service.name ? officialDateForService(service.name, service.period) : "")} onChange={(value) => updateService(index, "official_due_date", value)} /></label>
-                    <label><span className="client-field-label">Відповідальний бухгалтер<FieldTip>Тут показуються лише учасники вашої команди.</FieldTip></span><AccountantSelect value={service.accountant_id || ""} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={(value) => updateService(index, "accountant_id", value)} /></label>
+                    <label><span className="client-field-label">Відповідальні бухгалтери<FieldTip>За замовчуванням призначені вгорі. Тут можна змінити склад виконавців для окремої послуги.</FieldTip></span><AccountantMultiSelect value={service.accountant_ids || (service.accountant_id ? [service.accountant_id] : globalAccountantIds)} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={(ids) => updateService(index, { accountant_ids: ids, accountant_id: ids[0] || "" })} /></label>
                     <label><span className="client-field-label">Внутрішній дедлайн (днів до офіційного)<FieldTip>За скільки днів до офіційної дати нагадати виконавцю.</FieldTip></span><input type="number" min="0" max="90" value={service.internal_days_before ?? 5} onChange={(event) => updateService(index, "internal_days_before", event.target.value)} /></label>
                     <div className="client-service-reminders"><label className="service-reminder-switch"><input type="checkbox" checked={service.reminders_enabled !== false} onChange={(event) => updateService(index, "reminders_enabled", event.target.checked)} /><span className="service-reminder-slider" />Нагадувати про цю послугу</label><label className="service-reminder-switch"><input type="checkbox" checked={Boolean(service.create_task)} onChange={(event) => updateService(index, "create_task", event.target.checked)} /><span className="service-reminder-slider" />Створити задачу для відповідального бухгалтера</label></div>
                   </div>
