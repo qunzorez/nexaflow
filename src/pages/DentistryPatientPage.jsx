@@ -226,7 +226,7 @@ export default function DentistryPatientPage() {
           <header><div><h2>Створити план лікування</h2><p>Оберіть зуби один раз — усі додані послуги застосуються до них. Чернетка зберігається автоматично й відновиться після оновлення сторінки.</p></div></header>
           <label>Назва плану<input required value={plan.title} onChange={event => setPlan({ ...plan, title: event.target.value })} placeholder="Наприклад, лікування карієсу" /></label>
           <label>Коментар<textarea value={plan.comment} onChange={event => setPlan({ ...plan, comment: event.target.value })} rows="2" /></label>
-          <label>Відповідальний лікар<select value={plan.doctor_id || ""} onChange={event => setPlan({ ...plan, doctor_id: event.target.value })}><option value="">Поточний користувач</option>{teamUsers.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
+          <label>Відповідальний лікар<SearchableSelect options={[{ id: "", name: user?.name ? `${user.name} (поточний користувач)` : "Поточний користувач" }, ...teamUsers.map(person => ({ id: person.id, name: person.name, email: person.email }))]} value={plan.doctor_id || ""} placeholder="Оберіть лікаря" onChange={value => setPlan({ ...plan, doctor_id: value })} /></label>
           <section className="dentistry-plan-tooth-scope">
             <div><h3>Зубна формула</h3><p>{planTeeth.length ? `Вибрано ${planTeeth.length} зубів. Кожна послуга буде додана для кожного з них.` : "Виберіть кілька зубів або залиште формулу порожньою для загальної послуги."}</p></div>
             <DentalToothChart value={planTeeth} onChange={setPlanTeeth} />
