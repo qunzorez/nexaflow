@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Icon from "../components/Icon.jsx";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
@@ -51,14 +51,16 @@ const normalizeTeeth = value => {
 export default function DentistryPatientPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loadedDraftFor, setLoadedDraftFor] = useState(id);
   const [initialDraft] = useState(() => readPatientDraft(id));
+  const requestedTab = searchParams.get("tab") === "appointments" ? "Прийоми" : "";
   const [user, setUser] = useState(null);
   const [patient, setPatient] = useState(null);
   const [teamUsers, setTeamUsers] = useState([]);
   const [care, setCare] = useState(null);
   const [services, setServices] = useState([]);
-  const [tab, setTab] = useState(initialDraft.tab || tabs[0]);
+  const [tab, setTab] = useState(requestedTab || initialDraft.tab || tabs[0]);
   const [record, setRecord] = useState(initialDraft.record || emptyRecord);
   const [plan, setPlan] = useState(initialDraft.plan || emptyPlan());
   const [planTeeth, setPlanTeeth] = useState(initialDraft.planTeeth || []);

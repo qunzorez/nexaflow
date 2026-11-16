@@ -53,7 +53,7 @@ export default function AppointmentDetailPage() {
 
   return <Layout page="Деталі прийому" user={data.user}>
     <div className="content appointments-page appointment-detail-page">
-      <button className="page-back" type="button" onClick={() => navigate("/appointments")}><Icon name="back" /> До всіх записів</button>
+      {patient ? <Link className="page-back" to={`/patients/${patient.id}?tab=appointments`}><Icon name="back" /> До всіх записів</Link> : <button className="page-back" type="button" onClick={() => navigate("/appointments")}><Icon name="back" /> До всіх записів</button>}
       {notice && <div className="appointment-alert success" role="status">{notice}</div>}
       {error && <div className="appointment-alert error" role="alert">{error}</div>}
       <section className="welcome-row appointments-hero">
@@ -79,7 +79,7 @@ export default function AppointmentDetailPage() {
         <section className="panel appointment-create-panel">
           <div className="panel-heading"><div><h2>Пацієнт</h2><p>Контактна інформація та медична картка.</p></div><span className="appointment-heading-icon"><Icon name="user" /></span></div>
           <div className="appointment-patient-card"><strong>{patient?.name || task.client_names || task.client_name || "Пацієнт"}</strong><span>{patient?.module_data?.phone || "Телефон не вказаний"}</span><span>{patient?.module_data?.email || "Email не вказаний"}</span></div>
-          {patient && <Link className="primary-button" to={`/patients/${patient.id}`}>Відкрити картку пацієнта</Link>}
+          {patient && <Link className="primary-button appointment-patient-link" to={`/patients/${patient.id}`}><Icon name="user" /> Відкрити картку пацієнта <Icon name="forward" /></Link>}
         </section>
       </div>
     </div>
