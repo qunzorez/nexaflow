@@ -221,7 +221,7 @@ export default function DentistryPatientPage() {
 
       {tab === "Зубна формула" && <section className="dentistry-care-panel"><header><div><h2>Зубна формула пацієнта</h2><p>Схема показує зуби, зазначені в оглядах і виконаних послугах.</p></div></header><DentalToothChart value={[...new Set([...(care.medical_records || []).flatMap(item => normalizeTeeth(item.tooth_numbers)), ...(care.performed_services || []).map(item => Number(item.tooth_number)).filter(Boolean)])]} readOnly /></section>}
 
-      {tab === "План лікування" && <div className="dentistry-care-grid">
+      {tab === "План лікування" && <div className="dentistry-care-grid dentistry-treatment-plan-grid">
         <form className="dentistry-care-panel dentistry-care-form" onSubmit={createPlan}>
           <header><div><h2>Створити план лікування</h2><p>Оберіть зуби один раз — усі додані послуги застосуються до них. Чернетка зберігається автоматично й відновиться після оновлення сторінки.</p></div></header>
           <label>Назва плану<input required value={plan.title} onChange={event => setPlan({ ...plan, title: event.target.value })} placeholder="Наприклад, лікування карієсу" /></label>
