@@ -320,14 +320,15 @@ if ($action === 'perform_treatment_plans') {
     $planIds = array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($data['treatment_plan_ids'] ?? [])))));
     if (!$planIds) jsonResponse(false, 'Оберіть один або кілька планів лікування.', [], 422);
     foreach ($planIds as $planId) if (!preg_match('/^[a-f0-9]{32}$/i', $planId)) jsonResponse(false, 'Некоректний список планів лікування.', [], 422);
-    $appointment = dentalAppointment($pdo, $appointmentId, $patientId);
+    $appointment = dentalAppointment($pdo, $appointmentId, $patientId, true);
     $pdo->beginTransaction();
     $appointmentLock = $pdo->prepare('SELECT t.id, t.status, t.assignee_id FROM tasks t JOIN task_clients tc ON tc.task_id = t.id WHERE t.id = ? AND tc.client_id = ? AND t.is_client_appointment = 1 FOR UPDATE');
     try {
         $appointmentLock->execute([$appointmentId, $patientId]);
         $lockedAppointment = $appointmentLock->fetch();
-        if (!$lockedAppointment || in_array((string)$lockedAppointment['status'], ['cancelled', 'done', 'archived'], true)) throw new RuntimeException('Цей прийом уже завершений або недоступний.');
+        if (!$lockedAppointment || in_array((string)$lockedAppointment['status'], ['cancelled', 'archived'], true)) throw new RuntimeException('Цей прийом заархівований або недоступний.');
         $appointment = $lockedAppointment;
+        $appointmentWasCompleted = (string)$appointment['status'] === 'done';
         $marks = implode(',', array_fill(0, count($planIds), '?'));
         $selectedPlanQuery = $pdo->prepare("SELECT id FROM dental_treatment_plans WHERE patient_id = ? AND status = 'active' AND id IN ({$marks}) FOR UPDATE");
         $selectedPlanQuery->execute(array_merge([$patientId], $planIds));
@@ -376,7 +377,8 @@ if ($action === 'perform_treatment_plans') {
 
         $pdo->prepare("UPDATE tasks SET status = 'done' WHERE id = ? AND is_client_appointment = 1 AND status NOT IN ('cancelled', 'done', 'archived')")->execute([$appointmentId]);
         $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, 'completed', ?) ON DUPLICATE KEY UPDATE appointment_status = 'completed', updated_by = VALUES(updated_by)")->execute([$appointmentId, $userId]);
-        $pdo->prepare('INSERT INTO task_history (id, task_id, user_id, action, message) VALUES (?, ?, ?, ?, ?)')->execute([dentalId(), $appointmentId, $userId, 'appointment_completed_with_invoice', 'Прийом завершено після підтвердження послуг. Створено рахунок ' . $invoiceNumber . '.']);
+        $taskHistoryMessage = $appointmentWasCompleted ? 'До завершеного прийому додано послуги. Створено рахунок ' . $invoiceNumber . '.' : 'Прийом завершено після підтвердження послуг. Створено рахунок ' . $invoiceNumber . '.';
+        $pdo->prepare('INSERT INTO task_history (id, task_id, user_id, action, message) VALUES (?, ?, ?, ?, ?)')->execute([dentalId(), $appointmentId, $userId, 'appointment_completed_with_invoice', $taskHistoryMessage]);
         dentalAudit($pdo, $userId, 'appointment', $appointmentId, 'treatment_completed', ['plan_ids' => $planIds, 'performed_service_ids' => $performedIds, 'invoice_id' => $invoiceId, 'invoice_number' => $invoiceNumber, 'total_amount' => $amount]);
         dentalAudit($pdo, $userId, 'invoice', $invoiceId, 'issued', ['invoice_number' => $invoiceNumber, 'total_amount' => $amount, 'appointment_id' => $appointmentId]);
         $pdo->commit();

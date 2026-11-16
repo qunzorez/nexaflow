@@ -114,7 +114,7 @@ export default function DentistryPatientPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const availableAppointments = useMemo(() => (care?.appointments || []).filter(item => !["cancelled", "done", "archived"].includes(item.status)), [care]);
+  const availableAppointments = useMemo(() => (care?.appointments || []).filter(item => !["cancelled", "archived"].includes(item.status) && !["cancelled", "archived"].includes(item.appointment_status)), [care]);
   const recordAppointments = useMemo(() => (care?.appointments || []).filter(item => !["cancelled", "archived"].includes(item.status) && !["cancelled", "archived"].includes(item.appointment_status)), [care]);
   const uninvoiced = useMemo(() => (care?.performed_services || []).filter(item => !item.invoice_id), [care]);
   const openInvoices = useMemo(() => (care?.invoices || []).filter(item => item.status !== "cancelled" && Number(item.remaining_amount) > 0), [care]);
@@ -257,7 +257,7 @@ export default function DentistryPatientPage() {
       </div>}
       {tab === "Виконані послуги" && <div className="dentistry-care-grid"><form className="dentistry-care-panel dentistry-care-form" onSubmit={performService}>
         <header><div><h2>Завершити прийом і сформувати рахунок</h2><p>Оберіть прийом і один або кілька планів лікування. У рахунок потраплять усі послуги, що залишилися в цих планах.</p></div></header>
-        <label>Прийом пацієнта<select required value={performed.appointment_id} onChange={event => setPerformed({ appointment_id: event.target.value })}><option value="">Оберіть прийом</option>{availableAppointments.map(item => <option key={item.id} value={item.id}>{dateTime(item.due_date)} · {item.title} · {item.doctor_name || "Лікар"}</option>)}</select></label>
+        <label>Прийом пацієнта<select required value={performed.appointment_id} onChange={event => setPerformed({ appointment_id: event.target.value })}><option value="">Оберіть прийом</option>{availableAppointments.map(item => <option key={item.id} value={item.id}>{dateTime(item.due_date)} · {item.title} · {appointmentStatusLabel(item)} · {item.doctor_name || "Лікар"}</option>)}</select></label>
         <fieldset className="dentistry-plan-selection"><legend>Плани лікування</legend>
           {performablePlans.length ? performablePlans.map(item => <label className={`dentistry-plan-choice ${selectedPlanIds.includes(item.id) ? "selected" : ""}`} key={item.id}>
             <input type="checkbox" checked={selectedPlanIds.includes(item.id)} onChange={event => setSelectedPlanIds(current => event.target.checked ? [...new Set([...current, item.id])] : current.filter(planId => planId !== item.id))} />
