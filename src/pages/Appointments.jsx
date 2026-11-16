@@ -20,9 +20,13 @@ export default function Appointments() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [data, setData] = useState(null);
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(params.get("client") || "");
   const [serviceIndex, setServiceIndex] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
+  const [doctorFilter, setDoctorFilter] = useState("");
+  const [cabinet, setCabinet] = useState("");
+  const [reason, setReason] = useState("");
+  const [comment, setComment] = useState("");
   const [date, setDate] = useState(() => /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date") : isoDay(new Date()));
   const [time, setTime] = useState(params.get("time") || "09:00");
   const [duration, setDuration] = useState(60);
@@ -60,13 +64,15 @@ export default function Appointments() {
     if (date === today && start <= new Date().getHours() * 60 + new Date().getMinutes()) return false;
     if (start + Number(duration) > 23 * 60 + 59) return false;
     return !tasksOnDate.some(task => {
+      const taskDoctors = (task.assignee_ids || [task.assignee_id]).filter(Boolean).map(String);
+      if (responsibleId && !taskDoctors.includes(String(responsibleId)) && (!cabinet.trim() || String(task.cabinet_id || '').trim().toLocaleLowerCase() !== cabinet.trim().toLocaleLowerCase())) return false;
       const taskTime = String(task.due_date).match(/[ T](\d{2}):(\d{2})/);
       if (!taskTime) return false;
       const taskStart = Number(taskTime[1]) * 60 + Number(taskTime[2]);
       const taskDuration = Math.max(15, Number(task.duration_minutes || 60));
       return start < taskStart + taskDuration && taskStart < start + Number(duration);
     });
-  }), [tasksOnDate, duration, date]);
+  }), [tasksOnDate, duration, date, responsibleId, cabinet]);
 
   useEffect(() => {
     if (availableTimes.length && !availableTimes.includes(time)) setTime(availableTimes[0]);
@@ -95,6 +101,7 @@ export default function Appointments() {
   async function save(event) {
     event.preventDefault();
     if (!client) return setError("Оберіть клієнта.");
+    if (!responsibleId) return setError("Оберіть відповідального лікаря.");
     if (!availableTimes.includes(time)) return setError("Цей час уже зайнятий. Оберіть вільний слот.");
     setSaving(true);
     setError("");
@@ -113,14 +120,22 @@ export default function Appointments() {
           assignee_ids: responsibleId ? [responsibleId] : [],
           project_ids: [],
           due_date: appointmentAt,
+          cabinet_id: cabinet,
           duration_minutes: Number(duration),
           status: "todo",
           priority: "normal",
         };
+    appointmentPayload.cabinet_id = cabinet;
     const result = await post("/api/tasks.php", appointmentPayload);
     if (!result.ok) {
       setSaving(false);
       return setError(result.message || "Не вдалося створити запис.");
+    }
+    const appointmentDetails = await post("/api/dentistry-care.php", { action: "save_appointment_details", patient_id: client.id, appointment_id: result.task_id, cabinet_id: cabinet, reason, comment });
+    if (!appointmentDetails.ok) {
+      await post("/api/tasks.php", { action: "delete", id: result.task_id });
+      setSaving(false);
+      return setError(`Запис не додано: ${appointmentDetails.message}`);
     }
     if (selectedService && result.task_id) {
       const services = clientServices.map((service, index) => index === Number(serviceIndex)
@@ -128,6 +143,7 @@ export default function Appointments() {
         : service);
       const linkedSave = await post("/api/clients.php", { ...client, workspace_owner_id: client.created_by || "", services, action: "update", id: client.id });
       if (!linkedSave.ok) {
+        await post("/api/dentistry-care.php", { action: "delete_appointment_details", patient_id: client.id, appointment_id: result.task_id });
         await post("/api/tasks.php", { action: "delete", id: result.task_id });
         setSaving(false);
         return setError(`Запис не збережено в картці послуг: ${linkedSave.message}`);
@@ -139,7 +155,7 @@ export default function Appointments() {
   }
 
   if (!data) return <div className="loading-screen">Завантаження записів…</div>;
-  const appointments = data.tasks.filter(task => Number(task.is_client_appointment) === 1 && !["done", "archived", "cancelled"].includes(task.status));
+  const appointments = data.tasks.filter(task => Number(task.is_client_appointment) === 1 && !["done", "archived", "cancelled"].includes(task.status) && (!doctorFilter || (task.assignee_ids || [task.assignee_id]).some(personId => String(personId) === String(doctorFilter))));
   return <Layout page="Записи" user={data.user}>
     <div className="content appointments-page">
       <section className="welcome-row appointments-hero"><div><p className="eyebrow">СТОМАТОЛОГІЯ</p><h1>Записи</h1><p className="subtext">Плануйте прийоми клієнтів у вільні години календаря.</p></div><button className="primary-button" type="button" onClick={() => document.getElementById("appointment-form")?.scrollIntoView({ behavior: "smooth" })}><Icon name="plus" /> Новий запис</button></section>
@@ -151,11 +167,12 @@ export default function Appointments() {
             <label>Клієнт<SearchableSelect options={clients.map(item => ({ id: item.id, name: item.name, email: [item.module_data?.phone, item.module_data?.email].filter(Boolean).join(" · ") }))} value={clientId} placeholder="Оберіть клієнта" onChange={value => { const nextClient = clients.find(item => String(item.id) === String(value)); const doctorId = String(nextClient?.module_data?.doctor_id || ""); const isTeamDoctor = (data.team_users || []).some(person => String(person.id) === doctorId); setClientId(value); setServiceIndex(""); setResponsibleId(isTeamDoctor ? doctorId : ""); }} /></label>
             {client && <><div className="appointment-client-summary"><div><strong>{client.name}</strong><small>{[client.module_data?.phone, client.module_data?.email].filter(Boolean).join(" · ") || "Контактні дані не вказані"}</small></div><Link to={`/clients/${client.id}/edit`} target="_blank" rel="noreferrer" className="appointment-add-service"><Icon name="plus" /> Додати послугу</Link></div><div className="appointment-client-services"><div className="appointment-service-head"><div><strong>Послуги клієнта</strong><small>{clientServices.length ? "Оберіть незаплановану послугу. Для повторного прийому додайте її ще раз у картці пацієнта." : "Наявних послуг немає"}</small></div></div>{clientServices.length ? <div className="appointment-service-list">{clientServices.map((service, index) => { const booked = isServiceAlreadyBooked(service); return <button type="button" disabled={booked} className={`appointment-service-option${String(index) === serviceIndex ? " selected" : ""}${booked ? " is-booked" : ""}`} key={`${service.name}-${index}`} onClick={() => { setServiceIndex(current => current === String(index) ? "" : String(index)); setDuration(Number(service.appointment_duration_minutes || 60)); }}><span><strong>{service.name}</strong>{service.tooth_numbers?.length > 0 && <small>Зуби: {service.tooth_numbers.join(", ")}</small>}{booked && <small>Прийом уже заплановано</small>}</span><b>{Number(service.price || service.client_price || 0).toLocaleString("uk-UA")} грн</b></button>; })}</div> : <p className="appointment-no-services">Додайте послугу в картці пацієнта або створіть загальний запис без прив’язки до послуги.</p>}</div></>}
             <div className="appointment-fields"><label>Відповідальний<SearchableSelect options={[{ id: "", name: "Не призначено" }, ...(data.team_users || []).map(person => ({ id: person.id, name: person.name, email: person.email }))]} value={responsibleId} placeholder="Оберіть відповідального" onChange={setResponsibleId} /></label><label>Дата запису<DateTimePicker value={date} onChange={setDate} required /></label><label>Тривалість<select value={duration} onChange={event => setDuration(Number(event.target.value))}>{[15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480].map(minutes => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} хв` : `${minutes / 60} год${minutes % 60 ? ` ${minutes % 60} хв` : ""}`}</option>)}</select></label><label>Вільний час<select value={time} onChange={event => setTime(event.target.value)} disabled={!availableTimes.length}>{availableTimes.length ? availableTimes.map(slot => <option key={slot} value={slot}>{slot}</option>) : <option value="">Немає вільних слотів</option>}</select></label></div>
+            <div className="appointment-fields"><label>Кабінет<input value={cabinet} onChange={event => setCabinet(event.target.value)} placeholder="Наприклад, Кабінет 2" /></label><label>Причина прийому<input value={reason} onChange={event => setReason(event.target.value)} placeholder="Консультація, огляд…" /></label><label className="appointment-field-wide">Коментар<textarea value={comment} onChange={event => setComment(event.target.value)} rows="2" /></label></div>
             {!availableTimes.length && <p className="appointment-no-slots">На цю дату немає вільного часу для обраної тривалості.</p>}
             <div className="appointment-form-footer"><small>Графік записів: 08:00–23:59 · крок 15 хв</small><button className="primary-button" type="submit" disabled={saving || !client || !availableTimes.length}>{saving ? "Зберігаємо…" : "Додати запис"}</button></div>
           </form>
         </section>
-        <section className="panel appointment-list-panel"><div className="panel-heading"><div><h2>Заплановані прийоми</h2><p>Записи, створені для стоматологічних клієнтів.</p></div><span className="appointment-count">{appointments.length}</span></div>
+        <section className="panel appointment-list-panel"><div className="panel-heading"><div><h2>Заплановані прийоми</h2><p>Записи, створені для стоматологічних клієнтів.</p></div><span className="appointment-count">{appointments.length}</span></div><label className="appointment-doctor-filter">Лікар<select value={doctorFilter} onChange={event => setDoctorFilter(event.target.value)}><option value="">Усі лікарі</option>{(data.team_users || []).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
           {appointments.length ? <div className="appointment-list">{appointments.map(item => <Link to={`/tasks/${item.id}`} className="appointment-row" key={item.id}><span className="appointment-row-icon"><Icon name="calendar" /></span><div className="appointment-row-copy"><strong>Запис клієнта</strong><small>{[item.client_names || item.client_name || "Клієнт", item.assignee_names || item.assignee_name].filter(Boolean).join(" · ")}</small></div><div className="appointment-row-time"><strong>{item.due_date ? new Date(String(item.due_date).replace(" ", "T")).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : ""}</strong><small>{formatDate(item.due_date)}</small></div></Link>)}</div> : <div className="appointment-empty"><Icon name="calendar" /><strong>Записів поки немає</strong><span>Створіть перший прийом у формі поруч.</span></div>}
         </section>
       </div>

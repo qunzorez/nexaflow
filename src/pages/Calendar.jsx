@@ -99,6 +99,7 @@ export default function Calendar() {
     return Number.isNaN(date.getTime()) ? new Date() : date;
   });
   const [view, setView] = useState(() => VIEWS.some(option => option.id === searchParams.get("view")) ? searchParams.get("view") : "month");
+  const [doctorFilter, setDoctorFilter] = useState("");
 
   useEffect(() => {
     Promise.all([api("/api/clients.php"), api("/api/tasks.php?scope=calendar")]).then(([clientsResult, tasksResult]) => {
@@ -129,8 +130,8 @@ export default function Calendar() {
         const isAppointment = Number(task.is_client_appointment) === 1;
         return { id: `task-${task.id}`, kind: isAppointment ? "appointment" : "task", title: task.title, subtitle: task.client_names || task.client_name || task.primary_project_name || "Без проєкту", date, time, archived: isAppointment && task.status === "archived", task };
       });
-    return [...serviceEvents, ...taskEvents].filter(item => item.date).sort((a, b) => a.date - b.date);
-  }, [data]);
+    return [...serviceEvents, ...taskEvents].filter(item => item.date && (!doctorFilter || !item.task || (item.task.assignee_ids || []).some(personId => String(personId) === String(doctorFilter)))).sort((a, b) => a.date - b.date);
+  }, [data, doctorFilter]);
 
   const eventsByDay = useMemo(() => events.reduce((result, event) => {
     (result[dateKey(event.date)] ||= []).push(event);
@@ -176,6 +177,8 @@ export default function Calendar() {
             <p className="subtext">{data.active_client_module === "dentistry" ? "Записи клієнтів, робочі задачі та найближчі прийоми." : "Задачі, бухгалтерські послуги та найближчі дедлайни в одному місці."}</p>
           </div>
         </section>
+
+        {data.active_client_module === "dentistry" && <label className="calendar-doctor-filter">Лікар у календарі<select value={doctorFilter} onChange={event => setDoctorFilter(event.target.value)}><option value="">Уся команда</option>{(data.team_users || []).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
 
         <div className="calendar-layout">
           <section className="panel big-calendar-panel">

@@ -222,6 +222,25 @@ if (!$canManage) jsonResponse(false, 'Створювати клієнтів мо
 $action = (string)($data['action'] ?? 'create');
 if ($action === 'delete') {
     $id = trim((string)($data['id'] ?? ''));
+    $patientQuery = $pdo->prepare('SELECT module FROM clients WHERE id = ? LIMIT 1');
+    $patientQuery->execute([$id]);
+    if ((string)$patientQuery->fetchColumn() === 'dentistry') {
+        $taskColumns = array_column($pdo->query('SHOW COLUMNS FROM tasks')->fetchAll(), 'Field');
+        if (!in_array('is_client_appointment', $taskColumns, true)) $pdo->exec("ALTER TABLE tasks ADD is_client_appointment TINYINT(1) NOT NULL DEFAULT 0");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS task_clients (task_id CHAR(32) NOT NULL, client_id CHAR(32) NOT NULL, PRIMARY KEY (task_id, client_id), INDEX idx_task_clients_client (client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $visitCount = $pdo->prepare('SELECT COUNT(*) FROM tasks t JOIN task_clients tc ON tc.task_id = t.id WHERE tc.client_id = ? AND t.is_client_appointment = 1');
+        $visitCount->execute([$id]);
+        if ((int)$visitCount->fetchColumn() > 0) jsonResponse(false, 'Картку пацієнта з історією прийомів не можна видалити. Збережіть її як архівну картку.', ['code' => 'patient_has_history'], 409);
+        $careTables = ['dental_medical_records', 'dental_treatment_plans', 'dental_performed_services', 'dental_invoices', 'dental_payments', 'dental_documents'];
+        foreach ($careTables as $table) {
+            $exists = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+            $exists->execute([$table]);
+            if ((int)$exists->fetchColumn() === 0) continue;
+            $count = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE patient_id = ?");
+            $count->execute([$id]);
+            if ((int)$count->fetchColumn() > 0) jsonResponse(false, 'Картку пацієнта з медичною або фінансовою історією не можна видалити. Збережіть її як архівну картку.', ['code' => 'patient_has_history'], 409);
+        }
+    }
     $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
     jsonResponse(true, 'Клієнта видалено.');
 }

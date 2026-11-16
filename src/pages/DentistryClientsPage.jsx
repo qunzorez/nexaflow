@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import Icon from "../components/Icon.jsx";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
@@ -12,6 +13,7 @@ const visitDate = (value) => {
 };
 
 export default function DentistryClientsPage({ data, onCreate, onEdit, onDelete, notice, error }) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const now = Date.now();
@@ -63,7 +65,7 @@ export default function DentistryClientsPage({ data, onCreate, onEdit, onDelete,
           </div>
           {patient.nextAppointment && <div className="dentistry-next-visit"><span><Icon name="calendar" /> Найближчий прийом</span><strong>{visitDate(patient.nextAppointment.appointment_at)}</strong><small>{patient.nextAppointment.name} · {Number(patient.nextAppointment.appointment_duration_minutes || 60)} хв</small></div>}
           <div className="dentistry-patient-services"><div className="dentistry-section-label">Послуги <b>{patient.services?.length || 0}</b></div>{patient.services?.length ? <div className="dentistry-service-list">{patient.services.slice(0, 3).map((service, index) => <div className="dentistry-service-item" key={`${service.name}-${index}`}><span><strong>{service.name}</strong>{service.tooth_numbers?.length > 0 && <small>Зуби: {service.tooth_numbers.join(", ")}</small>}{service.appointment_task_id && service.appointment_at && <small>Прийом: {visitDate(service.appointment_at)}</small>}</span><b>{money(service.price)}</b></div>)}{patient.services.length > 3 && <small className="dentistry-more-services">Ще {patient.services.length - 3} послуг</small>}</div> : <p className="dentistry-no-services">Послуги ще не додані.</p>}</div>
-          <footer className="dentistry-patient-actions">{data.permissions?.manage && <button type="button" className="outline-btn" onClick={() => onEdit(patient)}><Icon name="edit" /> Відкрити картку</button>}{data.permissions?.delete && <button type="button" className="dentistry-delete-patient" onClick={() => onDelete(patient)} aria-label={`Видалити пацієнта ${patient.name}`}><Icon name="close" /></button>}</footer>
+          <footer className="dentistry-patient-actions"><button type="button" className="outline-btn" onClick={() => navigate(`/patients/${patient.id}`)}><Icon name="users" /> Картка пацієнта</button>{data.permissions?.manage && <button type="button" className="outline-btn" onClick={() => onEdit(patient)}><Icon name="edit" /> Редагувати</button>}{data.permissions?.delete && <button type="button" className="dentistry-delete-patient" onClick={() => onDelete(patient)} aria-label={`Видалити пацієнта ${patient.name}`}><Icon name="close" /></button>}</footer>
         </article>)}</div> : <div className="dentistry-patient-empty"><span><Icon name="users" /></span><h2>{search ? "Пацієнтів не знайдено" : "Пацієнтів ще немає"}</h2><p>{search ? "Спробуйте змінити пошуковий запит або фільтр." : "Додайте першого пацієнта, щоб вести його послуги та прийоми в одному місці."}</p>{data.permissions?.manage && !search && <button type="button" className="primary-action" disabled={clientLimitReached} title={clientLimitReached ? planLimitHint(data.user?.subscription, "clients") : undefined} onClick={onCreate}><Icon name="plus" /> Додати пацієнта</button>}</div>}
       </section>
     </main>

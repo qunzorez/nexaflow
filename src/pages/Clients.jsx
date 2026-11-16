@@ -113,12 +113,12 @@ const moduleServiceOptions = {
   legal: ["Юридична консультація", "Підготовка договору", "Представництво інтересів", "Правовий аналіз", "Судовий супровід", "Реєстрація бізнесу", "Перевірка документів", "Інше"],
   real_estate: ["Консультація з нерухомості", "Оцінка об’єкта", "Підготовка документів", "Супровід угоди", "Пошук нерухомості", "Оренда нерухомості", "Управління об’єктом", "Інше"],
 };
-function DentalToothChart({ value = [], onChange, editingServiceName = "", onFinishEditing }) {
+export function DentalToothChart({ value = [], onChange, editingServiceName = "", onFinishEditing, readOnly = false }) {
   const selected = new Set((value || []).map(Number));
-  const toggleTooth = (tooth) => onChange(selected.has(tooth) ? [...selected].filter((item) => item !== tooth) : [...selected, tooth].sort((a, b) => a - b));
+  const toggleTooth = (tooth) => { if (!readOnly) onChange?.(selected.has(tooth) ? [...selected].filter((item) => item !== tooth) : [...selected, tooth].sort((a, b) => a - b)); };
   const toggleGroup = (teeth) => {
     const allSelected = teeth.every((tooth) => selected.has(tooth));
-    onChange([...new Set(allSelected ? [...selected].filter((tooth) => !teeth.includes(tooth)) : [...selected, ...teeth])].sort((a, b) => a - b));
+    if (!readOnly) onChange?.([...new Set(allSelected ? [...selected].filter((tooth) => !teeth.includes(tooth)) : [...selected, ...teeth])].sort((a, b) => a - b));
   };
   const upperCenters = [42, 83, 126, 160, 194, 230, 266, 297, 340, 376, 411, 445, 478, 517, 558, 600];
   const lowerCenters = [44, 84, 126, 164, 209, 244, 277, 304, 336, 372, 408, 440, 473, 510, 551, 598];
@@ -131,19 +131,19 @@ function DentalToothChart({ value = [], onChange, editingServiceName = "", onFin
     const scaleY = lower ? 0.63 : 0.74;
     const transform = lower ? `translate(${center} 144) scale(${scaleX} ${scaleY})` : `translate(${center} 104) scale(${scaleX} ${-scaleY})`;
     const toggle = () => toggleTooth(tooth);
-    return <g key={tooth} className={`odontogram-tooth is-${kind}${selected.has(tooth) ? " is-selected" : ""}`} role="button" tabIndex="0" aria-label={`Зуб ${tooth}${selected.has(tooth) ? ", вибрано" : ""}`} aria-pressed={selected.has(tooth)} onClick={toggle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); } }}>
+    return <g key={tooth} className={`odontogram-tooth is-${kind}${selected.has(tooth) ? " is-selected" : ""}${readOnly ? " is-readonly" : ""}`} role={readOnly ? undefined : "button"} tabIndex={readOnly ? -1 : 0} aria-label={`Зуб ${tooth}${selected.has(tooth) ? ", вибрано" : ""}`} aria-pressed={readOnly ? undefined : selected.has(tooth)} onClick={readOnly ? undefined : toggle} onKeyDown={readOnly ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); } }}>
       <g transform={transform}><path className="odontogram-tooth-outline" d={DENTAL_TOOTH_SHAPES[kind]} /><path className="odontogram-tooth-detail" d={kind === "molar" ? "M-12 15 C-7 20 -2 19 2 15 C6 19 11 19 15 14 M-3 19 L-4 29 M4 19 L5 29" : kind === "premolar" ? "M-10 15 C-5 20 5 20 11 14 M0 19 L0 27" : kind === "canine" ? "M-8 15 C-3 19 5 19 10 14" : "M-8 15 C-3 18 4 18 10 14"} /></g>
       <text className="odontogram-tooth-number" x={center} y={lower ? 137 : 118} textAnchor="middle">{tooth}</text>
     </g>;
   };
   return <div className="dental-tooth-selector">
-    <div className="dental-tooth-heading"><strong>{editingServiceName ? `Зуби для послуги «${editingServiceName}»` : "Виберіть зуби, якщо послуга стосується конкретних зубів"}</strong><span>FDI · {selected.size} вибрано</span>{editingServiceName ? <button type="button" onClick={onFinishEditing}>Готово</button> : selected.size > 0 && <button type="button" onClick={() => onChange([])}>Очистити</button>}</div>
+    <div className="dental-tooth-heading"><strong>{editingServiceName ? `Зуби для послуги «${editingServiceName}»` : readOnly ? "Позначені зуби пацієнта" : "Виберіть зуби, якщо послуга стосується конкретних зубів"}</strong><span>FDI · {selected.size} вибрано</span>{editingServiceName && onFinishEditing ? <button type="button" onClick={onFinishEditing}>Готово</button> : !readOnly && selected.size > 0 && <button type="button" onClick={() => onChange?.([])}>Очистити</button>}</div>
     <svg className="dental-odontogram" viewBox="0 0 640 198" role="group" aria-label="Інтерактивна схема 32 зубів, система FDI">
       <line className="odontogram-divider" x1="28" x2="612" y1="123" y2="123" /><line className="odontogram-midline" x1="320" x2="320" y1="3" y2="195" />
       {upperTeeth.map((tooth, index) => renderTooth(tooth, upperCenters[index], false))}
       {lowerTeeth.map((tooth, index) => renderTooth(tooth, lowerCenters[index], true))}
     </svg>
-    <div className="dental-tooth-groups">{[["Верхній правий бік", DENTAL_TEETH.upperRight], ["Верхній лівий бік", DENTAL_TEETH.upperLeft], ["Нижній правий бік", DENTAL_TEETH.lowerRight], ["Нижній лівий бік", DENTAL_TEETH.lowerLeft]].map(([label, teeth]) => <button type="button" key={label} className={teeth.every((tooth) => selected.has(tooth)) ? "is-selected" : ""} onClick={() => toggleGroup(teeth)}>{label}</button>)}</div>
+    <div className="dental-tooth-groups">{[["Верхній правий бік", DENTAL_TEETH.upperRight], ["Верхній лівий бік", DENTAL_TEETH.upperLeft], ["Нижній правий бік", DENTAL_TEETH.lowerRight], ["Нижній лівий бік", DENTAL_TEETH.lowerLeft]].map(([label, teeth]) => <button type="button" key={label} disabled={readOnly} className={teeth.every((tooth) => selected.has(tooth)) ? "is-selected" : ""} onClick={() => toggleGroup(teeth)}>{label}</button>)}</div>
   </div>;
 }
 function officialDateForService(name = "", period = "Місяць") {
@@ -341,6 +341,10 @@ function availableAppointmentTimes(dateValue, durationMinutes, tasks, assigneeId
   const assignedId = String(assigneeId || "");
   const busy = (tasks || []).filter((task) => {
     if (Number(task.is_client_appointment) !== 1 || !task.due_date || ["archived", "cancelled", "done"].includes(task.status) || String(task.id) === String(excludeTaskId || "")) return false;
+    if (assignedId) {
+      const taskDoctors = (task.assignee_ids || [task.assignee_id]).filter(Boolean).map(String);
+      if (!taskDoctors.includes(assignedId)) return false;
+    }
     const due = String(task.due_date).replace("T", " ");
     if (due.slice(0, 10) !== date || !/\d{2}:\d{2}/.test(due.slice(10))) return false;
     const match = due.match(/(\d{2}):(\d{2})/);
@@ -371,6 +375,7 @@ export function validateAppointmentServices(services, tasks, moduleData = {}) {
     const match = String(service.appointment_at || "").match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/);
     if (!match) return "Виберіть доступні дату й час для кожного запису в календарі.";
     const assigneeId = moduleData.doctor_id || "";
+    if (!assigneeId) return "Спочатку призначте відповідального лікаря в картці пацієнта.";
     const slots = availableAppointmentTimes(match[1], service.appointment_duration_minutes, tasks, assigneeId, service.appointment_task_id, services, index);
     if (!slots.includes(match[2])) return "Обраний час уже зайнятий або недоступний. Виберіть інший час.";
   }
@@ -731,7 +736,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                     </label>
                   )}
                   {form.module === "dentistry" && <label>Лікар / стоматолог<AccountantSelect value={form.module_data?.doctor_id || teamUsers.find((person) => person.name === form.module_data?.doctor)?.id || ""} options={teamUsers} emptyMessage="У команді поки немає доступних учасників." placeholder="Оберіть лікаря з команди" searchPlaceholder="Пошук учасника команди…" notFoundMessage="Учасника не знайдено" onChange={(doctorId) => { const doctor = teamUsers.find((person) => String(person.id) === String(doctorId)); set("module_data", { ...form.module_data, doctor: doctor?.name || "", doctor_id: doctor ? String(doctor.id) : "" }); }} /></label>}
-                  {form.module === "dentistry" && <label>Номер медичної картки<input value={form.module_data?.medical_record || ""} onChange={(event) => set("module_data", { ...form.module_data, medical_record: event.target.value })} placeholder="Номер картки" /></label>}
+                  {form.module === "dentistry" && <label>Номер медичної картки<input value={form.module_data?.medical_record || ""} onChange={(event) => set("module_data", { ...form.module_data, medical_record: event.target.value })} placeholder="Номер картки" /></label>}{form.module === "dentistry" && <label>Адреса<input value={form.module_data?.address || ""} onChange={(event) => set("module_data", { ...form.module_data, address: event.target.value })} placeholder="Адреса пацієнта" /></label>}{form.module === "dentistry" && <label className="client-form-grid-wide">Медичні примітки<textarea value={form.module_data?.medical_notes || ""} onChange={(event) => set("module_data", { ...form.module_data, medical_notes: event.target.value })} rows="3" placeholder="Алергії, важливі особливості, примітки…" /></label>}
                   {form.module === "legal" && (
                     <label>
                       Тип справи

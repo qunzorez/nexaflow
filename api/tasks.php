@@ -21,6 +21,7 @@ if (!in_array('is_client_appointment', $existingColumns, true)) {
     $pdo->exec("UPDATE tasks SET is_client_appointment = 1 WHERE title LIKE 'Запис клієнта ·%'");
 }
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_clients (task_id CHAR(32) NOT NULL, client_id CHAR(32) NOT NULL, PRIMARY KEY (task_id, client_id), INDEX idx_task_clients_client (client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$pdo->exec("CREATE TABLE IF NOT EXISTS dental_appointment_details (appointment_id CHAR(32) PRIMARY KEY, cabinet_id VARCHAR(80) NULL, reason VARCHAR(190) NULL, comment TEXT NULL, updated_by CHAR(32) NOT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_history (id CHAR(32) PRIMARY KEY, task_id CHAR(32) NOT NULL, user_id CHAR(32) NULL, action VARCHAR(40) NOT NULL DEFAULT 'updated', message TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_task_history_task (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_attachments (id CHAR(32) PRIMARY KEY, task_id CHAR(32) NOT NULL, user_id CHAR(32) NULL, file_name VARCHAR(180) NOT NULL, file_url TEXT NOT NULL, mime_type VARCHAR(100) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_task_attachments_task (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS time_entries (id CHAR(32) PRIMARY KEY, task_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, minutes INT UNSIGNED NOT NULL, note VARCHAR(500) NULL, logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_time_entries_task (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -61,7 +62,7 @@ function normalizeTaskDateTime($value): ?string {
     if (!$date) return null;
     return strlen($raw) === 10 ? $date->format('Y-m-d 00:00:00') : $date->format('Y-m-d H:i:s');
 }
-function taskSelect(string $where = '1=1'): string { return "SELECT t.*, GROUP_CONCAT(DISTINCT tp.project_id) AS project_ids, GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') AS project_names, GROUP_CONCAT(DISTINCT ta.user_id) AS assignee_ids, GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') AS assignee_names, GROUP_CONCAT(DISTINCT tc.client_id) AS client_ids, GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') AS client_names, p0.name AS primary_project_name, a0.name AS primary_assignee_name, c.name AS creator_name FROM tasks t LEFT JOIN task_projects tp ON tp.task_id = t.id LEFT JOIN projects p ON p.id = tp.project_id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users a ON a.id = ta.user_id LEFT JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN clients cl ON cl.id = tc.client_id LEFT JOIN projects p0 ON p0.id = t.project_id LEFT JOIN users a0 ON a0.id = t.assignee_id JOIN users c ON c.id = t.created_by WHERE {$where} GROUP BY t.id"; }
+function taskSelect(string $where = '1=1'): string { return "SELECT t.*, d.cabinet_id, d.reason AS appointment_reason, d.comment AS appointment_comment, GROUP_CONCAT(DISTINCT tp.project_id) AS project_ids, GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') AS project_names, GROUP_CONCAT(DISTINCT ta.user_id) AS assignee_ids, GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') AS assignee_names, GROUP_CONCAT(DISTINCT tc.client_id) AS client_ids, GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') AS client_names, p0.name AS primary_project_name, a0.name AS primary_assignee_name, c.name AS creator_name FROM tasks t LEFT JOIN dental_appointment_details d ON d.appointment_id = t.id LEFT JOIN task_projects tp ON tp.task_id = t.id LEFT JOIN projects p ON p.id = tp.project_id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users a ON a.id = ta.user_id LEFT JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN clients cl ON cl.id = tc.client_id LEFT JOIN projects p0 ON p0.id = t.project_id LEFT JOIN users a0 ON a0.id = t.assignee_id JOIN users c ON c.id = t.created_by WHERE {$where} GROUP BY t.id"; }
 function normalizeTask(array $task): array { $task['project_ids'] = $task['project_ids'] ? explode(',', $task['project_ids']) : ($task['project_id'] ? [$task['project_id']] : []); $task['assignee_ids'] = $task['assignee_ids'] ? explode(',', $task['assignee_ids']) : ($task['assignee_id'] ? [$task['assignee_id']] : []); $task['client_ids'] = $task['client_ids'] ? explode(',', $task['client_ids']) : []; $task['project_name'] = $task['project_names'] ?: $task['primary_project_name']; $task['assignee_name'] = $task['assignee_names'] ?: $task['primary_assignee_name']; return $task; }
 function filterTaskClients(PDO $pdo, array $task, string $userId, bool $canManage): array
 {
@@ -174,14 +175,19 @@ if ($action === 'create' || $action === 'update') {
         $startMinutes = ((int)$appointmentStart->format('H')) * 60 + (int)$appointmentStart->format('i');
         $appointmentEnd = $appointmentStart->modify('+' . $durationMinutes . ' minutes');
         if ($startMinutes < 480 || (int)$appointmentStart->format('i') % 15 !== 0 || $appointmentEnd->format('Y-m-d') !== $appointmentStart->format('Y-m-d') || $appointmentEnd->format('H:i') > '23:59') jsonResponse(false, 'Запис має бути в межах графіка 08:00–23:59 і починатися з кроком 15 хвилин.', [], 422);
-        $conflictSql = "SELECT t.id FROM tasks t WHERE t.is_client_appointment = 1 AND t.status NOT IN ('done', 'cancelled', 'archived') AND t.due_date IS NOT NULL AND t.due_date < ? AND DATE_ADD(t.due_date, INTERVAL IF(t.duration_minutes > 0, t.duration_minutes, 60) MINUTE) > ?";
+        if (!$assigneeIds) jsonResponse(false, 'Оберіть відповідального лікаря для запису.', [], 422);
+        $cabinetId = trim((string)($data['cabinet_id'] ?? ''));
+        $conflictSql = "SELECT t.id FROM tasks t LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN dental_appointment_details dd ON dd.appointment_id = t.id WHERE t.is_client_appointment = 1 AND t.status NOT IN ('done', 'cancelled', 'archived') AND t.due_date IS NOT NULL AND t.due_date < ? AND DATE_ADD(t.due_date, INTERVAL IF(t.duration_minutes > 0, t.duration_minutes, 60) MINUTE) > ? AND (t.assignee_id IN (" . implode(',', array_fill(0, count($assigneeIds), '?')) . ") OR ta.user_id IN (" . implode(',', array_fill(0, count($assigneeIds), '?')) . ")" . ($cabinetId !== '' ? " OR dd.cabinet_id = ?" : '') . ')';
         $conflictParams = [$appointmentEnd->format('Y-m-d H:i:s'), $appointmentStart->format('Y-m-d H:i:s')];
+        $conflictParams = array_merge($conflictParams, $assigneeIds, $assigneeIds);
+        if ($cabinetId !== '') $conflictParams[] = $cabinetId;
         if ($action === 'update') { $conflictSql .= ' AND t.id <> ?'; $conflictParams[] = trim((string)($data['id'] ?? '')); }
-        [$appointmentAccessSql, $appointmentAccessParams] = taskAccessSql($user, $userId);
-        $conflictSql .= $appointmentAccessSql . ' LIMIT 1';
+        $workspaceMemberIds = array_values(array_unique(array_map('strval', $planContext['member_ids'] ?? [$planContext['owner_id']])));
+        if (!$workspaceMemberIds) $workspaceMemberIds = [(string)$planContext['owner_id']];
+        $conflictSql .= ' AND t.created_by IN (' . implode(',', array_fill(0, count($workspaceMemberIds), '?')) . ') LIMIT 1';
         $conflictQuery = $pdo->prepare($conflictSql);
-        $conflictQuery->execute(array_merge($conflictParams, $appointmentAccessParams));
-        if ($conflictQuery->fetchColumn()) jsonResponse(false, 'Обраний час уже зайнятий іншим записом або задачею.', [], 409);
+        $conflictQuery->execute(array_merge($conflictParams, $workspaceMemberIds));
+        if ($conflictQuery->fetchColumn()) jsonResponse(false, 'У цього лікаря або кабінету вже є запис на обраний час.', [], 409);
     }
     $recurrenceRules = ['none', 'hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']; $requestedRecurrence = trim((string)($data['recurrence_rule'] ?? 'none')); $recurrenceRule = in_array($requestedRecurrence, $recurrenceRules, true) ? $requestedRecurrence : 'none';
     if ($action === 'create' && ($data['status'] ?? '') === 'archived') jsonResponse(false, 'Нову задачу не можна одразу створити в архіві.', [], 422);
