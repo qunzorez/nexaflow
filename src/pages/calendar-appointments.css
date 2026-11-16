@@ -1,0 +1,3 @@
+.calendar-page .calendar-legend-dot.appointment{background:#1a9b6d}.calendar-page .calendar-event-chip.appointment{background:#e5f7ef;color:#117a55;border-left:3px solid #1a9b6d}.calendar-page .calendar-timed-event.appointment{border-left-color:#1a9b6d;background:#eaf8f1;color:#176d4e}.calendar-page .upcoming-icon.appointment{background:#e5f7ef;color:#117a55}
+
+.calendar-page .calendar-event-chip.appointment.archived,.calendar-page .calendar-timed-event.appointment.archived{background:#f0f4f1;color:#64756b;border-left-color:#8b9b91;border-color:#d5e0d8}.calendar-page .calendar-event-chip.appointment.archived{opacity:.88}

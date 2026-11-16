@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
+import DentistryTasksPage from "./DentistryTasksPage.jsx";
 import { api, post } from "../services/api.js";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./tasks.css";
@@ -181,7 +182,7 @@ export default function Tasks() {
       api("/api/clients.php"),
     ]);
     if (!result.ok) return navigate("/");
-    setData({ ...result, clients: clients.ok ? clients.clients || [] : [] });
+    setData({ ...result, clients: clients.ok ? clients.clients || [] : [], active_client_module: clients.ok ? clients.active_client_module : "accounting" });
   }
   useEffect(() => {
     load();
@@ -305,8 +306,14 @@ export default function Tasks() {
             : filter === "urgent"
               ? task.priority === "urgent" && !nonOverdueStatuses.has(task.status)
             : task.status === filter;
+      const linkedDentalClient = data.active_client_module === "dentistry"
+        ? (data.clients || []).find(client => (task.client_ids || []).some(clientId => String(clientId) === String(client.id)))
+        : null;
+      const dentalSearchText = linkedDentalClient
+        ? `${linkedDentalClient.name || ""} ${Object.values(linkedDentalClient.module_data || {}).join(" ")} ${(linkedDentalClient.services || []).map(service => service.name).join(" ")}`
+        : "";
       const haystack =
-        `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
+        `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""} ${dentalSearchText}`.toLowerCase();
       return (
         matchesFilter &&
         (!normalizedSearch || haystack.includes(normalizedSearch))
@@ -323,6 +330,7 @@ export default function Tasks() {
     }));
   const firstRow = filteredTasks.length ? (currentPage - 1) * pageSize + 1 : 0;
   const lastRow = Math.min(currentPage * pageSize, filteredTasks.length);
+  if (data.active_client_module === "dentistry") return <DentistryTasksPage data={data} onCreate={() => createTask()} onEdit={editTask} modal={modalOpen ? <TaskFormModal data={data} editing={editing} error={modalError} createDisabled={taskLimitReached} projectIds={projectIds} assigneeIds={assigneeIds} clientIds={clientIds} initialDueDate={initialDueDate} setProjectIds={setProjectIds} setAssigneeIds={setAssigneeIds} setClientIds={setClientIds} onSubmit={save} onClose={closeModal} /> : null} />;
   return (
     <Layout page="Задачі" user={data.user}>
       <div className="content tasks-page tasks-redesign">

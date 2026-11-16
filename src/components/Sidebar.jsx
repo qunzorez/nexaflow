@@ -30,6 +30,10 @@ export default function Sidebar({ user, open }) {
   });
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
+  const [activeClientModule, setActiveClientModule] = useState(() => {
+    try { return window.localStorage.getItem(`nexaflow.client.module.${workspaceCacheKey}`) || user?.active_client_module || ""; }
+    catch { return user?.active_client_module || ""; }
+  });
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const workspaceMenuRef = useRef(null);
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
@@ -63,6 +67,10 @@ export default function Sidebar({ user, open }) {
         canUseSupport && location.pathname !== "/support" ? api("/api/support.php?action=unread") : Promise.resolve({ unread: 0 }),
       ]);
       if (!active) return;
+      if (clients.active_client_module) {
+        setActiveClientModule(clients.active_client_module);
+        window.localStorage.setItem(`nexaflow.client.module.${workspaceCacheKey}`, clients.active_client_module);
+      }
       if (dashboard.user?.subscription?.features) {
         const features = dashboard.user.subscription.features;
         setPlanFeatures(features);
@@ -87,7 +95,7 @@ export default function Sidebar({ user, open }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [canUseSupport, countsStorageKey, featuresStorageKey, location.pathname, user?.id]);
+  }, [canUseSupport, countsStorageKey, featuresStorageKey, location.pathname, user?.id, workspaceCacheKey]);
   function clearSupportUnread() {
     setCounts(current => {
       const next = { ...current, support: 0 };
@@ -154,7 +162,7 @@ export default function Sidebar({ user, open }) {
           <span><Icon name="project" /></span> Проєкти <b>{counts.projects}</b>
         </Link>
         <Link className="nav-item" to="/tasks">
-          <span><Icon name="tasks" /></span> Задачі <b>{counts.tasks}</b>
+          <span><Icon name="tasks" /></span> {activeClientModule === "dentistry" ? "Записи / Задачі" : "Задачі"} <b>{counts.tasks}</b>
         </Link>
         {canManage && (
           <Link className="nav-item" to="/team">

@@ -31,6 +31,7 @@ export default function Settings() {
   const [clientModule, setClientModule] = useState(
     () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
   );
+  const [savingClientModule, setSavingClientModule] = useState(false);
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -115,6 +116,11 @@ export default function Settings() {
     }
   }
   useEffect(() => {
+    api("/api/client-module.php").then((moduleResult) => {
+      if (!moduleResult.ok) return;
+      setClientModule(moduleResult.active_client_module || "accounting");
+      window.localStorage.setItem("nexaflow.client.module", moduleResult.active_client_module || "accounting");
+    });
     api("/api/profile.php").then(async (result) => {
       if (!result.ok) return;
       const isPaymentReturn = new URLSearchParams(window.location.search).get("payment") === "return";
@@ -420,7 +426,7 @@ export default function Settings() {
                 <div><strong>Очікує активації: {subscription.pending_plan.name}</strong><small>{subscription.pending_plan.price} · тариф увімкнеться після остаточного підтвердження LiqPay</small></div>
                 {(user?.workspace_role || user?.role) === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
               </div>}
-              {user?.role === "admin" && <div className="subscription-module-select">
+              {((user?.workspace_role || user?.role) === "manager" || user?.role === "admin" || user?.role === "owner") && <div className="subscription-module-select">
                 <div className="subscription-module-label">
                   <span><Icon name="sparkle" /></span>
                   <div>
@@ -431,12 +437,17 @@ export default function Settings() {
                 <label className="subscription-module-control">
                   <select
                     value={clientModule}
-                    onChange={(event) => {
-                      setClientModule(event.target.value);
-                      window.localStorage.setItem(
-                        "nexaflow.client.module",
-                        event.target.value,
-                      );
+                    disabled={savingClientModule}
+                    onChange={async (event) => {
+                      const nextModule = event.target.value;
+                      setSavingClientModule(true);
+                      setError("");
+                      const saved = await post("/api/client-module.php", { module: nextModule });
+                      setSavingClientModule(false);
+                      if (!saved.ok) return setError(saved.message || "Не вдалося змінити модуль.");
+                      setClientModule(nextModule);
+                      window.localStorage.setItem("nexaflow.client.module", nextModule);
+                      setNotice(saved.message || "Модуль клієнтів збережено.");
                     }}
                   >
                     <option value="accounting">Бухгалтерія</option>

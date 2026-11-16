@@ -12,11 +12,16 @@ $userQuery->execute([$userId]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
+$userColumns = array_column($pdo->query('SHOW COLUMNS FROM users')->fetchAll(), 'Field');
+if (!in_array('active_client_module', $userColumns, true)) $pdo->exec("ALTER TABLE users ADD active_client_module VARCHAR(40) NOT NULL DEFAULT 'accounting'");
+$moduleQuery = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ?'); $moduleQuery->execute([(string)$planContext['owner_id']]);
+$workspaceClientModule = (string)($moduleQuery->fetchColumn() ?: 'accounting');
 $user['subscription'] = planSettingsPayload($planContext); $user['workspaces'] = $planContext['workspaces']; $user['active_workspace_id'] = $planContext['owner_id']; $user['workspace_role'] = $planContext['workspace_role'];
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS service_packages (
   id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting',
   description VARCHAR(500) NULL, client_price DECIMAL(12,2) NOT NULL DEFAULT 0, responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0, active TINYINT(1) NOT NULL DEFAULT 1,
+  calendar_enabled TINYINT(1) NOT NULL DEFAULT 0,
   created_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_service_packages_created_by (created_by)
@@ -26,6 +31,7 @@ $addedPackagePrices = false;
 if (!in_array('client_price', $packageColumns, true)) { $pdo->exec("ALTER TABLE service_packages ADD client_price DECIMAL(12,2) NOT NULL DEFAULT 0"); $addedPackagePrices = true; }
 if (!in_array('responsible_amount', $packageColumns, true)) { $pdo->exec("ALTER TABLE service_packages ADD responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0"); $addedPackagePrices = true; }
 if (!in_array('active', $packageColumns, true)) $pdo->exec("ALTER TABLE service_packages ADD active TINYINT(1) NOT NULL DEFAULT 1");
+if (!in_array('calendar_enabled', $packageColumns, true)) $pdo->exec("ALTER TABLE service_packages ADD calendar_enabled TINYINT(1) NOT NULL DEFAULT 0");
 $pdo->exec("CREATE TABLE IF NOT EXISTS service_catalog (
   id CHAR(32) PRIMARY KEY, package_id CHAR(32) NOT NULL, name VARCHAR(190) NOT NULL,
   client_price DECIMAL(12,2) NOT NULL DEFAULT 0, responsible_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -34,6 +40,9 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS service_catalog (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_service_catalog_package (package_id), INDEX idx_service_catalog_responsible (responsible_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$catalogColumns = array_column($pdo->query('SHOW COLUMNS FROM service_catalog')->fetchAll(), 'Field');
+if (!in_array('module', $catalogColumns, true)) $pdo->exec("ALTER TABLE service_catalog ADD module VARCHAR(40) NOT NULL DEFAULT 'accounting'");
+if (in_array('package_id', $catalogColumns, true)) $pdo->exec('ALTER TABLE service_catalog MODIFY package_id CHAR(32) NULL');
 if ($addedPackagePrices) {
   $pdo->exec("UPDATE service_packages p SET client_price = COALESCE((SELECT SUM(s.client_price) FROM service_catalog s WHERE s.package_id = p.id AND s.active = 1), 0), responsible_amount = COALESCE((SELECT SUM(s.responsible_amount) FROM service_catalog s WHERE s.package_id = p.id AND s.active = 1), 0)");
 }
@@ -43,8 +52,8 @@ $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
 $modules = ['all', 'accounting', 'dentistry', 'legal', 'real_estate'];
-$requestedModule = (string)($_GET['module'] ?? $data['module'] ?? 'accounting');
-$activeModule = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : 'accounting';
+$requestedModule = (string)($_GET['module'] ?? ($method === 'POST' ? ($data['module'] ?? $workspaceClientModule) : $workspaceClientModule));
+$activeModule = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : $workspaceClientModule;
 $newId = static fn(): string => bin2hex(random_bytes(16));
 $moduleLabel = static fn(string $module): string => [
     'all' => 'Усі модулі клієнтів', 'accounting' => 'Бухгалтерія', 'dentistry' => 'Стоматологія',
@@ -63,7 +72,7 @@ if ($method === 'GET') {
             $ownerCheck->execute([$ownerFilter]);
             if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Простір не знайдено.', [], 404);
         }
-        $sql = "SELECT p.id, p.name, p.module, p.description, p.client_price, p.responsible_amount, p.active, p.created_at, p.created_by AS owner_id, u.name AS owner_name, u.email AS owner_email FROM service_packages p LEFT JOIN users u ON u.id = p.created_by";
+        $sql = "SELECT p.id, p.name, p.module, p.description, p.client_price, p.responsible_amount, p.calendar_enabled, p.active, p.created_at, p.created_by AS owner_id, u.name AS owner_name, u.email AS owner_email FROM service_packages p LEFT JOIN users u ON u.id = p.created_by";
         if ($ownerFilter !== '' && in_array($moduleFilter, ['accounting', 'dentistry', 'legal', 'real_estate'], true)) {
             $packageQuery = $pdo->prepare($sql . " WHERE p.created_by = ? AND p.module IN (?, 'all') ORDER BY p.client_price, p.name");
             $packageQuery->execute([$ownerFilter, $moduleFilter]);
@@ -76,12 +85,34 @@ if ($method === 'GET') {
         } else {
             $packageQuery = $pdo->query($sql . ' ORDER BY p.client_price, p.name');
         }
+    } elseif (($_GET['scope'] ?? '') === 'all' && $requestedModule === 'all') {
+        // Managers can browse every module in their own workspace, never other workspaces.
+        $packageQuery = $pdo->prepare("SELECT p.id, p.name, p.module, p.description, p.client_price, p.responsible_amount, p.calendar_enabled, p.active, p.created_at, p.created_by AS owner_id, u.name AS owner_name, u.email AS owner_email FROM service_packages p LEFT JOIN users u ON u.id = p.created_by WHERE p.created_by = ? ORDER BY p.module, p.name");
+        $packageQuery->execute([$planContext['owner_id']]);
     } else {
-        // Regular workspace view remains limited to packages owned by its manager.
-        $packageQuery = $pdo->prepare("SELECT p.id, p.name, p.module, p.description, p.client_price, p.responsible_amount, p.active, p.created_at, p.created_by AS owner_id, u.name AS owner_name, u.email AS owner_email FROM service_packages p LEFT JOIN users u ON u.id = p.created_by WHERE p.created_by = ? AND p.module IN (?, 'all') ORDER BY p.name");
-        $packageQuery->execute([$planContext['owner_id'], $activeModule]);
+        $moduleForWorkspace = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : $activeModule;
+        $packageQuery = $pdo->prepare("SELECT p.id, p.name, p.module, p.description, p.client_price, p.responsible_amount, p.calendar_enabled, p.active, p.created_at, p.created_by AS owner_id, u.name AS owner_name, u.email AS owner_email FROM service_packages p LEFT JOIN users u ON u.id = p.created_by WHERE p.created_by = ? AND p.module IN (?, 'all') ORDER BY p.name");
+        $packageQuery->execute([$planContext['owner_id'], $moduleForWorkspace]);
     }
     $packages = $packageQuery->fetchAll();
+    $standaloneSql = "SELECT s.id, s.name, s.module, s.client_price, s.responsible_amount, s.active, s.created_by AS owner_id, u.name AS owner_name, u.email AS owner_email FROM service_catalog s LEFT JOIN users u ON u.id = s.created_by WHERE s.package_id IS NULL AND s.active = 1";
+    if ($globalScope && !empty($ownerFilter)) {
+        $standaloneQuery = $pdo->prepare($standaloneSql . ' AND s.created_by = ? AND s.module = ? ORDER BY s.name');
+        $standaloneQuery->execute([$ownerFilter, in_array($moduleFilter, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $moduleFilter : $activeModule]);
+    } elseif ($globalScope && in_array($moduleFilter, ['accounting', 'dentistry', 'legal', 'real_estate'], true)) {
+        $standaloneQuery = $pdo->prepare($standaloneSql . ' AND s.module = ? ORDER BY s.name');
+        $standaloneQuery->execute([$moduleFilter]);
+    } elseif ($globalScope) {
+        $standaloneQuery = $pdo->query($standaloneSql . ' ORDER BY s.name');
+    } elseif (($_GET['scope'] ?? '') === 'all' && $requestedModule === 'all') {
+        $standaloneQuery = $pdo->prepare($standaloneSql . ' AND s.created_by = ? ORDER BY s.module, s.name');
+        $standaloneQuery->execute([$planContext['owner_id']]);
+    } else {
+        $moduleForWorkspace = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : $activeModule;
+        $standaloneQuery = $pdo->prepare($standaloneSql . ' AND s.created_by = ? AND s.module = ? ORDER BY s.name');
+        $standaloneQuery->execute([$planContext['owner_id'], $moduleForWorkspace]);
+    }
+    $standaloneServices = $standaloneQuery->fetchAll();
     $packageIds = array_column($packages, 'id');
     $items = [];
     if ($packageIds) {
@@ -122,10 +153,13 @@ if ($method === 'GET') {
         $package['client_price'] = (float)$package['client_price'];
         $package['responsible_amount'] = (float)$package['responsible_amount'];
         $package['active'] = (bool)$package['active'];
+        $package['calendar_enabled'] = (bool)$package['calendar_enabled'];
         $package['services_count'] = count($package['services']);
     }
     unset($package);
-    jsonResponse(true, 'Послуги завантажено.', ['user' => $user, 'packages' => $packages, 'users' => $users, 'admin_workspaces' => $adminWorkspaces, 'active_module' => $activeModule, 'global_scope' => $globalScope, 'is_admin' => $isAdmin, 'modules' => array_map(fn(string $value): array => ['value' => $value, 'label' => $moduleLabel($value)], $modules), 'permissions' => ['manage' => $canManage]]);
+    foreach ($standaloneServices as &$standalone) { $standalone['client_price'] = (float)$standalone['client_price']; $standalone['responsible_amount'] = (float)$standalone['responsible_amount']; $standalone['active'] = (bool)$standalone['active']; $standalone['module_label'] = $moduleLabel((string)$standalone['module']); }
+    unset($standalone);
+    jsonResponse(true, 'Послуги завантажено.', ['user' => $user, 'packages' => $packages, 'standalone_services' => $standaloneServices, 'users' => $users, 'admin_workspaces' => $adminWorkspaces, 'active_module' => $workspaceClientModule, 'module_filter' => $activeModule, 'global_scope' => $globalScope, 'is_admin' => $isAdmin, 'modules' => array_map(fn(string $value): array => ['value' => $value, 'label' => $moduleLabel($value)], $modules), 'permissions' => ['manage' => $canManage]]);
 }
 
 if (!$canManage) jsonResponse(false, 'Керувати послугами може лише керівник простору.', [], 403);
@@ -133,6 +167,42 @@ if (!$isAdmin) requirePlanFeature($planContext, 'services');
 $action = (string)($data['action'] ?? '');
 $packageId = trim((string)($data['package_id'] ?? $data['id'] ?? ''));
 $serviceId = trim((string)($data['service_id'] ?? $data['id'] ?? ''));
+
+if (in_array($action, ['create_standalone_service', 'update_standalone_service'], true)) {
+    $name = trim((string)($data['name'] ?? ''));
+    $module = in_array((string)($data['module'] ?? ''), ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? (string)$data['module'] : $activeModule;
+    if (!$isAdmin) $module = $activeModule;
+    $clientPrice = max(0, round((float)($data['client_price'] ?? 0), 2));
+    $responsibleAmount = max(0, round((float)($data['responsible_amount'] ?? 0), 2));
+    if ($name === '') jsonResponse(false, 'Вкажіть назву послуги.', [], 422);
+    if ($action === 'update_standalone_service') {
+        $owned = $pdo->prepare('SELECT id, created_by FROM service_catalog WHERE id = ? AND package_id IS NULL' . ($isAdmin ? '' : ' AND created_by = ?') . ' LIMIT 1');
+        $values = [$serviceId]; if (!$isAdmin) $values[] = $planContext['owner_id']; $owned->execute($values); $existing = $owned->fetch();
+        if (!$existing) jsonResponse(false, 'Послугу не знайдено або її створив інший простір.', [], 404);
+        $ownerId = (string)$existing['created_by'];
+        if ($isAdmin && !empty($data['owner_id'])) $ownerId = (string)$data['owner_id'];
+        if ($isAdmin) { $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1"); $ownerCheck->execute([$ownerId]); if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для послуги.', [], 422); }
+        $duplicate = $pdo->prepare('SELECT id FROM service_catalog WHERE package_id IS NULL AND created_by = ? AND module = ? AND LOWER(name) = LOWER(?) AND active = 1 AND id <> ? LIMIT 1');
+        $duplicate->execute([$ownerId, $module, $name, $serviceId]);
+        if ($duplicate->fetchColumn()) jsonResponse(false, 'Така послуга вже є у каталозі цього простору.', [], 422);
+        $pdo->prepare('UPDATE service_catalog SET name = ?, module = ?, client_price = ?, responsible_amount = ?, created_by = ? WHERE id = ?')->execute([$name, $module, $clientPrice, $responsibleAmount, $ownerId, $serviceId]);
+        jsonResponse(true, 'Послугу оновлено.');
+    }
+    $ownerId = (string)$planContext['owner_id'];
+    if ($isAdmin && !empty($data['owner_id'])) $ownerId = (string)$data['owner_id'];
+    if ($isAdmin) { $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1"); $ownerCheck->execute([$ownerId]); if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для послуги.', [], 422); }
+    $duplicate = $pdo->prepare('SELECT id FROM service_catalog WHERE package_id IS NULL AND created_by = ? AND module = ? AND LOWER(name) = LOWER(?) AND active = 1 LIMIT 1');
+    $duplicate->execute([$ownerId, $module, $name]);
+    if ($duplicate->fetchColumn()) jsonResponse(false, 'Така послуга вже є у вашому каталозі.', [], 422);
+    $pdo->prepare('INSERT INTO service_catalog (id, package_id, name, module, client_price, responsible_amount, created_by) VALUES (?, NULL, ?, ?, ?, ?, ?)')->execute([$newId(), $name, $module, $clientPrice, $responsibleAmount, $ownerId]);
+    jsonResponse(true, 'Послугу створено.');
+}
+if ($action === 'delete_standalone_service') {
+    $delete = $pdo->prepare('DELETE FROM service_catalog WHERE id = ? AND package_id IS NULL' . ($isAdmin ? '' : ' AND created_by = ?'));
+    $values = [$serviceId]; if (!$isAdmin) $values[] = $planContext['owner_id']; $delete->execute($values);
+    if (!$delete->rowCount()) jsonResponse(false, 'Послугу не знайдено або її створив інший простір.', [], 404);
+    jsonResponse(true, 'Послугу видалено.');
+}
 
 if (in_array($action, ['create_package', 'update_package'], true)) {
     $name = trim((string)($data['name'] ?? ''));
@@ -156,8 +226,9 @@ if (in_array($action, ['create_package', 'update_package'], true)) {
             if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для пакета.', [], 422);
             $ownerId = (string)$data['owner_id'];
         }
-        $query = $pdo->prepare('UPDATE service_packages SET name = ?, module = ?, description = ?, client_price = ?, responsible_amount = ?, created_by = ? WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?'));
-        $updateValues = [$name, $module, $description ?: null, $clientPrice, $responsibleAmount, $ownerId, $packageId];
+        $calendarEnabled = !empty($data['calendar_enabled']) ? 1 : 0;
+        $query = $pdo->prepare('UPDATE service_packages SET name = ?, module = ?, description = ?, client_price = ?, responsible_amount = ?, calendar_enabled = ?, created_by = ? WHERE id = ?' . ($isAdmin ? '' : ' AND created_by = ?'));
+        $updateValues = [$name, $module, $description ?: null, $clientPrice, $responsibleAmount, $calendarEnabled, $ownerId, $packageId];
         if (!$isAdmin) $updateValues[] = $planContext['owner_id'];
         $query->execute($updateValues);
         if ($isAdmin && $ownerId !== (string)$existingPackage['created_by']) {
@@ -171,8 +242,9 @@ if (in_array($action, ['create_package', 'update_package'], true)) {
         if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для пакета.', [], 422);
         $ownerId = (string)$data['owner_id'];
     }
-    $query = $pdo->prepare('INSERT INTO service_packages (id, name, module, description, client_price, responsible_amount, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    $query->execute([$newId(), $name, $module, $description ?: null, $clientPrice, $responsibleAmount, $ownerId]);
+    $calendarEnabled = !empty($data['calendar_enabled']) ? 1 : 0;
+    $query = $pdo->prepare('INSERT INTO service_packages (id, name, module, description, client_price, responsible_amount, calendar_enabled, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $query->execute([$newId(), $name, $module, $description ?: null, $clientPrice, $responsibleAmount, $calendarEnabled, $ownerId]);
     jsonResponse(true, 'Пакет створено.');
 }
 

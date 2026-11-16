@@ -4,6 +4,7 @@ import Layout from "../components/Layout.jsx";
 import Icon from "../components/Icon.jsx";
 import { api } from "../services/api.js";
 import "./calendar.css";
+import "./calendar-appointments.css";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const VIEWS = [
@@ -11,7 +12,7 @@ const VIEWS = [
   { id: "week", label: "Тиждень" },
   { id: "day", label: "День" },
 ];
-const HOURS = Array.from({ length: 13 }, (_, index) => index + 8);
+const HOURS = Array.from({ length: 16 }, (_, index) => index + 8);
 
 function nextDeadline(period, now = new Date()) {
   const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -73,9 +74,9 @@ function viewTitle(date, view) {
 
 function EventChip({ event, onOpen, compact = false }) {
   return (
-    <button type="button" className={`calendar-event-chip ${event.kind}${compact ? " compact" : ""}`} onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event); }} title={`${event.title} · ${event.subtitle}`}>
+    <button type="button" className={`calendar-event-chip ${event.kind}${event.archived ? " archived" : ""}${compact ? " compact" : ""}`} onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event); }} title={`${event.title} · ${event.subtitle}${event.archived ? " · В архіві" : ""}`}>
       {!compact && <Icon name={event.kind === "task" ? "check" : "calendar"} />}
-      {compact ? <strong>{event.time ? `${event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · ` : ""}{event.title}</strong> : <span>{event.title}</span>}
+      {compact ? <strong>{event.time ? `${event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · ` : ""}{event.title}{event.archived ? " · Архів" : ""}</strong> : <span>{event.title}{event.archived ? " · В архіві" : ""}</span>}
     </button>
   );
 }
@@ -84,7 +85,7 @@ function TimeGrid({ days, eventsByDay, onOpen, onCreate }) {
   return <div className={`calendar-time-grid ${days.length === 1 ? "single-day" : ""}`}>
     <div className="calendar-time-head"><span>Час</span>{days.map((date, index) => <button type="button" key={dateKey(date)} className={dateKey(date) === dateKey(new Date()) ? "today" : ""} onClick={() => onCreate(date)}>{days.length > 1 ? `${WEEKDAYS[index]} · ` : ""}{date.getDate()} {date.toLocaleDateString("uk-UA", { month: "short" })}</button>)}</div>
     <div className="calendar-all-day-row"><span>Весь день</span>{days.map(date => <div key={dateKey(date)} role="button" tabIndex="0" onClick={() => onCreate(date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") onCreate(date); }}>{(eventsByDay[dateKey(date)] || []).filter(event => !event.time).map(event => <EventChip key={event.id} event={event} onOpen={onOpen} />)}</div>)}</div>
-    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <button type="button" className="calendar-hour-slot" key={hour} onClick={() => onCreate(date, hour)} aria-label={`Створити задачу ${dateTimeKey(date, hour)}`} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}`} style={{ top: `${Math.max(0, minutes)}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} · {event.title}</strong><small>{event.subtitle}</small></button>; })}</div>)}</div></div>
+    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <button type="button" className="calendar-hour-slot" key={hour} onClick={() => onCreate(date, hour)} aria-label={`Створити задачу ${dateTimeKey(date, hour)}`} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}${event.archived ? " archived" : ""}`} style={{ top: `${Math.max(0, minutes)}px`, height: `${Math.max(20, Number(event.task?.duration_minutes || 60))}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })}{event.task?.duration_minutes ? `–${new Date(event.time.getTime() + Number(event.task.duration_minutes) * 60000).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })}` : ""} · {event.title}{event.archived ? " · Архів" : ""}</strong>{Number(event.task?.duration_minutes || 60) >= 45 && <small>{event.subtitle}{event.archived ? " · Запис завершено" : ""}</small>}</button>; })}</div>)}</div></div>
   </div>;
 }
 
@@ -108,7 +109,8 @@ export default function Calendar() {
 
   const events = useMemo(() => {
     if (!data) return [];
-    const serviceEvents = (data.clients || []).flatMap(client => (client.services || [])
+    // Dentistry treatments become calendar events only through linked appointment tasks.
+    const serviceEvents = (data.clients || []).filter(client => client.module !== "dentistry").flatMap(client => (client.services || [])
       .filter(service => service.name)
       .map((service, index) => {
         const official = parseDate(service.official_due_date) || nextDeadline(service.period);
@@ -118,13 +120,14 @@ export default function Calendar() {
         return { id: `service-${client.id}-${index}`, kind: "service", title: service.name, subtitle: client.name, date: internal, official, client, accountant: accountant || (service.accountant_name ? { name: service.accountant_name } : null) };
       }));
     const taskEvents = (data.tasks || [])
-      .filter(task => task.due_date && !["archived", "cancelled"].includes(task.status))
+      .filter(task => task.due_date && (!['archived', 'cancelled'].includes(task.status) || (data.active_client_module === "dentistry" && Number(task.is_client_appointment) === 1 && task.status === "archived")))
       .map(task => {
         const date = parseDate(task.due_date);
         const dueTime = /[T ]\d{2}:\d{2}/.test(String(task.due_date || "")) ? parseDateTime(task.due_date) : null;
         const reminder = parseDateTime(task.reminder_at);
         const time = dueTime || (reminder && date && dateKey(reminder) === dateKey(date) ? reminder : null);
-        return { id: `task-${task.id}`, kind: "task", title: task.title, subtitle: task.primary_project_name || "Без проєкту", date, time, task };
+        const isAppointment = Number(task.is_client_appointment) === 1;
+        return { id: `task-${task.id}`, kind: isAppointment ? "appointment" : "task", title: task.title, subtitle: task.client_names || task.client_name || task.primary_project_name || "Без проєкту", date, time, archived: isAppointment && task.status === "archived", task };
       });
     return [...serviceEvents, ...taskEvents].filter(item => item.date).sort((a, b) => a.date - b.date);
   }, [data]);
@@ -157,8 +160,10 @@ export default function Calendar() {
     return next;
   });
 
-  const openEvent = event => navigate(event.kind === "task" ? `/tasks/${event.task.id}` : `/clients/${event.client.id}/edit`);
-  const createTaskUrl = (date, hour = null) => `/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}&return_view=${view}&return_date=${dateKey(date)}`;
+  const openEvent = event => navigate(event.task ? `/tasks/${event.task.id}` : `/clients/${event.client.id}/edit`);
+  const createTaskUrl = (date, hour = null) => data.active_client_module === "dentistry"
+    ? `/appointments?date=${dateKey(date)}${hour === null ? "" : `&time=${String(hour).padStart(2, "0")}:00`}`
+    : `/tasks?create=1&due_date=${encodeURIComponent(dateTimeKey(date, hour))}&return_view=${view}&return_date=${dateKey(date)}`;
   if (!data) return <div className="loading-screen">Завантаження календаря…</div>;
 
   return (
@@ -168,7 +173,7 @@ export default function Calendar() {
           <div>
             <p className="eyebrow">РОБОЧІ ІНСТРУМЕНТИ</p>
             <h1>Календар</h1>
-            <p className="subtext">Задачі, бухгалтерські послуги та найближчі дедлайни в одному місці.</p>
+            <p className="subtext">{data.active_client_module === "dentistry" ? "Записи клієнтів, робочі задачі та найближчі прийоми." : "Задачі, бухгалтерські послуги та найближчі дедлайни в одному місці."}</p>
           </div>
         </section>
 
@@ -189,6 +194,7 @@ export default function Calendar() {
 
             <div className="calendar-legend">
               <span className="calendar-legend-item"><i className="calendar-legend-dot task" />Задачі</span>
+              {data.active_client_module === "dentistry" && <span className="calendar-legend-item"><i className="calendar-legend-dot appointment" />Записи</span>}
               <span className="calendar-legend-item"><i className="calendar-legend-dot service" />Бухгалтерські послуги</span>
             </div>
 

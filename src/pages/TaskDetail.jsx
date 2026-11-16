@@ -1,7 +1,7 @@
 import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
@@ -16,6 +16,7 @@ import "../modules/tasks/time-log.css";
 import "../modules/tasks/task-status-dropdown.css";
 import "../modules/tasks/task-priority.css";
 import "./task-completion-prompt.css";
+import "./dentistry-tasks.css";
 
 const statusLabels = {
   todo: "До виконання",
@@ -83,7 +84,7 @@ export default function TaskDetail() {
     ]);
     if (!detail.ok) return navigate("/tasks");
     setData(detail);
-    setListData({ ...list, clients: clients.ok ? clients.clients || [] : [] });
+    setListData({ ...list, clients: clients.ok ? clients.clients || [] : [], active_client_module: clients.ok ? clients.active_client_module : "accounting" });
   }
   useEffect(() => {
     load();
@@ -137,6 +138,13 @@ export default function TaskDetail() {
     setNotice("Задачу переміщено до архіву.");
     load();
   }
+  async function completeAppointment() {
+    setError("");
+    const result = await post("/api/tasks.php", { action: "complete_appointment", id });
+    if (!result.ok) return setError(result.message);
+    setNotice(result.message);
+    load();
+  }
   async function logTime(event) {
     event.preventDefault();
     setError("");
@@ -157,6 +165,9 @@ export default function TaskDetail() {
   if (!data || !listData)
     return <div className="loading-screen">Завантаження задачі…</div>;
   const task = data.task;
+  const isDentistry = listData.active_client_module === "dentistry";
+  const linkedClient = (listData.clients || []).find(client => (task.client_ids || []).some(clientId => String(clientId) === String(client.id)));
+  const isAppointment = Number(task.is_client_appointment) === 1 || (isDentistry && /^Запис клієнта\b/i.test(String(task.title || "")));
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role);
   const priorityInfo = {
     low: ["Низький", <Icon name="low" />],
@@ -183,50 +194,51 @@ export default function TaskDetail() {
     : "<p>Опис задачі ще не додано.</p>";
   return (
     <Layout page="Деталі задачі" user={data.user}>
-      <div className="content task-detail-page">
+      <div className={`content task-detail-page${isDentistry ? " dentistry-task-detail" : ""}`}>
         <button
           className="page-back"
           type="button"
-          onClick={() => navigate("/tasks")}
+          onClick={() => navigate(isDentistry && isAppointment ? "/appointments" : "/tasks")}
         >
-          <Icon name="back" /> Назад до задач
+          <Icon name="back" /> {isDentistry && isAppointment ? "Назад до записів" : "Назад до задач"}
         </button>
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
         <section className="task-detail-header">
           <div>
-            <p className="eyebrow">ЗАДАЧА</p>
+            <p className="eyebrow">{isDentistry ? (isAppointment ? "ЗАПИС ПАЦІЄНТА" : "ЗАДАЧА ПАЦІЄНТА") : "ЗАДАЧА"}</p>
             <h1>{task.title}</h1>
-            <div className="detail-badges">
+            {!(isDentistry && isAppointment) && <div className="detail-badges">
               <TaskStatusDropdown
                 task={task}
                 canManage={canManage}
                 onChange={changeStatus}
               />
-              <span
+              {!isDentistry && <span
                 className={`detail-priority detail-priority-${task.priority}`}
               >
                 <span className="detail-priority-icon">{priorityInfo[1]}</span>
                 {priorityInfo[0]}
-              </span>
-            </div>
+              </span>}
+            </div>}
           </div>
           <div className="task-detail-actions">
-            <button
+            {isDentistry && isAppointment && !["cancelled", "archived"].includes(task.status) && <button className="primary-action" type="button" onClick={completeAppointment}><Icon name="check" /> Завершено</button>}
+            {!(isDentistry && isAppointment) && <button
               className="outline-btn"
               type="button"
               onClick={() => setTimeModal(true)}
             >
               <Icon name="plus" /> Лог часу
-            </button>
-            <button className="primary-action" type="button" onClick={edit}>
-              Редагувати задачу
+            </button>}
+            <button className="primary-action" type="button" onClick={() => isDentistry && isAppointment ? navigate(`/appointments/${task.id}/edit`) : edit()}>
+              {isDentistry && isAppointment ? "Редагувати запис" : "Редагувати задачу"}
             </button>
           </div>
         </section>
         <div className="task-detail-grid">
           <main>
-            <section className="panel task-description-panel">
+            {isDentistry ? <DentistryTaskOverview task={task} client={linkedClient} isAppointment={isAppointment} /> : <section className="panel task-description-panel">
               <h2>Опис задачі</h2>
               <div
                 className="detail-description"
@@ -264,8 +276,8 @@ export default function TaskDetail() {
                   value={task.reminder_at || "Не встановлено"}
                 />
               </div>
-            </section>
-            <section className="panel time-panel">
+            </section>}
+            {!(isDentistry && isAppointment) && <section className="panel time-panel">
               <div className="panel-heading">
                 <div>
                   <h2>Лог часу</h2>
@@ -295,7 +307,7 @@ export default function TaskDetail() {
                   <p className="muted-note">Час ще не додано.</p>
                 )}
               </div>
-            </section>
+            </section>}
           </main>
           <aside>
             <section className="panel history-panel">
@@ -377,4 +389,29 @@ function Info({ label, value }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function DentistryTaskOverview({ task, client, isAppointment }) {
+  const patient = client?.module_data || {};
+  const services = client?.services || [];
+  const currentService = services.find(service => String(service.appointment_task_id || "") === String(task.id));
+  const serviceAppointments = services.filter(service => service.appointment_task_id && String(service.appointment_task_id) !== String(task.id) && service.add_to_calendar && service.appointment_at);
+  const scheduledAt = task.due_date ? new Date(String(task.due_date).replace(" ", "T")) : null;
+  const patientFacts = [
+    ["Телефон", patient.phone],
+    ["Email", patient.email],
+    ["Дата народження", patient.birth_date],
+    ["Тип пацієнта", patient.patient_type],
+    ["Медична картка", patient.medical_record],
+    ["Лікар", patient.doctor],
+  ].filter(([, value]) => value);
+  return <>
+    <section className="panel dentistry-task-detail-patient">
+      <div className="dentistry-task-detail-heading"><span className="dentistry-task-detail-avatar"><Icon name="user" /></span><div><p>КАРТКА ПАЦІЄНТА</p><h2>{client?.name || task.client_names || task.client_name || "Пацієнта не вказано"}</h2></div>{client && <Link to={`/clients/${client.id}/edit`} className="outline-btn"><Icon name="edit" /> Картка пацієнта</Link>}</div>
+      {patientFacts.length ? <div className="dentistry-task-detail-facts">{patientFacts.map(([label, value]) => <Info key={label} label={label} value={value} />)}</div> : <p className="muted-note">Додаткові дані пацієнта ще не заповнені.</p>}
+    </section>
+    {isAppointment && <section className="panel dentistry-task-detail-visit"><div className="panel-heading"><div><h2>Деталі прийому</h2><p>Час і відповідальний за візит.</p></div><span className="dentistry-visit-icon"><Icon name="calendar" /></span></div><div className="dentistry-task-detail-facts"><Info label="Дата та час" value={scheduledAt && !Number.isNaN(scheduledAt.getTime()) ? scheduledAt.toLocaleString("uk-UA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Не заплановано"} /><Info label="Тривалість" value={formatMinutes(task.duration_minutes)} /><Info label="Відповідальний" value={task.assignee_name || "Не призначено"} /><Info label="Послуга" value={currentService?.name || task.title.replace(/^Запис клієнта\s*[·—-]?\s*/, "") || "Загальний прийом"} />{currentService?.tooth_numbers?.length > 0 && <Info label="Зуби" value={currentService.tooth_numbers.join(", ")} />}</div>{task.description && <div className="dentistry-task-detail-description" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description, { USE_PROFILES: { html: true } }) }} />}</section>}
+    <section className="panel dentistry-task-detail-services"><div className="panel-heading"><div><h2>Послуги пацієнта</h2><p>Послуги та ціни з картки клієнта.</p></div><span className="appointment-count">{services.length}</span></div>{services.length ? <div className="dentistry-task-detail-service-list">{services.map((service, index) => <article key={`${service.name}-${index}`}><div><strong>{service.name}</strong>{service.tooth_numbers?.length > 0 && <small>Зуби: {service.tooth_numbers.join(", ")}</small>}</div><b>{Number(service.price || 0).toLocaleString("uk-UA")} грн</b></article>)}</div> : <p className="muted-note">Послуги пацієнта ще не додані.</p>}</section>
+    {serviceAppointments.length > 0 && <section className="panel dentistry-task-detail-services"><div className="panel-heading"><div><h2>Записи з картки пацієнта</h2><p>Заплановані прийоми, додані до його послуг.</p></div></div><div className="dentistry-task-detail-service-list">{serviceAppointments.map((service, index) => { const date = new Date(String(service.appointment_at).replace(" ", "T")); return <article key={`${service.name}-${index}`}><div><strong>{service.name}</strong><small>{Number(service.appointment_duration_minutes || 60)} хв · {service.accountant_name || patient.doctor || "Відповідальний не вказаний"}</small></div><b>{Number.isNaN(date.getTime()) ? service.appointment_at : date.toLocaleString("uk-UA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</b></article>; })}</div></section>}
+  </>;
 }
