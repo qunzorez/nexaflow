@@ -26,7 +26,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS task_clients (task_id CHAR(32) NOT NULL, 
 $pdo->exec("CREATE TABLE IF NOT EXISTS dental_appointment_details (appointment_id CHAR(32) PRIMARY KEY, cabinet_id VARCHAR(80) NULL, reason VARCHAR(190) NULL, comment TEXT NULL, appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled', updated_by CHAR(32) NOT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $appointmentStatusColumn = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dental_appointment_details' AND COLUMN_NAME = 'appointment_status'")->fetchColumn();
 if (!(int)$appointmentStatusColumn) $pdo->exec("ALTER TABLE dental_appointment_details ADD appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled'");
-$pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appointment_id SET d.appointment_status = CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END WHERE t.is_client_appointment = 1 AND t.status IN ('done', 'archived', 'cancelled') AND d.appointment_status <> CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END");
+$pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appointment_id SET d.appointment_status = CASE WHEN t.status = 'cancelled' THEN 'cancelled' WHEN t.status = 'archived' THEN 'archived' ELSE 'completed' END WHERE t.is_client_appointment = 1 AND t.status IN ('done', 'archived', 'cancelled') AND d.appointment_status <> CASE WHEN t.status = 'cancelled' THEN 'cancelled' WHEN t.status = 'archived' THEN 'archived' ELSE 'completed' END");
 $isMultipart = str_contains(strtolower((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'multipart/form-data');
 $data = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? ($isMultipart ? $_POST : body()) : [];
 $action = trim((string)($_GET['action'] ?? $data['action'] ?? 'patient'));
@@ -374,7 +374,7 @@ if ($action === 'perform_treatment_plans') {
             $insertInvoiceItem->execute([dentalId(), $invoiceId, $performedRow['id'], $performedRow['service_name'], $performedRow['tooth_number'], $performedRow['quantity'], $performedRow['unit_price'], $performedRow['total_price']]);
         }
 
-        $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ? AND is_client_appointment = 1 AND status NOT IN ('cancelled', 'done', 'archived')")->execute([$appointmentId]);
+        $pdo->prepare("UPDATE tasks SET status = 'done' WHERE id = ? AND is_client_appointment = 1 AND status NOT IN ('cancelled', 'done', 'archived')")->execute([$appointmentId]);
         $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, 'completed', ?) ON DUPLICATE KEY UPDATE appointment_status = 'completed', updated_by = VALUES(updated_by)")->execute([$appointmentId, $userId]);
         $pdo->prepare('INSERT INTO task_history (id, task_id, user_id, action, message) VALUES (?, ?, ?, ?, ?)')->execute([dentalId(), $appointmentId, $userId, 'appointment_completed_with_invoice', 'Прийом завершено після підтвердження послуг. Створено рахунок ' . $invoiceNumber . '.']);
         dentalAudit($pdo, $userId, 'appointment', $appointmentId, 'treatment_completed', ['plan_ids' => $planIds, 'performed_service_ids' => $performedIds, 'invoice_id' => $invoiceId, 'invoice_number' => $invoiceNumber, 'total_amount' => $amount]);

@@ -44,7 +44,7 @@ if ($claimTaskId !== '') {
         $required = in_array($action, ['delete', 'archive'], true) ? 'delete' : (in_array($action, ['set_status', 'set_appointment_status'], true) ? 'update' : 'edit');
         requireClaim($claims, $required);
         if ($action === 'set_status' && in_array($data['status'] ?? '', ['archived', 'cancelled'], true)) requireClaim($claims, 'delete');
-        if ($action === 'set_appointment_status' && ($data['appointment_status'] ?? '') === 'cancelled') requireClaim($claims, 'delete');
+        if ($action === 'set_appointment_status' && in_array(($data['appointment_status'] ?? ''), ['cancelled', 'archived'], true)) requireClaim($claims, 'delete');
         if ($action === 'update') {
             $currentStatus = $pdo->prepare('SELECT status FROM tasks WHERE id = ?'); $currentStatus->execute([$claimTaskId]);
             $oldStatusForClaims = (string)$currentStatus->fetchColumn(); $currentStatus->closeCursor();
@@ -115,7 +115,7 @@ if ($method === 'GET') {
             $memberMarks = implode(',', array_fill(0, count($workspaceMembers), '?'));
             $todayInWorkspace = (new DateTimeImmutable('now', new DateTimeZone('Europe/Kyiv')))->format('Y-m-d');
             $pdo->prepare("UPDATE tasks SET status = 'done' WHERE is_client_appointment = 1 AND status NOT IN ('done', 'cancelled', 'archived') AND due_date IS NOT NULL AND DATE(due_date) < ? AND created_by IN ({$memberMarks})")->execute(array_merge([$todayInWorkspace], $workspaceMembers));
-            $pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appointment_id SET d.appointment_status = CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END WHERE t.is_client_appointment = 1 AND t.status IN ('done', 'archived', 'cancelled') AND d.appointment_status <> CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END");
+            $pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appointment_id SET d.appointment_status = CASE WHEN t.status = 'cancelled' THEN 'cancelled' WHEN t.status = 'archived' THEN 'archived' ELSE 'completed' END WHERE t.is_client_appointment = 1 AND t.status IN ('done', 'archived', 'cancelled') AND d.appointment_status <> CASE WHEN t.status = 'cancelled' THEN 'cancelled' WHEN t.status = 'archived' THEN 'archived' ELSE 'completed' END");
         }
     }
     [$accessSql, $accessParams] = taskAccessSql($user, $userId); $detailId = trim((string)($_GET['id'] ?? ''));
@@ -138,7 +138,7 @@ if ($method !== 'POST') jsonResponse(false, 'Метод не підтримує�
 if ($action === 'set_appointment_status') {
     $taskId = trim((string)($data['id'] ?? ''));
     $newStatus = trim((string)($data['appointment_status'] ?? ''));
-    $allowedStatuses = ['scheduled', 'confirmed', 'arrived', 'completed', 'cancelled'];
+    $allowedStatuses = ['scheduled', 'confirmed', 'arrived', 'completed', 'archived', 'cancelled'];
     if (!$taskId || !in_array($newStatus, $allowedStatuses, true)) jsonResponse(false, 'Оберіть коректний статус прийому.', [], 422);
     if (!canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до запису.', [], 403);
     requirePlanFeature($planContext, 'calendar');
@@ -151,8 +151,8 @@ if ($action === 'set_appointment_status') {
     if (!$appointment || (int)$appointment['is_client_appointment'] !== 1) jsonResponse(false, 'Запис пацієнта не знайдено.', [], 404);
     $oldTaskStatus = (string)$appointment['status'];
     $isManager = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
-    if ($newStatus === 'cancelled' && !$isManager) jsonResponse(false, 'Скасувати прийом може лише менеджер або адміністратор.', [], 403);
-    $nextTaskStatus = ['scheduled' => 'todo', 'confirmed' => 'todo', 'arrived' => 'in_progress', 'completed' => 'archived', 'cancelled' => 'cancelled'][$newStatus];
+    if (in_array($newStatus, ['archived', 'cancelled'], true) && !$isManager) jsonResponse(false, ($newStatus === 'archived' ? 'Архівувати прийом' : 'Скасувати прийом') . ' може лише менеджер або адміністратор.', [], 403);
+    $nextTaskStatus = ['scheduled' => 'todo', 'confirmed' => 'todo', 'arrived' => 'in_progress', 'completed' => 'done', 'archived' => 'archived', 'cancelled' => 'cancelled'][$newStatus];
     $isReopening = in_array($oldTaskStatus, ['done', 'archived', 'cancelled'], true) && in_array($nextTaskStatus, ['todo', 'in_progress'], true);
     if ($isReopening) {
         if (!$isManager) jsonResponse(false, 'Повернути прийом з архіву може лише менеджер або адміністратор.', [], 403);
@@ -163,7 +163,7 @@ if ($action === 'set_appointment_status') {
         $pdo->prepare('UPDATE tasks SET status = ? WHERE id = ?')->execute([$nextTaskStatus, $taskId]);
         $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE appointment_status = VALUES(appointment_status), updated_by = VALUES(updated_by)")->execute([$taskId, $newStatus, $userId]);
         if (in_array($oldTaskStatus, ['done', 'archived', 'cancelled'], true) && $isReopening) releasePlanCapacityLocks((string)$planContext['owner_id']);
-        addHistory($pdo, $taskId, $userId, 'appointment_status_updated', 'Статус прийому змінено на «' . ['scheduled' => 'Заплановано', 'confirmed' => 'Підтверджено', 'arrived' => 'Пацієнт прибув', 'completed' => 'Завершено', 'cancelled' => 'Скасовано'][$newStatus] . '».');
+        addHistory($pdo, $taskId, $userId, 'appointment_status_updated', 'Статус прийому змінено на «' . ['scheduled' => 'Заплановано', 'confirmed' => 'Підтверджено', 'arrived' => 'Пацієнт прибув', 'completed' => 'Завершено', 'archived' => 'Архів', 'cancelled' => 'Скасовано'][$newStatus] . '».');
         $pdo->commit();
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -185,12 +185,12 @@ if ($action === 'complete_appointment') {
     $appointmentQuery->execute([$taskId]);
     $appointment = $appointmentQuery->fetch();
     if (!$appointment || (int)$appointment['is_client_appointment'] !== 1) jsonResponse(false, 'Запис пацієнта не знайдено.', [], 404);
-    if ((string)$appointment['status'] !== 'archived') {
-        $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ?")->execute([$taskId]);
-        addHistory($pdo, $taskId, $userId, 'appointment_completed', 'Прийом позначено виконаним і переміщено до архіву.');
+    if ((string)$appointment['status'] !== 'done') {
+        $pdo->prepare("UPDATE tasks SET status = 'done' WHERE id = ?")->execute([$taskId]);
+        addHistory($pdo, $taskId, $userId, 'appointment_completed', 'Прийом позначено завершеним.');
     }
     $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, 'completed', ?) ON DUPLICATE KEY UPDATE appointment_status = 'completed', updated_by = VALUES(updated_by)")->execute([$taskId, $userId]);
-    jsonResponse(true, 'Запис позначено виконаним і переміщено до архіву.', ['status' => 'archived']);
+    jsonResponse(true, 'Прийом позначено завершеним.', ['status' => 'done', 'appointment_status' => 'completed']);
 }
 if ($action === 'add_history') { $taskId = trim((string)($data['id'] ?? '')); $message = trim((string)($data['message'] ?? '')); if (!$taskId || !$message) jsonResponse(false, 'Дані історії неповні.', [], 422); if (!canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до задачі.', [], 403); addHistory($pdo, $taskId, $userId, 'description_detail', $message); jsonResponse(true, 'Дію додано в історію.'); }
 if ($action === 'set_reminder') { $taskId = trim((string)($data['task_id'] ?? '')); $reminderAt = trim((string)($data['reminder_at'] ?? '')) ?: null; if (!$taskId || !canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до задачі.', [], 403); if ($reminderAt !== null) { $date = DateTime::createFromFormat('Y-m-d\TH:i', $reminderAt); if (!$date || $date->format('Y-m-d\TH:i') !== $reminderAt) jsonResponse(false, 'Вкажіть коректну дату та час.', [], 422); } $pdo->prepare('UPDATE tasks SET reminder_at = ? WHERE id = ?')->execute([$reminderAt, $taskId]); if ($reminderAt) addHistory($pdo, $taskId, $userId, 'reminder_updated', 'Нагадування перенесено на ' . $date->format('d.m.Y H:i') . '.'); else addHistory($pdo, $taskId, $userId, 'reminder_removed', 'Нагадування вимкнено.'); jsonResponse(true, $reminderAt ? 'Нове нагадування встановлено.' : 'Нагадування вимкнено.'); }

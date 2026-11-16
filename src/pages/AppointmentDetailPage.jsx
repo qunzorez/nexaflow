@@ -48,8 +48,8 @@ export default function AppointmentDetailPage() {
   const task = data.task;
   const patient = data.patient;
   const date = task.due_date ? new Date(String(task.due_date).replace(" ", "T")) : null;
-  const appointmentStatus = task.appointment_status || ({ archived: "completed", done: "completed", cancelled: "cancelled", in_progress: "arrived" }[task.status] || "scheduled");
-  const statusLabels = { scheduled: "Заплановано", confirmed: "Підтверджено", arrived: "Пацієнт прибув", completed: "Завершено", cancelled: "Скасовано" };
+  const appointmentStatus = task.appointment_status || ({ archived: "archived", done: "completed", cancelled: "cancelled", in_progress: "arrived" }[task.status] || "scheduled");
+  const statusLabels = { scheduled: "Заплановано", confirmed: "Підтверджено", arrived: "Пацієнт прибув", completed: "Завершено", archived: "В архіві", cancelled: "Скасовано" };
 
   return <Layout page="Деталі прийому" user={data.user}>
     <div className="content appointments-page appointment-detail-page">
@@ -60,7 +60,7 @@ export default function AppointmentDetailPage() {
         <div><p className="eyebrow">ПРИЙОМ ПАЦІЄНТА</p><h1>{patient?.name || task.client_names || "Запис клієнта"}</h1><p className="subtext">Деталі прийому та пацієнта.</p></div>
         <div className="appointment-detail-actions">
           <label className="appointment-status-control">Статус прийому<select value={appointmentStatus} disabled={busy} onChange={event => changeStatus(event.target.value)}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          {!['completed', 'cancelled'].includes(appointmentStatus) && <Link className="outline-btn" to={`/appointments/${id}/edit`}><Icon name="edit" /> Редагувати запис</Link>}
+          {!['completed', 'archived', 'cancelled'].includes(appointmentStatus) && <Link className="outline-btn" to={`/appointments/${id}/edit`}><Icon name="edit" /> Редагувати запис</Link>}
         </div>
       </section>
       <div className="appointment-detail-grid">
