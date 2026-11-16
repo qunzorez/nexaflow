@@ -308,7 +308,7 @@ if ($action === 'update_treatment_plan') {
 
 if ($action === 'perform_service') {
     $appointmentId = trim((string)($data['appointment_id'] ?? ''));
-    $appointment = dentalAppointment($pdo, $appointmentId, $patientId);
+    $appointment = dentalAppointment($pdo, $appointmentId, $patientId, true);
     $catalog = dentalCatalogService($pdo, $ownerId, (string)($data['service_id'] ?? ''));
     $quantity = min(100, max(1, (int)($data['quantity'] ?? 1)));
     $tooth = isset($data['tooth_number']) && (int)$data['tooth_number'] > 0 ? (int)$data['tooth_number'] : null;
