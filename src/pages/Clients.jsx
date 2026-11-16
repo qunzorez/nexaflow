@@ -312,7 +312,7 @@ export const emptyForm = {
   has_employees: false,
   employee_count: "",
   special_taxes: [],
-  module: window.localStorage.getItem("nexaflow.client.module") || "accounting",
+  module: "accounting",
   module_data: {},
   services: [],
 };
@@ -813,12 +813,8 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                     <option key={item}>{item}</option>
                   ))}
                 </select>
-<<<<<<< Updated upstream
-              </label>}
-=======
                 {form.module === "accounting" && <small className="client-tax-hint">Для цього режиму дедлайни декларацій з’являться в календарі. Додайте ПДВ, акциз, працівників і специфічні податки нижче, щоб бачити пов’язані строки.</small>}
-              </label>
->>>>>>> Stashed changes
+              </label>}
             </div>
             {form.module === "accounting" && <><div className="client-toggles">
               <Toggle
@@ -871,12 +867,8 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                   </label>
                 ))}
               </div>
-<<<<<<< Updated upstream
-            </fieldset></>}
-=======
               {form.special_taxes.length > 0 && <p className="client-field-hint">Для обраного податку додайте бухгалтерську послугу та вкажіть її офіційний строк: період звітності залежить від виду податку й об’єкта.</p>}
-            </fieldset>
->>>>>>> Stashed changes
+            </fieldset></>}
             {form.module === "accounting" && <fieldset className="client-services-fieldset">
               <legend>Бухгалтерські послуги</legend>
               <p className="client-field-hint">Спочатку ваші послуги із збереженими цінами, нижче — стандартні пропозиції.</p>

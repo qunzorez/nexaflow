@@ -19,7 +19,7 @@ export default function ClientCreatePage() {
   const [calendarTasks, setCalendarTasks] = useState([]);
   const [form, setForm] = useState({
     ...emptyForm,
-    module: window.localStorage.getItem("nexaflow.client.module") || "accounting",
+    module: "accounting",
   });
   const [error, setError] = useState("");
 
@@ -29,6 +29,7 @@ export default function ClientCreatePage() {
       if (!result.permissions?.manage) return navigate("/clients", { replace: true });
       setUser({ ...result.user, active_client_module: result.active_client_module || "accounting" });
       window.localStorage.setItem("nexaflow.client.module", result.active_client_module || "accounting");
+      setForm((current) => ({ ...current, module: result.active_client_module || "accounting" }));
       setAvailableUsers(result.available_users || []);
       setTeamUsers(result.team_users || []);
       setAvailableUsersByClient(result.available_users_by_client || {});

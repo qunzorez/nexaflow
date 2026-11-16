@@ -42,7 +42,7 @@ export default function ClientEditPage() {
         has_employees: Boolean(Number(client.has_employees)),
         employee_count: client.employee_count || "",
         special_taxes: client.special_taxes || [],
-        module: client.module || window.localStorage.getItem("nexaflow.client.module") || "accounting",
+        module: client.module || "accounting",
         module_data: client.module_data || {},
         services: (client.services || []).map((service) => ({ ...service, is_package: Boolean(service.is_package || service.package_id) })),
       });
