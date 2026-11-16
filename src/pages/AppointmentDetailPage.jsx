@@ -34,13 +34,13 @@ export default function AppointmentDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  async function complete() {
+  async function changeStatus(appointmentStatus) {
     setBusy(true);
     setError("");
-    const result = await post("/api/tasks.php", { action: "complete_appointment", id });
+    const result = await post("/api/tasks.php", { action: "set_appointment_status", id, appointment_status: appointmentStatus });
     setBusy(false);
-    if (!result.ok) return setError(result.message || "Не вдалося завершити прийом.");
-    setNotice(result.message || "Прийом завершено.");
+    if (!result.ok) return setError(result.message || "Не вдалося змінити статус прийому.");
+    setNotice(result.message || "Статус прийому змінено.");
     await load();
   }
 
@@ -48,7 +48,8 @@ export default function AppointmentDetailPage() {
   const task = data.task;
   const patient = data.patient;
   const date = task.due_date ? new Date(String(task.due_date).replace(" ", "T")) : null;
-  const statusText = { todo: "Заплановано", in_progress: "Триває", review: "Очікує перевірки", done: "Завершено", cancelled: "Скасовано", archived: "Архів" }[task.status] || task.status;
+  const appointmentStatus = task.appointment_status || ({ archived: "completed", done: "completed", cancelled: "cancelled", in_progress: "arrived" }[task.status] || "scheduled");
+  const statusLabels = { scheduled: "Заплановано", confirmed: "Підтверджено", arrived: "Пацієнт прибув", completed: "Завершено", cancelled: "Скасовано" };
 
   return <Layout page="Деталі прийому" user={data.user}>
     <div className="content appointments-page appointment-detail-page">
@@ -58,8 +59,8 @@ export default function AppointmentDetailPage() {
       <section className="welcome-row appointments-hero">
         <div><p className="eyebrow">ПРИЙОМ ПАЦІЄНТА</p><h1>{patient?.name || task.client_names || "Запис клієнта"}</h1><p className="subtext">Деталі прийому та пацієнта.</p></div>
         <div className="appointment-detail-actions">
-          {!['done', 'cancelled', 'archived'].includes(task.status) && <button className="primary-button" type="button" disabled={busy} onClick={complete}><Icon name="check" /> {busy ? "Завершуємо…" : "Завершити прийом"}</button>}
-          {!['done', 'cancelled', 'archived'].includes(task.status) && <Link className="outline-btn" to={`/appointments/${id}/edit`}><Icon name="edit" /> Редагувати запис</Link>}
+          <label className="appointment-status-control">Статус прийому<select value={appointmentStatus} disabled={busy} onChange={event => changeStatus(event.target.value)}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          {!['completed', 'cancelled'].includes(appointmentStatus) && <Link className="outline-btn" to={`/appointments/${id}/edit`}><Icon name="edit" /> Редагувати запис</Link>}
         </div>
       </section>
       <div className="appointment-detail-grid">
@@ -70,7 +71,7 @@ export default function AppointmentDetailPage() {
             <div><small>Тривалість</small><strong>{durationLabel(task.duration_minutes)}</strong></div>
             <div><small>Лікар</small><strong>{task.assignee_names || task.assignee_name || "Не призначено"}</strong></div>
             <div><small>Кабінет</small><strong>{task.cabinet_id || "Не вказано"}</strong></div>
-            <div><small>Статус</small><strong>{statusText}</strong></div>
+            <div><small>Статус</small><strong>{statusLabels[appointmentStatus] || appointmentStatus}</strong></div>
             <div><small>Причина прийому</small><strong>{task.appointment_reason || "Не вказана"}</strong></div>
           </div>
           {task.appointment_comment && <p className="appointment-detail-comment">{task.appointment_comment}</p>}

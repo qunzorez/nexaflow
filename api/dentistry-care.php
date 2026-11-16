@@ -23,6 +23,10 @@ if (!in_array('is_client_appointment', $taskColumns, true)) {
     $pdo->exec("UPDATE tasks SET is_client_appointment = 1 WHERE title LIKE 'Запис клієнта ·%'");
 }
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_clients (task_id CHAR(32) NOT NULL, client_id CHAR(32) NOT NULL, PRIMARY KEY (task_id, client_id), INDEX idx_task_clients_client (client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$pdo->exec("CREATE TABLE IF NOT EXISTS dental_appointment_details (appointment_id CHAR(32) PRIMARY KEY, cabinet_id VARCHAR(80) NULL, reason VARCHAR(190) NULL, comment TEXT NULL, appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled', updated_by CHAR(32) NOT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$appointmentStatusColumn = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dental_appointment_details' AND COLUMN_NAME = 'appointment_status'")->fetchColumn();
+if (!(int)$appointmentStatusColumn) $pdo->exec("ALTER TABLE dental_appointment_details ADD appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled'");
+$pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appointment_id SET d.appointment_status = CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END WHERE t.is_client_appointment = 1 AND t.status IN ('done', 'archived', 'cancelled') AND d.appointment_status <> CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END");
 $isMultipart = str_contains(strtolower((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'multipart/form-data');
 $data = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? ($isMultipart ? $_POST : body()) : [];
 $action = trim((string)($_GET['action'] ?? $data['action'] ?? 'patient'));
@@ -148,7 +152,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $payments->execute([$patientId]);
     $documents = $pdo->prepare('SELECT id, patient_id, record_id, original_name, mime_type, file_size, uploaded_by, created_at FROM dental_documents WHERE patient_id = ? ORDER BY created_at DESC');
     $documents->execute([$patientId]);
-    $visitQuery = $pdo->prepare('SELECT t.id, t.title, t.status, t.due_date, t.duration_minutes, d.cabinet_id, d.reason, d.comment, GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR \', \') AS doctor_name FROM tasks t JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users u ON u.id = ta.user_id LEFT JOIN dental_appointment_details d ON d.appointment_id = t.id WHERE tc.client_id = ? AND t.is_client_appointment = 1 GROUP BY t.id ORDER BY t.due_date DESC');
+    $visitQuery = $pdo->prepare('SELECT t.id, t.title, t.status, d.appointment_status, t.due_date, t.duration_minutes, d.cabinet_id, d.reason, d.comment, GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR \', \') AS doctor_name FROM tasks t JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users u ON u.id = ta.user_id LEFT JOIN dental_appointment_details d ON d.appointment_id = t.id WHERE tc.client_id = ? AND t.is_client_appointment = 1 GROUP BY t.id ORDER BY t.due_date DESC');
     $visitQuery->execute([$patientId]);
     $invoiceTotal = 0; $paidTotal = 0; $debtTotal = 0;
     foreach ($invoiceRows as $invoice) { if ((string)$invoice['status'] === 'cancelled') continue; $invoiceTotal += (int)round((float)$invoice['total_amount'] * 100); $paidTotal += (int)round((float)$invoice['paid_amount'] * 100); $debtTotal += (int)round((float)$invoice['remaining_amount'] * 100); }

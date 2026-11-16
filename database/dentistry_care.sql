@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS dental_appointment_details (
   cabinet_id VARCHAR(80) NULL,
   reason VARCHAR(190) NULL,
   comment TEXT NULL,
+  appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
   updated_by CHAR(32) NOT NULL,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

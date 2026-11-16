@@ -21,7 +21,9 @@ if (!in_array('is_client_appointment', $existingColumns, true)) {
     $pdo->exec("UPDATE tasks SET is_client_appointment = 1 WHERE title LIKE 'Запис клієнта ·%'");
 }
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_clients (task_id CHAR(32) NOT NULL, client_id CHAR(32) NOT NULL, PRIMARY KEY (task_id, client_id), INDEX idx_task_clients_client (client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-$pdo->exec("CREATE TABLE IF NOT EXISTS dental_appointment_details (appointment_id CHAR(32) PRIMARY KEY, cabinet_id VARCHAR(80) NULL, reason VARCHAR(190) NULL, comment TEXT NULL, updated_by CHAR(32) NOT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$pdo->exec("CREATE TABLE IF NOT EXISTS dental_appointment_details (appointment_id CHAR(32) PRIMARY KEY, cabinet_id VARCHAR(80) NULL, reason VARCHAR(190) NULL, comment TEXT NULL, appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled', updated_by CHAR(32) NOT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$appointmentStatusExists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dental_appointment_details' AND COLUMN_NAME = 'appointment_status'")->fetchColumn();
+if (!(int)$appointmentStatusExists) $pdo->exec("ALTER TABLE dental_appointment_details ADD appointment_status VARCHAR(20) NOT NULL DEFAULT 'scheduled'");
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_history (id CHAR(32) PRIMARY KEY, task_id CHAR(32) NOT NULL, user_id CHAR(32) NULL, action VARCHAR(40) NOT NULL DEFAULT 'updated', message TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_task_history_task (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS task_attachments (id CHAR(32) PRIMARY KEY, task_id CHAR(32) NOT NULL, user_id CHAR(32) NULL, file_name VARCHAR(180) NOT NULL, file_url TEXT NOT NULL, mime_type VARCHAR(100) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_task_attachments_task (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 $pdo->exec("CREATE TABLE IF NOT EXISTS time_entries (id CHAR(32) PRIMARY KEY, task_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, minutes INT UNSIGNED NOT NULL, note VARCHAR(500) NULL, logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_time_entries_task (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -39,9 +41,10 @@ if ($claimTaskId !== '') {
     $claims = resourceClaims($pdo, $userId, 'task', $claimTaskId);
     requireClaim($claims, 'read');
     if ($method === 'POST') {
-        $required = in_array($action, ['delete', 'archive'], true) ? 'delete' : ($action === 'set_status' ? 'update' : 'edit');
+        $required = in_array($action, ['delete', 'archive'], true) ? 'delete' : (in_array($action, ['set_status', 'set_appointment_status'], true) ? 'update' : 'edit');
         requireClaim($claims, $required);
         if ($action === 'set_status' && in_array($data['status'] ?? '', ['archived', 'cancelled'], true)) requireClaim($claims, 'delete');
+        if ($action === 'set_appointment_status' && ($data['appointment_status'] ?? '') === 'cancelled') requireClaim($claims, 'delete');
         if ($action === 'update') {
             $currentStatus = $pdo->prepare('SELECT status FROM tasks WHERE id = ?'); $currentStatus->execute([$claimTaskId]);
             $oldStatusForClaims = (string)$currentStatus->fetchColumn(); $currentStatus->closeCursor();
@@ -62,7 +65,7 @@ function normalizeTaskDateTime($value): ?string {
     if (!$date) return null;
     return strlen($raw) === 10 ? $date->format('Y-m-d 00:00:00') : $date->format('Y-m-d H:i:s');
 }
-function taskSelect(string $where = '1=1'): string { return "SELECT t.*, d.cabinet_id, d.reason AS appointment_reason, d.comment AS appointment_comment, GROUP_CONCAT(DISTINCT tp.project_id) AS project_ids, GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') AS project_names, GROUP_CONCAT(DISTINCT ta.user_id) AS assignee_ids, GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') AS assignee_names, GROUP_CONCAT(DISTINCT tc.client_id) AS client_ids, GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') AS client_names, p0.name AS primary_project_name, a0.name AS primary_assignee_name, c.name AS creator_name FROM tasks t LEFT JOIN dental_appointment_details d ON d.appointment_id = t.id LEFT JOIN task_projects tp ON tp.task_id = t.id LEFT JOIN projects p ON p.id = tp.project_id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users a ON a.id = ta.user_id LEFT JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN clients cl ON cl.id = tc.client_id LEFT JOIN projects p0 ON p0.id = t.project_id LEFT JOIN users a0 ON a0.id = t.assignee_id JOIN users c ON c.id = t.created_by WHERE {$where} GROUP BY t.id"; }
+function taskSelect(string $where = '1=1'): string { return "SELECT t.*, d.cabinet_id, d.reason AS appointment_reason, d.comment AS appointment_comment, d.appointment_status, GROUP_CONCAT(DISTINCT tp.project_id) AS project_ids, GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') AS project_names, GROUP_CONCAT(DISTINCT ta.user_id) AS assignee_ids, GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') AS assignee_names, GROUP_CONCAT(DISTINCT tc.client_id) AS client_ids, GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') AS client_names, p0.name AS primary_project_name, a0.name AS primary_assignee_name, c.name AS creator_name FROM tasks t LEFT JOIN dental_appointment_details d ON d.appointment_id = t.id LEFT JOIN task_projects tp ON tp.task_id = t.id LEFT JOIN projects p ON p.id = tp.project_id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users a ON a.id = ta.user_id LEFT JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN clients cl ON cl.id = tc.client_id LEFT JOIN projects p0 ON p0.id = t.project_id LEFT JOIN users a0 ON a0.id = t.assignee_id JOIN users c ON c.id = t.created_by WHERE {$where} GROUP BY t.id"; }
 function normalizeTask(array $task): array { $task['project_ids'] = $task['project_ids'] ? explode(',', $task['project_ids']) : ($task['project_id'] ? [$task['project_id']] : []); $task['assignee_ids'] = $task['assignee_ids'] ? explode(',', $task['assignee_ids']) : ($task['assignee_id'] ? [$task['assignee_id']] : []); $task['client_ids'] = $task['client_ids'] ? explode(',', $task['client_ids']) : []; $task['project_name'] = $task['project_names'] ?: $task['primary_project_name']; $task['assignee_name'] = $task['assignee_names'] ?: $task['primary_assignee_name']; return $task; }
 function filterTaskClients(PDO $pdo, array $task, string $userId, bool $canManage): array
 {
@@ -112,6 +115,7 @@ if ($method === 'GET') {
             $memberMarks = implode(',', array_fill(0, count($workspaceMembers), '?'));
             $todayInWorkspace = (new DateTimeImmutable('now', new DateTimeZone('Europe/Kyiv')))->format('Y-m-d');
             $pdo->prepare("UPDATE tasks SET status = 'done' WHERE is_client_appointment = 1 AND status NOT IN ('done', 'cancelled', 'archived') AND due_date IS NOT NULL AND DATE(due_date) < ? AND created_by IN ({$memberMarks})")->execute(array_merge([$todayInWorkspace], $workspaceMembers));
+            $pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appointment_id SET d.appointment_status = CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END WHERE t.is_client_appointment = 1 AND t.status IN ('done', 'archived', 'cancelled') AND d.appointment_status <> CASE WHEN t.status = 'cancelled' THEN 'cancelled' ELSE 'completed' END");
         }
     }
     [$accessSql, $accessParams] = taskAccessSql($user, $userId); $detailId = trim((string)($_GET['id'] ?? ''));
@@ -131,6 +135,43 @@ if ($method === 'GET') {
     jsonResponse(true, 'Задачі завантажено.', ['user' => $user, 'tasks' => $tasks, 'projects' => $projectQuery->fetchAll(), 'people' => $peopleQuery->fetchAll(), 'permissions' => ['create' => true, 'admin' => $isAdmin]]);
 }
 if ($method !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
+if ($action === 'set_appointment_status') {
+    $taskId = trim((string)($data['id'] ?? ''));
+    $newStatus = trim((string)($data['appointment_status'] ?? ''));
+    $allowedStatuses = ['scheduled', 'confirmed', 'arrived', 'completed', 'cancelled'];
+    if (!$taskId || !in_array($newStatus, $allowedStatuses, true)) jsonResponse(false, 'Оберіть коректний статус прийому.', [], 422);
+    if (!canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до запису.', [], 403);
+    requirePlanFeature($planContext, 'calendar');
+    $moduleQuery = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ? LIMIT 1');
+    $moduleQuery->execute([(string)$planContext['owner_id']]);
+    if ((string)$moduleQuery->fetchColumn() !== 'dentistry') jsonResponse(false, 'Зміна статусу доступна лише для стоматологічних прийомів.', [], 403);
+    $appointmentQuery = $pdo->prepare('SELECT is_client_appointment, status FROM tasks WHERE id = ? LIMIT 1');
+    $appointmentQuery->execute([$taskId]);
+    $appointment = $appointmentQuery->fetch();
+    if (!$appointment || (int)$appointment['is_client_appointment'] !== 1) jsonResponse(false, 'Запис пацієнта не знайдено.', [], 404);
+    $oldTaskStatus = (string)$appointment['status'];
+    $isManager = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
+    if ($newStatus === 'cancelled' && !$isManager) jsonResponse(false, 'Скасувати прийом може лише менеджер або адміністратор.', [], 403);
+    $nextTaskStatus = ['scheduled' => 'todo', 'confirmed' => 'todo', 'arrived' => 'in_progress', 'completed' => 'archived', 'cancelled' => 'cancelled'][$newStatus];
+    $isReopening = in_array($oldTaskStatus, ['done', 'archived', 'cancelled'], true) && in_array($nextTaskStatus, ['todo', 'in_progress'], true);
+    if ($isReopening) {
+        if (!$isManager) jsonResponse(false, 'Повернути прийом з архіву може лише менеджер або адміністратор.', [], 403);
+        requirePlanCapacity($planContext, 'tasks_month');
+    }
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('UPDATE tasks SET status = ? WHERE id = ?')->execute([$nextTaskStatus, $taskId]);
+        $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE appointment_status = VALUES(appointment_status), updated_by = VALUES(updated_by)")->execute([$taskId, $newStatus, $userId]);
+        if (in_array($oldTaskStatus, ['done', 'archived', 'cancelled'], true) && $isReopening) releasePlanCapacityLocks((string)$planContext['owner_id']);
+        addHistory($pdo, $taskId, $userId, 'appointment_status_updated', 'Статус прийому змінено на «' . ['scheduled' => 'Заплановано', 'confirmed' => 'Підтверджено', 'arrived' => 'Пацієнт прибув', 'completed' => 'Завершено', 'cancelled' => 'Скасовано'][$newStatus] . '».');
+        $pdo->commit();
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('Appointment status update failed: ' . $error->getMessage());
+        jsonResponse(false, 'Не вдалося змінити статус прийому.', [], 500);
+    }
+    jsonResponse(true, 'Статус прийому змінено.', ['status' => $nextTaskStatus, 'appointment_status' => $newStatus]);
+}
 if ($action === 'complete_appointment') {
     $taskId = trim((string)($data['id'] ?? ''));
     if (!$taskId || !canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до запису.', [], 403);
@@ -148,6 +189,7 @@ if ($action === 'complete_appointment') {
         $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ?")->execute([$taskId]);
         addHistory($pdo, $taskId, $userId, 'appointment_completed', 'Прийом позначено виконаним і переміщено до архіву.');
     }
+    $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, 'completed', ?) ON DUPLICATE KEY UPDATE appointment_status = 'completed', updated_by = VALUES(updated_by)")->execute([$taskId, $userId]);
     jsonResponse(true, 'Запис позначено виконаним і переміщено до архіву.', ['status' => 'archived']);
 }
 if ($action === 'add_history') { $taskId = trim((string)($data['id'] ?? '')); $message = trim((string)($data['message'] ?? '')); if (!$taskId || !$message) jsonResponse(false, 'Дані історії неповні.', [], 422); if (!canAccessTask($pdo, $user, $userId, $taskId)) jsonResponse(false, 'Немає доступу до задачі.', [], 403); addHistory($pdo, $taskId, $userId, 'description_detail', $message); jsonResponse(true, 'Дію додано в історію.'); }
