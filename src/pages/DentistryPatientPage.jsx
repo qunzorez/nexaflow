@@ -216,6 +216,7 @@ export default function DentistryPatientPage() {
             <div><h3>Зубна формула</h3><p>{planTeeth.length ? `Вибрано ${planTeeth.length} зубів. Кожна послуга буде додана для кожного з них.` : "Виберіть кілька зубів або залиште формулу порожньою для загальної послуги."}</p></div>
             <DentalToothChart value={planTeeth} onChange={setPlanTeeth} />
           </section>
+          <button className="primary-action dentistry-add-plan-service" type="button" onClick={() => setPlan(current => ({ ...current, items: [...current.items, { service_id: "", quantity: 1, tooth_number: "", comment: "" }] }))}><Icon name="plus" /> Додати послугу</button>
           <div className="dentistry-plan-service-heading"><h3>Послуги плану</h3><small>{planTeeth.length ? `Сума рахується на ${planTeeth.length} зубів` : "Сума рахується один раз для кожної послуги"}</small></div>
           {plan.items.map((item, index) => {
             const unitPrice = Number(services.find(service => String(service.id) === String(item.service_id))?.client_price || 0);
@@ -227,7 +228,6 @@ export default function DentistryPatientPage() {
             </div>;
           })}
           <div className="dentistry-plan-total"><span>Орієнтовна сума плану</span><strong>{money(planEstimate)}</strong></div>
-          <button className="outline-btn" type="button" onClick={() => setPlan(current => ({ ...current, items: [...current.items, { service_id: "", quantity: 1, tooth_number: "", comment: "" }] }))}>Додати послугу</button>
           <button className="primary-action" disabled={busy || !services.length} type="submit">Створити план</button>
         </form>
         <section className="dentistry-care-panel"><header><div><h2>Плани пацієнта</h2><p>Виконання позицій оновлюється фактичними послугами.</p></div></header>{care.treatment_plans?.map(item => <article className="dentistry-plan-card" key={item.id}><header><div><strong>{item.title}</strong><small>{item.doctor_name || "Лікар"} · {dateTime(item.created_at)}</small></div><b>{money(item.estimated_total)}</b></header><div className="dentistry-plan-lines">{item.items?.map(row => <div key={row.id}><span>{row.service_name}{row.tooth_number ? ` · зуб ${row.tooth_number}` : ""} · {row.completed_quantity}/{row.quantity}</span><small>{money(row.planned_price)} · {row.status}</small></div>)}</div><footer><span>Статус: {item.status}</span>{item.status === "active" && <button type="button" onClick={() => runAction("update_treatment_plan", { id: item.id, status: "cancelled" }, "План скасовано.")}>Скасувати план</button>}</footer></article>)}</section>
