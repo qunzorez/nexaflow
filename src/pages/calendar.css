@@ -137,7 +137,14 @@
 .calendar-page .calendar-weekdays span:last-child{border-right:0}
 .month-grid .calendar-day{border-top:0;border-left:0;border-radius:0}
 @media(max-width:900px){.calendar-page .calendar-toolbar{grid-template-columns:36px minmax(0,1fr) 36px auto}.calendar-page .calendar-view-switch{grid-column:1/-1;justify-self:stretch}.calendar-page .calendar-view-switch button{flex:1}}
+<<<<<<< Updated upstream
 @media(max-width:600px){.calendar-page .calendar-toolbar{grid-template-columns:32px minmax(0,1fr) 32px}.calendar-page .calendar-nav-button{width:32px;height:32px}.calendar-page .calendar-period-title h2{font-size:16px}.calendar-page .calendar-today-button{grid-column:1/-1;width:100%}.calendar-page .calendar-view-switch{grid-column:1/-1}.calendar-time-grid{border-radius:11px}.calendar-time-body{min-height:864px}.calendar-hour-slot{height:54px}.calendar-time-labels{grid-template-rows:repeat(16,54px)}}
 
 .calendar-timed-event{min-height:20px;padding:2px 6px}.calendar-timed-event strong{font-size:9px;line-height:1.2}@media(max-width:600px){.calendar-timed-event{padding:2px 4px}}
 .calendar-doctor-filter{display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;margin:0 0 14px;padding:10px 13px;border:1px solid #dce9e1;border-radius:12px;background:#fff;color:#718179;font-size:12px;font-weight:700}.calendar-doctor-filter select{min-width:180px;min-height:34px;border:1px solid #e1eae4;border-radius:8px;padding:6px 9px;background:#fbfdfb;color:#25342c;font:inherit}
+=======
+@media(max-width:600px){.calendar-page .calendar-toolbar{grid-template-columns:32px minmax(0,1fr) 32px}.calendar-page .calendar-nav-button{width:32px;height:32px}.calendar-page .calendar-period-title h2{font-size:16px}.calendar-page .calendar-today-button{grid-column:1/-1;width:100%}.calendar-page .calendar-view-switch{grid-column:1/-1}.calendar-time-grid{border-radius:11px}.calendar-time-body{min-height:702px}.calendar-hour-slot{height:54px}.calendar-time-labels{grid-template-rows:repeat(13,54px)}}
+
+.calendar-legend-dot.tax{background:#d58a28}.upcoming-icon.tax{background:#fff2df;color:#a86712}
+.calendar-event-chip.tax{background:#fff5e7;border-left-color:#d58a28;color:#89540e}
+>>>>>>> Stashed changes

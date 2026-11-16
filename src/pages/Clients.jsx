@@ -29,10 +29,16 @@ export const legalForms = [
   "Інше",
 ];
 export const taxSystems = [
-  "Загальна система",
+  "ФОП 1 група",
+  "ФОП 2 група",
+  "ФОП 3 група",
+  "ФОП на загальній системі",
+  "ТОВ на єдиному податку (3 група)",
+  "ТОВ на загальній системі",
   "Єдиний податок 3 група",
   "Єдиний податок 5 група",
   "Єдиний податок 4 група",
+  "Загальна система",
   "Без системи оподаткування",
 ];
 export const serviceOptions = [
@@ -572,6 +578,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
       showDuplicateNotice(`Пакет «${packageItem.name}» уже додано до цього клієнта.`);
       return;
     }
+    if (packageItem.module && packageItem.module !== form.module) set("module", packageItem.module);
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
     const nextServices = [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_id: "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
     set("services", nextServices);
@@ -802,11 +809,16 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                   value={form.tax_system}
                   onChange={(event) => set("tax_system", event.target.value)}
                 >
-                  {taxSystems.map((item) => (
+                  {[...new Set([...taxSystems, form.tax_system])].map((item) => (
                     <option key={item}>{item}</option>
                   ))}
                 </select>
+<<<<<<< Updated upstream
               </label>}
+=======
+                {form.module === "accounting" && <small className="client-tax-hint">Для цього режиму дедлайни декларацій з’являться в календарі. Додайте ПДВ, акциз, працівників і специфічні податки нижче, щоб бачити пов’язані строки.</small>}
+              </label>
+>>>>>>> Stashed changes
             </div>
             {form.module === "accounting" && <><div className="client-toggles">
               <Toggle
@@ -839,6 +851,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                 </label>
               )}
             </div>
+            {form.module === "accounting" && form.legal_form === "ТОВ" && (form.tax_system === "ТОВ на загальній системі" || form.tax_system === "Загальна система") && <label className={`client-toggle${form.module_data?.tax_income_over_40m ? " is-active" : ""}`}><input type="checkbox" checked={Boolean(form.module_data?.tax_income_over_40m)} onChange={(event) => set("module_data", { ...form.module_data, tax_income_over_40m: event.target.checked })} /><span>Дохід за попередній рік понад 40 млн грн</span><small>Для квартального календаря податку на прибуток</small></label>}
             <fieldset>
               <legend>Специфічні податки</legend>
               <div className="tax-checkbox-grid">
@@ -858,12 +871,17 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                   </label>
                 ))}
               </div>
+<<<<<<< Updated upstream
             </fieldset></>}
+=======
+              {form.special_taxes.length > 0 && <p className="client-field-hint">Для обраного податку додайте бухгалтерську послугу та вкажіть її офіційний строк: період звітності залежить від виду податку й об’єкта.</p>}
+            </fieldset>
+>>>>>>> Stashed changes
             {form.module === "accounting" && <fieldset className="client-services-fieldset">
               <legend>Бухгалтерські послуги</legend>
               <p className="client-field-hint">Спочатку ваші послуги із збереженими цінами, нижче — стандартні пропозиції.</p>
               <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>{clientServiceLimit !== null ? `До ${clientServiceLimit} послуг на клієнта в плані «${subscription.name}».` : "Оберіть послугу — дата заповниться автоматично за відомим строком."}</small></div><button type="button" className="primary-action" disabled={serviceLimitReached} onClick={addService}><Icon name="plus" /> {serviceLimitReached ? "Ліміт послуг досягнуто" : "Додати послугу"}</button></div>
-              {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакет додасться однією позицією із загальною ціною та відповідальним.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн` }))} value={selectedPackageId} onChange={setSelectedPackageId} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
+              {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Вибір пакета автоматично встановить його модуль клієнта.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн · ${moduleNames[packageItem.module] || moduleNames.accounting}` }))} value={selectedPackageId} onChange={(id) => { setSelectedPackageId(id); const packageItem = servicePackages.find((item) => String(item.id) === String(id)); if (packageItem?.module) set("module", packageItem.module); }} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
               <div className="client-services-list-label">Додані послуги <span>{standaloneServiceCount}{clientServiceLimit !== null ? ` / ${clientServiceLimit}` : ""}</span></div>
               <div className="client-services-list">
                 {(form.services || []).map((service, index) => <div className={`client-service-card${service._isNew ? " client-service-card-new" : ""}${service.is_package ? ` client-package-card price-tier-${packageTier(service)}` : ""}`} key={`${index}-${service.name}`}>

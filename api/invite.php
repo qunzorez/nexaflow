@@ -35,8 +35,16 @@ $actorRole = (string)$actorRoleQuery->fetchColumn();
 $actorRoleQuery->closeCursor();
 $planContext = workspacePlan($pdo, (string)$_SESSION['user_id'], $actorRole);
 $actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
+$invitationOwnerId = (string)$_SESSION['user_id'];
+$requestedWorkspaceOwnerId = trim((string)($data['workspace_owner_id'] ?? ''));
+if ($actorAdmin && $action === 'send' && $requestedWorkspaceOwnerId !== '') {
+    $workspaceCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
+    $workspaceCheck->execute([$requestedWorkspaceOwnerId]);
+    if (!$workspaceCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний робочий простір.', [], 422);
+    $invitationOwnerId = $requestedWorkspaceOwnerId;
+}
 $isProjectLead = ($planContext['workspace_role'] ?? '') === 'project_lead';
-if (!in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true)) jsonResponse(false, 'Керувати запрошеннями може лише менеджер або керівник проєкту активного простору.', [], 403);
+if (!$actorAdmin && !in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true)) jsonResponse(false, 'Керувати запрошеннями може лише менеджер або керівник проєкту активного простору.', [], 403);
 
 if ($action === 'resend') {
     $inviteId = trim((string)($data['invite_id'] ?? ''));
@@ -95,14 +103,19 @@ $projectId = trim((string)($data['project_id'] ?? ''));
 $role = trim((string)($data['role'] ?? 'member'));
 $groupId = trim((string)($data['group_id'] ?? ''));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['admin', 'manager', 'member', 'viewer'], true)) jsonResponse(false, 'Введіть коректний email і роль.', [], 422);
+if ($actorAdmin && $requestedWorkspaceOwnerId !== '' && $groupId !== '') {
+    $workspaceGroup = $pdo->prepare("SELECT id FROM project_groups WHERE id = ? AND project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(permissions) THEN permissions ELSE '{}' END, '$.owner_id')) = ? LIMIT 1");
+    $workspaceGroup->execute([$groupId, $requestedWorkspaceOwnerId]);
+    if (!$workspaceGroup->fetchColumn()) jsonResponse(false, 'Обрана група не належить цьому простору.', [], 422);
+}
 if ($isProjectLead && in_array($role, ['admin', 'manager'], true)) jsonResponse(false, 'Керівник проєкту може запросити учасника, але не призначати системні ролі.', [], 403);
 $emailUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
 $emailUser->execute([$email]);
 $existingId = (string)($emailUser->fetchColumn() ?: '');
 $alreadyMember = false;
 if ($existingId !== '') {
-    $teamMembership = $pdo->prepare("SELECT 1 WHERE EXISTS (SELECT 1 FROM user_invitations WHERE email = ? AND invited_by = ? AND status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations WHERE email = ? AND invited_by = ? AND status = 'accepted') LIMIT 1");
-    $teamMembership->execute([$email, $_SESSION['user_id'], $email, $_SESSION['user_id']]);
+    $teamMembership = $pdo->prepare("SELECT 1 WHERE EXISTS (SELECT 1 FROM user_invitations WHERE email = ? AND invited_by = ? AND status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations pi JOIN projects p ON p.id = pi.project_id WHERE pi.email = ? AND pi.invited_by = ? AND p.owner_id = ? AND pi.status = 'accepted') LIMIT 1");
+    $teamMembership->execute([$email, $invitationOwnerId, $email, $invitationOwnerId, $invitationOwnerId]);
     $alreadyMember = (bool)$teamMembership->fetchColumn();
 }
 if (!$actorAdmin) {
@@ -146,14 +159,14 @@ if ($projectId === '') {
     }
     if ($existingId !== '' && $alreadyMember) jsonResponse(false, 'Цей користувач уже приєднався до вашої команди.', ['code' => 'already_team_member'], 409);
     $pendingDuplicate = $pdo->prepare("SELECT id FROM user_invitations WHERE invited_by = ? AND email = ? AND status = 'pending' LIMIT 1");
-    $pendingDuplicate->execute([$_SESSION['user_id'], $email]);
+    $pendingDuplicate->execute([$invitationOwnerId, $email]);
     if ($pendingId = $pendingDuplicate->fetchColumn()) jsonResponse(false, 'Для цього користувача вже є очікуване запрошення. Повторно надішліть його зі списку нижче.', ['code' => 'invite_pending', 'invite_id' => $pendingId], 409);
     try {
-        $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE invited_by = ? AND email = ? AND status = 'pending'")->execute([$_SESSION['user_id'], $email]);
+        $pdo->prepare("UPDATE user_invitations SET status = 'revoked' WHERE invited_by = ? AND email = ? AND status = 'pending'")->execute([$invitationOwnerId, $email]);
         $token = bin2hex(random_bytes(32));
         $invitationId = bin2hex(random_bytes(16));
         $insert = $pdo->prepare('INSERT INTO user_invitations (id, invited_by, email, role, group_id, token_hash, expires_at) VALUES (?, ?, ?, \'user\', ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))');
-        $insert->execute([$invitationId, $_SESSION['user_id'], $email, $groupId !== '' ? $groupId : null, hash('sha256', $token)]);
+        $insert->execute([$invitationId, $invitationOwnerId, $email, $groupId !== '' ? $groupId : null, hash('sha256', $token)]);
         releasePlanCapacityLocks((string)$planContext['owner_id']);
         $existingInviteUser = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
         $existingInviteUser->execute([$email]);

@@ -16,6 +16,42 @@ $actorQuery->execute([$userId]); $actorRole = (string)$actorQuery->fetchColumn()
 $planContext = workspacePlan($pdo, $userId, $actorRole);
 $actorAdmin = in_array($actorRole, ['admin', 'owner'], true);
 $isProjectLead = ($planContext['workspace_role'] ?? '') === 'project_lead';
+if ($method === 'POST' && $action === 'admin_assign_workspace_group') {
+    if (!$actorAdmin) jsonResponse(false, 'Керувати групами різних просторів може лише адміністратор.', [], 403);
+    $workspaceOwnerId = trim((string)($data['workspace_owner_id'] ?? ''));
+    $memberId = trim((string)($data['user_id'] ?? ''));
+    $groupId = trim((string)($data['group_id'] ?? ''));
+    if ($workspaceOwnerId === '' || $memberId === '') jsonResponse(false, 'Оберіть простір і користувача.', [], 422);
+    $workspaceQuery = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
+    $workspaceQuery->execute([$workspaceOwnerId]);
+    if (!$workspaceQuery->fetchColumn()) jsonResponse(false, 'Робочий простір не знайдено.', [], 404);
+    $leadQuery = $pdo->prepare("SELECT DISTINCT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?");
+    $leadQuery->execute([$workspaceOwnerId]);
+    $actors = array_values(array_unique(array_merge([$workspaceOwnerId], array_map('strval', $leadQuery->fetchAll(PDO::FETCH_COLUMN)))));
+    $actorMarks = implode(',', array_fill(0, count($actors), '?'));
+    $memberQuery = $pdo->prepare("SELECT 1 FROM users u WHERE u.id = ? AND u.id <> ? AND u.role <> 'owner' AND (
+        EXISTS (SELECT 1 FROM user_invitations i WHERE LOWER(i.email) = LOWER(u.email) AND i.invited_by IN ({$actorMarks}) AND i.status = 'accepted')
+        OR EXISTS (SELECT 1 FROM project_invitations i JOIN projects p ON p.id = i.project_id WHERE LOWER(i.email) = LOWER(u.email) AND i.invited_by IN ({$actorMarks}) AND p.owner_id = ? AND i.status = 'accepted')
+    ) LIMIT 1");
+    $memberQuery->execute(array_merge([$memberId, $workspaceOwnerId], $actors, $actors, [$workspaceOwnerId]));
+    if (!$memberQuery->fetchColumn()) jsonResponse(false, 'Користувач не є учасником вибраного простору.', [], 404);
+    if ($groupId !== '') {
+        $groupQuery = $pdo->prepare("SELECT id, name FROM project_groups WHERE id = ? AND project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(permissions) THEN permissions ELSE '{}' END, '$.owner_id')) = ? LIMIT 1");
+        $groupQuery->execute([$groupId, $workspaceOwnerId]);
+        $group = $groupQuery->fetch();
+        if (!$group) jsonResponse(false, 'Група не належить вибраному простору.', [], 422);
+    }
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("DELETE gm FROM project_group_members gm JOIN project_groups pg ON pg.id = gm.group_id WHERE gm.user_id = ? AND pg.project_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?")->execute([$memberId, $workspaceOwnerId]);
+        if ($groupId !== '') $pdo->prepare('INSERT IGNORE INTO project_group_members (group_id, user_id) VALUES (?, ?)')->execute([$groupId, $memberId]);
+        $pdo->commit();
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $error;
+    }
+    jsonResponse(true, $groupId === '' ? 'Користувача прибрано з групи.' : 'Користувача додано до групи.');
+}
 if ($method === 'POST' && in_array($action, ['update_global_group', 'delete_global_group'], true)) {
     $managedGroup = manageableGroup($pdo, trim((string)($data['group_id'] ?? '')), $userId, $actorAdmin);
 }

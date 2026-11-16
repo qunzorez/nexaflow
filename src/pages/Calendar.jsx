@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import Icon from "../components/Icon.jsx";
 import { api } from "../services/api.js";
+import { clientTaxDeadlines } from "../utils/clientTaxDeadlines.js";
 import "./calendar.css";
 import "./calendar-appointments.css";
 
@@ -120,6 +121,9 @@ export default function Calendar() {
         const accountant = (data.available_users || []).find(person => String(person.id) === String(service.accountant_id));
         return { id: `service-${client.id}-${index}`, kind: "service", title: service.name, subtitle: client.name, date: internal, official, client, accountant: accountant || (service.accountant_name ? { name: service.accountant_name } : null) };
       }));
+    const taxEvents = (data.clients || []).flatMap(client => clientTaxDeadlines(client).map(event => ({
+      ...event, kind: "tax", subtitle: client.name, official: event.date,
+    })));
     const taskEvents = (data.tasks || [])
       .filter(task => task.due_date && (!['archived', 'cancelled'].includes(task.status) || (data.active_client_module === "dentistry" && Number(task.is_client_appointment) === 1 && task.status === "archived")))
       .map(task => {
@@ -130,8 +134,13 @@ export default function Calendar() {
         const isAppointment = Number(task.is_client_appointment) === 1;
         return { id: `task-${task.id}`, kind: isAppointment ? "appointment" : "task", title: task.title, subtitle: task.client_names || task.client_name || task.primary_project_name || "Без проєкту", date, time, archived: isAppointment && task.status === "archived", task };
       });
+<<<<<<< Updated upstream
     return [...serviceEvents, ...taskEvents].filter(item => item.date && (!doctorFilter || !item.task || (item.task.assignee_ids || []).some(personId => String(personId) === String(doctorFilter)))).sort((a, b) => a.date - b.date);
   }, [data, doctorFilter]);
+=======
+    return [...serviceEvents, ...taxEvents, ...taskEvents].filter(item => item.date).sort((a, b) => a.date - b.date);
+  }, [data]);
+>>>>>>> Stashed changes
 
   const eventsByDay = useMemo(() => events.reduce((result, event) => {
     (result[dateKey(event.date)] ||= []).push(event);
@@ -199,6 +208,7 @@ export default function Calendar() {
               <span className="calendar-legend-item"><i className="calendar-legend-dot task" />Задачі</span>
               {data.active_client_module === "dentistry" && <span className="calendar-legend-item"><i className="calendar-legend-dot appointment" />Записи</span>}
               <span className="calendar-legend-item"><i className="calendar-legend-dot service" />Бухгалтерські послуги</span>
+              <span className="calendar-legend-item"><i className="calendar-legend-dot tax" />Податкова звітність</span>
             </div>
 
             {view === "month" && <><div className="calendar-weekdays">{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid month-grid">{calendarDays.map(date => { const dayEvents = eventsByDay[dateKey(date)] || []; const inMonth = date.getMonth() === cursor.getMonth(); return <div className={`calendar-day ${inMonth ? "" : "outside"} ${dateKey(date) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(date)} onClick={() => navigate(createTaskUrl(date))} role="button" tabIndex="0" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") navigate(createTaskUrl(date)); }}><span className="calendar-day-number"><span>{date.getDate()}</span><button type="button" className="calendar-day-add" onClick={event => { event.stopPropagation(); navigate(createTaskUrl(date)); }} aria-label={`Створити задачу на ${dateKey(date)}`}><Icon name="plus" /></button></span><div className="calendar-day-events">{dayEvents.map(event => <EventChip key={event.id} event={event} onOpen={openEvent} compact />)}</div></div>; })}</div></>}
@@ -212,7 +222,7 @@ export default function Calendar() {
             <div className="panel-heading"><div><h2>Найближчі дедлайни</h2><p>Задачі та послуги, які потребують уваги.</p></div><span className="task-count-badge">{upcoming.length}</span></div>
             <div className="upcoming-deadlines">{upcoming.length ? upcoming.map(event => <button type="button" className="upcoming-deadline" key={event.id} onClick={() => openEvent(event)}>
               <span className={`upcoming-icon ${event.kind}`}><Icon name={event.kind === "task" ? "check" : "calendar"} /></span>
-              <span className="upcoming-copy"><strong>{event.title}</strong><small>{event.subtitle}</small></span><time>{formatDate(event.date)}</time>
+              <span className="upcoming-copy"><strong>{event.title}</strong><small>{event.subtitle}{event.detail ? ` · ${event.detail}` : ""}</small></span><time>{formatDate(event.date)}</time>
             </button>) : <div className="calendar-empty"><Icon name="calendar" /><p>Найближчих дедлайнів немає.</p></div>}</div>
           </section>
         </div>

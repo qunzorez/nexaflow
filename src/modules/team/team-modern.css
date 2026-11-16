@@ -98,17 +98,60 @@
 .admin-role-row:hover { background: #fbfefc; }
 .admin-role-row select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
 .admin-role-row select:disabled { opacity: .55; cursor: not-allowed; background: #f2f5f3; }
+<<<<<<< Updated upstream
 .admin-role-head { grid-template-columns: minmax(150px, 1.2fr) minmax(150px, 1fr) minmax(125px, .8fr) minmax(130px, .8fr) 100px 145px; }
+=======
+.admin-role-head, .admin-role-row { grid-template-columns: minmax(150px, 1.2fr) minmax(150px, 1fr) minmax(125px, .8fr) minmax(130px, .8fr) 100px; }
+>>>>>>> Stashed changes
 .admin-user-edit-row input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
 .admin-user-edit-actions { display: flex; gap: 6px; }
 .admin-user-edit-actions button, .admin-role-row > .outline-btn, .admin-role-row > .remove-member { min-height: 34px; padding: 7px 10px; font-size: 10px; }
 .admin-user-email { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+<<<<<<< Updated upstream
 .admin-workspace-select { display: grid; gap: 7px; margin: 14px 0; color: var(--muted); font-size: 11px; font-weight: 700; }
 .admin-workspace-select select { max-width: 560px; border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: white; color: var(--ink); }
 .team-member-space-card { max-width: 760px; margin: 36px auto; padding: 30px; }
 .team-member-space-card h1 { margin: 8px 0; }
 .team-member-space-card p:not(.eyebrow) { max-width: 620px; color: var(--muted); line-height: 1.6; margin: 12px 0 20px; }
 .team-member-space-card .outline-btn { color: #b83c38; border-color: #e9b6b2; }
+=======
+.admin-add-member-form { display:flex; align-items:end; gap:10px; margin:12px 0 16px; }
+.admin-add-member-form label { display:grid; flex:1; gap:6px; color:var(--muted); font-size:11px; font-weight:700; }
+.admin-add-member-form input { width:100%; min-height:40px; border:1px solid var(--line); border-radius:9px; padding:9px 11px; }
+.admin-add-member-form .primary-action { min-height:40px; white-space:nowrap; }
+.admin-workspace-select { display:grid; gap:7px; margin:14px 0; color:var(--muted); font-size:11px; font-weight:700; }
+.admin-workspace-select select { max-width:560px; border:1px solid var(--line); border-radius:9px; padding:10px 12px; background:#fff; color:var(--ink); }
+.admin-workspace-groups-panel { margin: 0 0 18px; }
+.admin-workspace-roster { display: grid; gap: 14px; max-height: 600px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin; }
+.admin-workspace-group { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.admin-workspace-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; background: linear-gradient(110deg, #f2faf5, #fbfdfb); border-bottom: 1px solid var(--line); }
+.admin-workspace-group-heading>div { display: grid; gap: 4px; min-width: 170px; }
+.admin-workspace-group-heading strong { color: var(--ink); font-size: 13px; }
+.admin-workspace-group-heading strong span { color: var(--brand); }
+.admin-workspace-group-heading small { color: var(--muted); font-size: 10px; }
+.admin-workspace-invite { display: flex; align-items: center; gap: 7px; width: min(650px, 62%); }
+.admin-workspace-invite input,.admin-workspace-invite select { min-width: 0; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: #fff; color: var(--ink); font-size: 10px; }
+.admin-workspace-invite input { flex: 1.2; }
+.admin-workspace-invite select { flex: 1; }
+.admin-workspace-invite .primary-action { min-height: 36px; padding: 7px 12px; white-space: nowrap; font-size: 10px; }
+.admin-workspace-table-wrap { overflow-x: auto; }
+.admin-workspace-table { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(270px, 1.35fr); align-items: center; gap: 12px; min-width: 700px; padding: 10px 14px; }
+.admin-workspace-table-head { position: sticky; top: 0; z-index: 1; background: #f5faf7; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.admin-workspace-table-row { border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.admin-workspace-table-row:hover { background: #fbfefc; }
+.admin-workspace-table-row .member-info { min-width: 0; display: grid; gap: 3px; }
+.admin-workspace-table-row .member-info strong { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.admin-workspace-table-row .member-info small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-workspace-table-row select { width: 100%; min-width: 0; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font-size: 11px; }
+.admin-workspace-actions { display:flex; justify-content:flex-end; gap:7px; }
+.admin-workspace-actions button { min-height: 36px; padding: 7px 9px; font-size: 10px; white-space: nowrap; }
+.admin-workspace-table-row .remove-member:disabled { opacity: .45; cursor: not-allowed; }
+.admin-workspace-empty { padding: 20px; color: var(--muted); font-size: 12px; text-align: center; }
+.workspace-membership-panel { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 18px; padding:14px 18px; }
+.workspace-membership-panel>div { display:grid; gap:5px; }
+.workspace-membership-panel small { color:var(--muted); font-size:11px; }
+.workspace-membership-panel .remove-member { flex:none; }
+>>>>>>> Stashed changes
 
 .admin-group-owner {
   border: 1px solid var(--line);
@@ -154,6 +197,9 @@
   .admin-role-head { display: none; }
   .admin-role-row { grid-template-columns: 1fr; gap: 8px; }
   .admin-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-add-member-form,.workspace-membership-panel,.admin-workspace-group-heading { align-items:stretch; flex-direction:column; }
+  .admin-workspace-invite { width:100%; flex-wrap:wrap; }
+  .admin-workspace-invite input { flex-basis:100%; }
 }
 
 .manager-team-grid > .panel {

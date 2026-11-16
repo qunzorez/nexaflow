@@ -269,7 +269,7 @@ $name = trim((string)($data['name'] ?? ''));
 $legalForm = trim((string)($data['legal_form'] ?? ''));
 $taxSystem = trim((string)($data['tax_system'] ?? ''));
 $allowedForms = ['ТОВ', 'ФОП', 'ПрАТ', 'АТ', 'Неприбуткова організація', 'Інше'];
-$allowedSystems = ['Загальна система', 'Єдиний податок 3 група', 'Єдиний податок 5 група', 'Єдиний податок 4 група', 'Без системи оподаткування'];
+$allowedSystems = ['ФОП 1 група', 'ФОП 2 група', 'ФОП 3 група', 'ФОП на загальній системі', 'ТОВ на єдиному податку (3 група)', 'ТОВ на загальній системі', 'Загальна система', 'Єдиний податок 3 група', 'Єдиний податок 5 група', 'Єдиний податок 4 група', 'Без системи оподаткування'];
 if ($name === '' || !in_array($legalForm, $allowedForms, true) || !in_array($taxSystem, $allowedSystems, true)) jsonResponse(false, 'Заповніть назву, форму власності та систему оподаткування.', [], 422);
 $hasVat = !empty($data['has_vat']) ? 1 : 0; $hasExcise = !empty($data['has_excise']) ? 1 : 0; $hasEmployees = !empty($data['has_employees']) ? 1 : 0;
 $employeeCount = $hasEmployees ? max(1, (int)($data['employee_count'] ?? 0)) : null;

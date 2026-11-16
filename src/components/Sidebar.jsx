@@ -37,8 +37,9 @@ export default function Sidebar({ user, open }) {
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const workspaceMenuRef = useRef(null);
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
-  const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole);
-  const isAdmin = ["admin", "owner"].includes(userRole);
+  const globalAdmin = ["admin", "owner"].includes(String(user?.role || "").toLowerCase());
+  const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole) || globalAdmin;
+  const isAdmin = ["admin", "owner"].includes(userRole) || globalAdmin;
   const canUseSupport = isAdmin || ["admin", "owner"].includes(String(user?.role || "").toLowerCase()) || Number(user?.is_support_agent) === 1 || Boolean(planFeatures.support);
   const dentalNavFeatures = ["dental_inventory", "dental_procurement", "dental_management_accounting", "dental_doctor_payroll", "dental_equipment"];
   const hasDentalNav = dentalNavFeatures.some(feature => Boolean(planFeatures[feature]));
@@ -165,11 +166,16 @@ export default function Sidebar({ user, open }) {
         </Link>}
         {activeClientModule !== "dentistry" && <Link className="nav-item" to="/tasks">
           <span><Icon name="tasks" /></span> Задачі <b>{counts.tasks}</b>
+<<<<<<< Updated upstream
         </Link>}
         {activeClientModule === "dentistry" && planFeatures.calendar && <Link className="nav-item" to="/appointments">
           <span><Icon name="calendar" /></span> Записи
         </Link>}
         {(canManage || (userRole === "user" && String(activeWorkspaceId) !== String(user?.id))) && (
+=======
+        </Link>
+        {(canManage || userRole === "user") && (
+>>>>>>> Stashed changes
           <Link className="nav-item" to="/team">
             <span className="nav-icon">
               <Icon name="users" />
