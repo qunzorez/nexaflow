@@ -16,7 +16,6 @@ import "../modules/tasks/time-log.css";
 import "../modules/tasks/task-status-dropdown.css";
 import "../modules/tasks/task-priority.css";
 import "./task-completion-prompt.css";
-import "./dentistry-tasks.css";
 
 const statusLabels = {
   todo: "До виконання",
@@ -96,6 +95,10 @@ export default function TaskDetail() {
       window.removeEventListener("focus", refreshOnFocus);
     };
   }, [id]);
+  useEffect(() => {
+    if (!data?.task || listData?.active_client_module !== "dentistry") return;
+    if (Number(data.task.is_client_appointment) === 1) navigate(`/appointments/${data.task.id}`, { replace: true });
+  }, [data, listData, navigate]);
   function edit() {
     setProjectIds(data.task.project_ids || []);
     setAssigneeIds(data.task.assignee_ids || []);
@@ -138,13 +141,6 @@ export default function TaskDetail() {
     setNotice("Задачу переміщено до архіву.");
     load();
   }
-  async function completeAppointment() {
-    setError("");
-    const result = await post("/api/tasks.php", { action: "complete_appointment", id });
-    if (!result.ok) return setError(result.message);
-    setNotice(result.message);
-    load();
-  }
   async function logTime(event) {
     event.preventDefault();
     setError("");
@@ -166,8 +162,8 @@ export default function TaskDetail() {
     return <div className="loading-screen">Завантаження задачі…</div>;
   const task = data.task;
   const isDentistry = listData.active_client_module === "dentistry";
-  const linkedClient = (listData.clients || []).find(client => (task.client_ids || []).some(clientId => String(clientId) === String(client.id)));
   const isAppointment = Number(task.is_client_appointment) === 1 || (isDentistry && /^Запис клієнта\b/i.test(String(task.title || "")));
+  if (isDentistry && isAppointment) return <div className="loading-screen">Відкриваємо запис…</div>;
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role);
   const priorityInfo = {
     low: ["Низький", <Icon name="low" />],
@@ -194,51 +190,50 @@ export default function TaskDetail() {
     : "<p>Опис задачі ще не додано.</p>";
   return (
     <Layout page="Деталі задачі" user={data.user}>
-      <div className={`content task-detail-page${isDentistry ? " dentistry-task-detail" : ""}`}>
+      <div className="content task-detail-page">
         <button
           className="page-back"
           type="button"
-          onClick={() => navigate(isDentistry && isAppointment ? "/appointments" : "/tasks")}
+          onClick={() => navigate("/tasks")}
         >
-          <Icon name="back" /> {isDentistry && isAppointment ? "Назад до записів" : "Назад до задач"}
+          <Icon name="back" /> Назад до задач
         </button>
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
         <section className="task-detail-header">
           <div>
-            <p className="eyebrow">{isDentistry ? (isAppointment ? "ЗАПИС ПАЦІЄНТА" : "ЗАДАЧА ПАЦІЄНТА") : "ЗАДАЧА"}</p>
-            <h1>{isDentistry && isAppointment ? "Прийом пацієнта" : task.title}</h1>
-            {!(isDentistry && isAppointment) && <div className="detail-badges">
+            <p className="eyebrow">ЗАДАЧА</p>
+            <h1>{task.title}</h1>
+            <div className="detail-badges">
               <TaskStatusDropdown
                 task={task}
                 canManage={canManage}
                 onChange={changeStatus}
               />
-              {!isDentistry && <span
+              <span
                 className={`detail-priority detail-priority-${task.priority}`}
               >
                 <span className="detail-priority-icon">{priorityInfo[1]}</span>
                 {priorityInfo[0]}
-              </span>}
-            </div>}
+              </span>
+            </div>
           </div>
           <div className="task-detail-actions">
-            {isDentistry && isAppointment && !["cancelled", "archived"].includes(task.status) && <button className="primary-action" type="button" onClick={completeAppointment}><Icon name="check" /> Завершено</button>}
-            {!(isDentistry && isAppointment) && <button
+            <button
               className="outline-btn"
               type="button"
               onClick={() => setTimeModal(true)}
             >
               <Icon name="plus" /> Лог часу
-            </button>}
-            <button className="primary-action" type="button" onClick={() => isDentistry && isAppointment ? navigate(`/appointments/${task.id}/edit`) : edit()}>
-              {isDentistry && isAppointment ? "Редагувати запис" : "Редагувати задачу"}
+            </button>
+            <button className="primary-action" type="button" onClick={edit}>
+              Редагувати задачу
             </button>
           </div>
         </section>
         <div className="task-detail-grid">
           <main>
-            {isDentistry ? <DentistryTaskOverview task={task} client={linkedClient} isAppointment={isAppointment} /> : <section className="panel task-description-panel">
+            <section className="panel task-description-panel">
               <h2>Опис задачі</h2>
               <div
                 className="detail-description"
@@ -276,8 +271,8 @@ export default function TaskDetail() {
                   value={task.reminder_at || "Не встановлено"}
                 />
               </div>
-            </section>}
-            {!(isDentistry && isAppointment) && <section className="panel time-panel">
+            </section>
+            <section className="panel time-panel">
               <div className="panel-heading">
                 <div>
                   <h2>Лог часу</h2>
@@ -307,7 +302,7 @@ export default function TaskDetail() {
                   <p className="muted-note">Час ще не додано.</p>
                 )}
               </div>
-            </section>}
+            </section>
           </main>
           <aside>
             <section className="panel history-panel">

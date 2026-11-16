@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
-import DentistryTasksPage from "./DentistryTasksPage.jsx";
 import { api, post } from "../services/api.js";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./tasks.css";
@@ -296,7 +295,10 @@ export default function Tasks() {
     ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role) ||
     task.created_by === data.user?.id;
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredTasks = data.tasks
+  const tasksForCurrentModule = data.active_client_module === "dentistry"
+    ? data.tasks.filter(task => Number(task.is_client_appointment) !== 1)
+    : data.tasks;
+  const filteredTasks = tasksForCurrentModule
     .filter((task) => {
       const matchesFilter =
         filter === "all"
@@ -330,7 +332,6 @@ export default function Tasks() {
     }));
   const firstRow = filteredTasks.length ? (currentPage - 1) * pageSize + 1 : 0;
   const lastRow = Math.min(currentPage * pageSize, filteredTasks.length);
-  if (data.active_client_module === "dentistry") return <DentistryTasksPage data={data} onCreate={() => createTask()} onEdit={editTask} modal={modalOpen ? <TaskFormModal data={data} editing={editing} error={modalError} createDisabled={taskLimitReached} projectIds={projectIds} assigneeIds={assigneeIds} clientIds={clientIds} initialDueDate={initialDueDate} setProjectIds={setProjectIds} setAssigneeIds={setAssigneeIds} setClientIds={setClientIds} onSubmit={save} onClose={closeModal} /> : null} />;
   return (
     <Layout page="Задачі" user={data.user}>
       <div className="content tasks-page tasks-redesign">

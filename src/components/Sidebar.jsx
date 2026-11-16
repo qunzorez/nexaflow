@@ -162,8 +162,11 @@ export default function Sidebar({ user, open }) {
           <span><Icon name="project" /></span> Проєкти <b>{counts.projects}</b>
         </Link>
         <Link className="nav-item" to="/tasks">
-          <span><Icon name="tasks" /></span> {activeClientModule === "dentistry" ? "Записи / Задачі" : "Задачі"} <b>{counts.tasks}</b>
+          <span><Icon name="tasks" /></span> Задачі <b>{counts.tasks}</b>
         </Link>
+        {activeClientModule === "dentistry" && planFeatures.calendar && <Link className="nav-item" to="/appointments">
+          <span><Icon name="calendar" /></span> Записи
+        </Link>}
         {canManage && (
           <Link className="nav-item" to="/team">
             <span className="nav-icon">

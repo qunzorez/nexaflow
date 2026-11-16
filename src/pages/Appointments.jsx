@@ -22,6 +22,8 @@ export default function Appointments() {
   const [clientId, setClientId] = useState(params.get("client") || "");
   const [responsibleId, setResponsibleId] = useState("");
   const [doctorFilter, setDoctorFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("upcoming");
+  const [search, setSearch] = useState("");
   const [cabinet, setCabinet] = useState("");
   const [reason, setReason] = useState("");
   const [comment, setComment] = useState("");
@@ -120,7 +122,15 @@ export default function Appointments() {
   }
 
   if (!data) return <div className="loading-screen">Завантаження записів…</div>;
-  const appointments = data.tasks.filter(task => Number(task.is_client_appointment) === 1 && !["done", "archived", "cancelled"].includes(task.status) && (!doctorFilter || (task.assignee_ids || [task.assignee_id]).some(personId => String(personId) === String(doctorFilter))));
+  const appointments = data.tasks.filter(task => {
+    if (Number(task.is_client_appointment) !== 1) return false;
+    const active = !["done", "archived", "cancelled"].includes(task.status);
+    const statusMatches = statusFilter === "upcoming" ? active : statusFilter === "archive" ? ["done", "archived", "cancelled"].includes(task.status) : task.status === statusFilter;
+    const doctorMatches = !doctorFilter || (task.assignee_ids || [task.assignee_id]).some(personId => String(personId) === String(doctorFilter));
+    const query = search.trim().toLocaleLowerCase("uk");
+    const searchMatches = !query || `${task.client_names || task.client_name || ""} ${task.assignee_names || task.assignee_name || ""} ${task.appointment_reason || ""}`.toLocaleLowerCase("uk").includes(query);
+    return statusMatches && doctorMatches && searchMatches;
+  }).sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || "")));
   return <Layout page="Записи" user={data.user}>
     <div className="content appointments-page">
       <section className="welcome-row appointments-hero"><div><p className="eyebrow">СТОМАТОЛОГІЯ</p><h1>Записи</h1><p className="subtext">Плануйте прийоми клієнтів у вільні години календаря.</p></div><button className="primary-button" type="button" onClick={() => document.getElementById("appointment-form")?.scrollIntoView({ behavior: "smooth" })}><Icon name="plus" /> Новий запис</button></section>
@@ -137,8 +147,8 @@ export default function Appointments() {
             <div className="appointment-form-footer"><small>Графік записів: 08:00–23:59 · крок 15 хв</small><button className="primary-button" type="submit" disabled={saving || !client || !availableTimes.length}>{saving ? "Зберігаємо…" : "Додати запис"}</button></div>
           </form>
         </section>
-        <section className="panel appointment-list-panel"><div className="panel-heading"><div><h2>Заплановані прийоми</h2><p>Записи, створені для стоматологічних клієнтів.</p></div><span className="appointment-count">{appointments.length}</span></div><label className="appointment-doctor-filter">Лікар<select value={doctorFilter} onChange={event => setDoctorFilter(event.target.value)}><option value="">Усі лікарі</option>{(data.team_users || []).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
-          {appointments.length ? <div className="appointment-list">{appointments.map(item => <Link to={`/tasks/${item.id}`} className="appointment-row" key={item.id}><span className="appointment-row-icon"><Icon name="calendar" /></span><div className="appointment-row-copy"><strong>Запис клієнта</strong><small>{[item.client_names || item.client_name || "Клієнт", item.assignee_names || item.assignee_name].filter(Boolean).join(" · ")}</small></div><div className="appointment-row-time"><strong>{item.due_date ? new Date(String(item.due_date).replace(" ", "T")).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : ""}</strong><small>{formatDate(item.due_date)}</small></div></Link>)}</div> : <div className="appointment-empty"><Icon name="calendar" /><strong>Записів поки немає</strong><span>Створіть перший прийом у формі поруч.</span></div>}
+        <section className="panel appointment-list-panel"><div className="panel-heading"><div><h2>{statusFilter === "upcoming" ? "Найближчі прийоми" : "Історія прийомів"}</h2><p>Записи пацієнтів у стоматологічному календарі.</p></div><span className="appointment-count">{appointments.length}</span></div><div className="appointment-list-filters"><input aria-label="Пошук прийомів" value={search} onChange={event => setSearch(event.target.value)} placeholder="Пошук за пацієнтом, лікарем або причиною…" /><select aria-label="Фільтр прийомів" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="upcoming">Майбутні та активні</option><option value="archive">Архів і завершені</option><option value="cancelled">Скасовані</option><option value="done">Завершені</option></select><select aria-label="Фільтр лікаря" value={doctorFilter} onChange={event => setDoctorFilter(event.target.value)}><option value="">Усі лікарі</option>{(data.team_users || []).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></div>
+          {appointments.length ? <div className="appointment-list">{appointments.map(item => <Link to={`/appointments/${item.id}`} className="appointment-row" key={item.id}><span className="appointment-row-icon"><Icon name="calendar" /></span><div className="appointment-row-copy"><strong>Запис клієнта</strong><small>{[item.client_names || item.client_name || "Клієнт", item.assignee_names || item.assignee_name].filter(Boolean).join(" · ")}</small></div><div className="appointment-row-time"><strong>{item.due_date ? new Date(String(item.due_date).replace(" ", "T")).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" }) : ""}</strong><small>{formatDate(item.due_date)}</small></div></Link>)}</div> : <div className="appointment-empty"><Icon name="calendar" /><strong>Записів поки немає</strong><span>Створіть перший прийом у формі поруч.</span></div>}
         </section>
       </div>
     </div>

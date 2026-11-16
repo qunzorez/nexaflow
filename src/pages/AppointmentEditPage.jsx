@@ -90,13 +90,13 @@ export default function AppointmentEditPage() {
     if (!result.ok) return setError(result.message || "Не вдалося оновити запис.");
     const detailResult = await post("/api/dentistry-care.php", { action: "save_appointment_details", patient_id: client.id, appointment_id: id, cabinet_id: cabinet, reason, comment });
     if (!detailResult.ok) return setError(`Запис оновлено, але деталі не збережено: ${detailResult.message}`);
-    navigate(`/tasks/${id}`);
+    navigate(`/appointments/${id}`);
   }
 
   if (!data || !task) return <div className="loading-screen">Завантаження запису…</div>;
   return <Layout page="Редагувати запис" user={data.user}>
     <div className="content appointments-page">
-      <button className="page-back" type="button" onClick={() => navigate(`/tasks/${id}`)}><Icon name="back" /> Назад до запису</button>
+      <button className="page-back" type="button" onClick={() => navigate(`/appointments/${id}`)}><Icon name="back" /> Назад до запису</button>
       <section className="welcome-row appointments-hero"><div><p className="eyebrow">СТОМАТОЛОГІЯ</p><h1>Редагувати запис</h1><p className="subtext">Оновіть пацієнта, лікаря, час і деталі прийому.</p></div></section>
       <section className="panel appointment-create-panel appointment-edit-panel">
         {error && <div className="appointment-alert error" role="alert">{error}</div>}
@@ -106,7 +106,7 @@ export default function AppointmentEditPage() {
           <div className="appointment-fields"><label>Відповідальний<SearchableSelect options={[{ id: "", name: "Не призначено" }, ...(data.team_users || []).map(person => ({ id: person.id, name: person.name, email: person.email }))]} value={responsibleId} placeholder="Оберіть відповідального" onChange={setResponsibleId} /></label><label>Дата запису<DateTimePicker value={date} onChange={setDate} required /></label><label>Тривалість<select value={duration} onChange={event => setDuration(Number(event.target.value))}>{[15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480].map(minutes => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} хв` : `${minutes / 60} год${minutes % 60 ? ` ${minutes % 60} хв` : ""}`}</option>)}</select></label><label>Вільний час<select value={time} onChange={event => setTime(event.target.value)} disabled={!availableTimes.length}>{availableTimes.length ? availableTimes.map(slot => <option key={slot} value={slot}>{slot}</option>) : <option value="">Немає вільних слотів</option>}</select></label></div>
           <div className="appointment-fields"><label>Кабінет<input value={cabinet} onChange={event => setCabinet(event.target.value)} placeholder="Наприклад, Кабінет 2" /></label><label>Причина прийому<input value={reason} onChange={event => setReason(event.target.value)} placeholder="Консультація, огляд…" /></label><label className="appointment-field-wide">Коментар<textarea value={comment} onChange={event => setComment(event.target.value)} rows="2" /></label></div>
           {!availableTimes.length && <p className="appointment-no-slots">На цю дату немає вільного часу для обраної тривалості.</p>}
-          <div className="appointment-form-footer"><small>Графік записів: 08:00–23:59 · крок 15 хв</small><div><button className="outline-btn" type="button" onClick={() => navigate(`/tasks/${id}`)}>Скасувати</button><button className="primary-button" type="submit" disabled={saving || !client || !availableTimes.length}>{saving ? "Зберігаємо…" : "Зберегти запис"}</button></div></div>
+          <div className="appointment-form-footer"><small>Графік записів: 08:00–23:59 · крок 15 хв</small><div><button className="outline-btn" type="button" onClick={() => navigate(`/appointments/${id}`)}>Скасувати</button><button className="primary-button" type="submit" disabled={saving || !client || !availableTimes.length}>{saving ? "Зберігаємо…" : "Зберегти запис"}</button></div></div>
         </form>
       </section>
     </div>
