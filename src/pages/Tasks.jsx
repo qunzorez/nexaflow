@@ -181,7 +181,7 @@ export default function Tasks() {
       api("/api/clients.php"),
     ]);
     if (!result.ok) return navigate("/");
-    setData({ ...result, clients: clients.ok ? clients.clients || [] : [] });
+    setData({ ...result, clients: clients.ok ? clients.clients || [] : [], active_client_module: clients.ok ? clients.active_client_module : "accounting" });
   }
   useEffect(() => {
     load();
@@ -295,7 +295,10 @@ export default function Tasks() {
     ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role) ||
     task.created_by === data.user?.id;
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredTasks = data.tasks
+  const tasksForCurrentModule = data.active_client_module === "dentistry"
+    ? data.tasks.filter(task => Number(task.is_client_appointment) !== 1)
+    : data.tasks;
+  const filteredTasks = tasksForCurrentModule
     .filter((task) => {
       const matchesFilter =
         filter === "all"
@@ -305,8 +308,14 @@ export default function Tasks() {
             : filter === "urgent"
               ? task.priority === "urgent" && !nonOverdueStatuses.has(task.status)
             : task.status === filter;
+      const linkedDentalClient = data.active_client_module === "dentistry"
+        ? (data.clients || []).find(client => (task.client_ids || []).some(clientId => String(clientId) === String(client.id)))
+        : null;
+      const dentalSearchText = linkedDentalClient
+        ? `${linkedDentalClient.name || ""} ${Object.values(linkedDentalClient.module_data || {}).join(" ")} ${(linkedDentalClient.services || []).map(service => service.name).join(" ")}`
+        : "";
       const haystack =
-        `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""}`.toLowerCase();
+        `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""} ${dentalSearchText}`.toLowerCase();
       return (
         matchesFilter &&
         (!normalizedSearch || haystack.includes(normalizedSearch))

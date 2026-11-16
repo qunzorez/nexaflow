@@ -49,6 +49,7 @@ if ($method === 'POST' && $action === 'create_global_group') {
     if (!$creator->fetch()) jsonResponse(false, 'Недостатньо прав для створення групи.', [], 403);
     $groupName = trim((string)($data['name'] ?? ''));
     if ($groupName === '') jsonResponse(false, 'Введіть назву групи.', [], 422);
+    if (mb_strtolower($groupName, 'UTF-8') === 'лікар' && ($planContext['module'] ?? 'accounting') !== 'dentistry') jsonResponse(false, 'Роль «Лікар» доступна лише в модулі стоматології.', ['code' => 'role_module_unavailable'], 403);
     $presetMetric = ['керівник проєкту' => 'project_leads', 'модератор' => 'moderators'][mb_strtolower($groupName)] ?? null;
     if (!$actorAdmin && $presetMetric !== null && (int)($planContext['plan'][$presetMetric] ?? 0) < 1) jsonResponse(false, 'Ця роль недоступна у вашому плані.', ['code' => 'plan_role_unavailable', 'metric' => $presetMetric], 403);
     $existingGroups = $pdo->query('SELECT name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll();

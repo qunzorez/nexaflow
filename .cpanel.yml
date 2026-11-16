@@ -3,11 +3,17 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home3/nexaflow/public_html/
     - /usr/bin/test -f dist/index.html
-    - /bin/mkdir -p $DEPLOYPATH/dist $DEPLOYPATH/api/support-private
+    - /bin/sh tools/deploy-php.sh tools/deployment-preflight.php $DEPLOYPATH
+    - /usr/bin/test -f database/dentistry_care.sql
+    - /usr/bin/test -f database/dentistry_patient_ledger.sql
+    - /usr/bin/test -f database/dentistry_erp.sql
+    - /usr/bin/test -f database/dentistry_erp_operations.sql
+    - /bin/mkdir -p $DEPLOYPATH/dist $DEPLOYPATH/api/support-private $DEPLOYPATH/database
     - /bin/cp -R dist/. $DEPLOYPATH/dist/
     - /bin/cp .htaccess $DEPLOYPATH/.htaccess
     - /bin/cp api/.htaccess $DEPLOYPATH/api/.htaccess
     - /bin/cp api/support-private/.htaccess $DEPLOYPATH/api/support-private/.htaccess
+    - /bin/cp database/.htaccess database/dentistry_care.sql database/dentistry_patient_ledger.sql database/dentistry_erp.sql database/dentistry_erp_operations.sql $DEPLOYPATH/database/
     - /bin/cp appsettings.json $DEPLOYPATH/appsettings.json
     - /bin/sh tools/deploy-php.sh tools/set-web-environment.php $DEPLOYPATH
     - /usr/bin/find api -maxdepth 1 -name '*.php' ! -name 'config.local.php' ! -name 'config.web.php' ! -name 'config.php' ! -name 'liqpay.local.php' -exec /bin/cp {} $DEPLOYPATH/api/ \;

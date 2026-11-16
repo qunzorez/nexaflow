@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import { api, post } from "../services/api.js";
-import { ClientFormModal, emptyForm, serviceTaskPayload } from "./Clients.jsx";
+import { ClientFormModal, emptyForm, serviceAppointmentTaskPayload, serviceTaskPayload, validateAppointmentServices } from "./Clients.jsx";
 import "./clients.css";
 
 export default function ClientEditPage() {
@@ -13,10 +13,14 @@ export default function ClientEditPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [teamUsers, setTeamUsers] = useState([]);
   const [availableUsersByClient, setAvailableUsersByClient] = useState({});
   const [servicePackages, setServicePackages] = useState([]);
+  const [standaloneServices, setStandaloneServices] = useState([]);
+  const [calendarTasks, setCalendarTasks] = useState([]);
   const [adminWorkspaces, setAdminWorkspaces] = useState([]);
   const [workspaceOwnerId, setWorkspaceOwnerId] = useState("");
+  const originalAppointmentTaskIds = useRef([]);
 
   useEffect(() => {
     api("/api/clients.php").then(async (result) => {
@@ -26,6 +30,7 @@ export default function ClientEditPage() {
       if (!client) return navigate("/clients", { replace: true });
       setUser(result.user);
       setAvailableUsers(result.available_users || []);
+      setTeamUsers(result.team_users || []);
       setAvailableUsersByClient(result.available_users_by_client || {});
       setAdminWorkspaces(result.admin_workspaces || []);
       setWorkspaceOwnerId(client.created_by || "");
@@ -41,6 +46,7 @@ export default function ClientEditPage() {
         module_data: client.module_data || {},
         services: (client.services || []).map((service) => ({ ...service, is_package: Boolean(service.is_package || service.package_id) })),
       });
+      originalAppointmentTaskIds.current = (client.services || []).map((service) => service.appointment_task_id).filter(Boolean);
     });
   }, [id, navigate]);
 
@@ -49,13 +55,18 @@ export default function ClientEditPage() {
     const isAdmin = ["admin", "owner"].includes(user.role);
     if (isAdmin && !workspaceOwnerId) return;
     const clientsUrl = isAdmin ? `/api/clients.php?workspace_owner_id=${encodeURIComponent(workspaceOwnerId)}` : "/api/clients.php";
-    const servicesUrl = isAdmin ? `/api/services.php?module=all&scope=all&owner_id=${encodeURIComponent(workspaceOwnerId)}` : `/api/services.php?module=${encodeURIComponent(form.module || "accounting")}`;
-    Promise.all([api(clientsUrl), api(servicesUrl)]).then(([clientsResult, packagesResult]) => {
+    const servicesUrl = isAdmin ? `/api/services.php?module=${encodeURIComponent(form.module || "accounting")}&scope=all&owner_id=${encodeURIComponent(workspaceOwnerId)}` : `/api/services.php?module=${encodeURIComponent(form.module || "accounting")}`;
+    Promise.all([api(clientsUrl), api(servicesUrl), api("/api/tasks.php")]).then(([clientsResult, packagesResult, tasksResult]) => {
       if (clientsResult.ok) {
         setAvailableUsers(clientsResult.available_users || []);
+        setTeamUsers(clientsResult.team_users || []);
         setAvailableUsersByClient(clientsResult.available_users_by_client || {});
       }
-      if (packagesResult.ok) setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
+      if (packagesResult.ok) {
+        setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
+        setStandaloneServices((packagesResult.standalone_services || []).filter((item) => item.active !== false));
+      }
+      if (tasksResult.ok) setCalendarTasks(tasksResult.tasks || []);
     });
   }, [user?.id, user?.role, form?.module, workspaceOwnerId, Boolean(form)]);
 
@@ -64,28 +75,75 @@ export default function ClientEditPage() {
     setError("");
     setNotice("");
     const submittedName = new FormData(event.currentTarget).get("name");
+    if (form.module !== "dentistry" && (form.services || []).some((service) => service.add_to_calendar)) {
+      if (!user?.subscription?.features?.calendar) return setError("У вашому тарифі немає доступу до календаря.");
+      const latestTasks = await api("/api/tasks.php");
+      const appointmentError = validateAppointmentServices(form.services, latestTasks.ok ? latestTasks.tasks || [] : calendarTasks, form.module_data);
+      if (appointmentError) return setError(appointmentError);
+    }
     const submittedForm = { ...form, name: typeof submittedName === "string" ? submittedName.trim() : form.name, workspace_owner_id: workspaceOwnerId };
     const result = await post("/api/clients.php", { ...submittedForm, workspace_owner_id: workspaceOwnerId, action: "update", id });
     if (!result.ok) return setError(result.message);
     if (result.client?.name) setForm((current) => ({ ...current, name: result.client.name }));
+    if (form.module === "dentistry") {
+      setNotice(result.message);
+      return;
+    }
     const services = [...(submittedForm.services || [])];
     let taskError = "";
     let tasksChanged = false;
     let tasksCreated = 0;
     const createdTaskIds = [];
+    const cancelledTaskIds = new Set();
     const removeCreatedTasks = async () => Promise.all(createdTaskIds.map((taskId) => post("/api/tasks.php", { action: "delete", id: taskId })));
     for (let index = 0; index < services.length; index += 1) {
-      const service = services[index];
-      if (!service.create_task || !service.name || service.task_id) continue;
-      const taskResult = await post("/api/tasks.php", serviceTaskPayload(submittedForm, service, id));
-      if (!taskResult.ok) {
-        taskError = taskResult.message;
-        continue;
+      let service = services[index];
+      if (!service.name) continue;
+      if (service.add_to_calendar && service.appointment_at) {
+        const appointmentPayload = serviceAppointmentTaskPayload({ ...submittedForm, workspace_owner_id: workspaceOwnerId }, service, id);
+        const appointmentResult = service.appointment_task_id
+          ? await post("/api/tasks.php", { ...appointmentPayload, action: "update", id: service.appointment_task_id })
+          : await post("/api/tasks.php", appointmentPayload);
+        if (!appointmentResult.ok) {
+          taskError = appointmentResult.message;
+          continue;
+        }
+        if (!service.appointment_task_id && appointmentResult.task_id) {
+          createdTaskIds.push(appointmentResult.task_id);
+          service = { ...service, appointment_task_id: appointmentResult.task_id };
+          services[index] = service;
+          tasksChanged = true;
+          tasksCreated += 1;
+        }
+      } else if (service.appointment_task_id) {
+        const appointmentTaskId = service.appointment_task_id;
+        const cancelResult = await post("/api/tasks.php", { action: "set_status", id: appointmentTaskId, status: "cancelled" });
+        if (!cancelResult.ok) {
+          taskError = cancelResult.message;
+          continue;
+        }
+        service = { ...service, appointment_task_id: "" };
+        services[index] = service;
+        cancelledTaskIds.add(appointmentTaskId);
+        tasksChanged = true;
       }
-      if (taskResult.task_id) createdTaskIds.push(taskResult.task_id);
-      services[index] = { ...service, task_id: taskResult.task_id || "" };
-      tasksChanged = true;
-      tasksCreated += 1;
+      if (service.create_task && !service.task_id) {
+        const taskResult = await post("/api/tasks.php", serviceTaskPayload(submittedForm, service, id));
+        if (!taskResult.ok) {
+          taskError = taskResult.message;
+          continue;
+        }
+        if (taskResult.task_id) createdTaskIds.push(taskResult.task_id);
+        services[index] = { ...service, task_id: taskResult.task_id || "" };
+        tasksChanged = true;
+        tasksCreated += 1;
+      }
+    }
+    const retainedAppointmentIds = new Set(services.map((service) => service.appointment_task_id).filter(Boolean));
+    for (const appointmentTaskId of originalAppointmentTaskIds.current) {
+      if (retainedAppointmentIds.has(appointmentTaskId) || cancelledTaskIds.has(appointmentTaskId)) continue;
+      const cancelResult = await post("/api/tasks.php", { action: "set_status", id: appointmentTaskId, status: "cancelled" });
+      if (!cancelResult.ok) taskError = cancelResult.message;
     }
     if (tasksChanged) {
       const taskSave = await post("/api/clients.php", { ...submittedForm, workspace_owner_id: workspaceOwnerId, services, action: "update", id });
@@ -97,13 +155,61 @@ export default function ClientEditPage() {
     }
     if (taskError) {
       setForm((current) => ({ ...current, services }));
-      setError(`Дані клієнта збережено, але одну або кілька задач не створено: ${taskError}`);
+      setError(`Дані клієнта збережено, але запис у календарі або пов’язану задачу не вдалося синхронізувати: ${taskError}`);
       return;
     }
+    originalAppointmentTaskIds.current = services.map((service) => service.appointment_task_id).filter(Boolean);
     setNotice(tasksCreated > 0 ? `Зміни збережено. Створено задач: ${tasksCreated}.` : result.message);
   }
 
-  async function addService(nextForm, service) {
+  async function saveAppointment(nextForm, serviceIndex) {
+    const service = nextForm.services?.[serviceIndex];
+    if (!service?.name || !service.add_to_calendar) return false;
+    setError("");
+    setNotice("");
+    if (!user?.subscription?.features?.calendar) {
+      setError("У вашому тарифі немає доступу до календаря.");
+      return false;
+    }
+    const latestTasks = await api("/api/tasks.php");
+    const appointmentError = validateAppointmentServices(nextForm.services, latestTasks.ok ? latestTasks.tasks || [] : calendarTasks, nextForm.module_data);
+    if (appointmentError) {
+      setError(appointmentError);
+      return false;
+    }
+    const payload = serviceAppointmentTaskPayload({ ...nextForm, workspace_owner_id: workspaceOwnerId }, service, id);
+    const taskResult = service.appointment_task_id
+      ? await post("/api/tasks.php", { ...payload, action: "update", id: service.appointment_task_id })
+      : await post("/api/tasks.php", payload);
+    if (!taskResult.ok) {
+      setError(`Запис у календар не додано, зміни послуги не збережено: ${taskResult.message}`);
+      return false;
+    }
+    const taskId = service.appointment_task_id || taskResult.task_id || "";
+    const services = nextForm.services.map((item, index) => index === serviceIndex ? { ...item, appointment_task_id: taskId } : item);
+    const linkedSave = await post("/api/clients.php", { ...nextForm, workspace_owner_id: workspaceOwnerId, services, action: "update", id });
+    if (!linkedSave.ok) {
+      if (!service.appointment_task_id && taskId) {
+        await post("/api/tasks.php", { action: "delete", id: taskId });
+      } else if (service.appointment_task_id) {
+        const previousService = form?.services?.[serviceIndex];
+        if (previousService) {
+          const rollbackPayload = serviceAppointmentTaskPayload({ ...form, workspace_owner_id: workspaceOwnerId }, previousService, id);
+          await post("/api/tasks.php", { ...rollbackPayload, action: "update", id: service.appointment_task_id });
+        }
+      }
+      setError(`Не вдалося прив’язати запис до послуги: ${linkedSave.message}`);
+      return false;
+    }
+    setForm((current) => ({ ...current, services }));
+    originalAppointmentTaskIds.current = [...new Set([...originalAppointmentTaskIds.current, taskId].filter(Boolean))];
+    const refreshedTasks = await api("/api/tasks.php");
+    if (refreshedTasks.ok) setCalendarTasks(refreshedTasks.tasks || []);
+    setNotice(service.appointment_task_id ? "Запис у календарі оновлено." : "Запис додано до календаря.");
+    return true;
+  }
+
+  async function addService(nextForm, service, reason = "service") {
     setError("");
     setNotice("");
     const result = await post("/api/clients.php", { ...nextForm, workspace_owner_id: workspaceOwnerId, action: "update", id });
@@ -111,6 +217,7 @@ export default function ClientEditPage() {
       setError(result.message);
       return false;
     }
+    setNotice(reason === "teeth" ? `Для послуги «${service?.name || ""}» збережено вибір зубів.` : service?.is_package || reason === "package" ? `Пакет «${service.package_name || service.name}» додано автоматично.` : `Послугу «${service?.name || ""}» додано автоматично.`);
     if (service?.create_task && !service.task_id) {
       const taskResult = await post("/api/tasks.php", serviceTaskPayload({ ...nextForm, workspace_owner_id: workspaceOwnerId }, service, id));
       if (!taskResult.ok) {
@@ -145,7 +252,7 @@ export default function ClientEditPage() {
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
         {user && ["admin", "owner"].includes(user.role) && <label className="admin-client-workspace-select">Простір-власник клієнта<select value={workspaceOwnerId} onChange={event => setWorkspaceOwnerId(event.target.value)} required>{adminWorkspaces.map(owner => <option key={owner.id} value={owner.id}>{owner.name} · {owner.email}</option>)}</select></label>}
-        <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} clientId={id} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
+        <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} teamUsers={teamUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} standaloneServices={standaloneServices} calendarTasks={calendarTasks} clientId={id} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onSaveAppointment={saveAppointment} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>
   );

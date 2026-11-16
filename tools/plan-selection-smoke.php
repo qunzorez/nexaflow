@@ -39,18 +39,49 @@ function httpSmoke(string $url, ?array $json = null, ?string $cookieFile = null)
 }
 
 try {
-    foreach (['growth', 'team', 'business'] as $plan) {
-        $id = bin2hex(random_bytes(16)); $password = bin2hex(random_bytes(12)); $email = 'liqpay-smoke-' . $id . '@nexaflow.local';
-        $users[] = $id;
-        $pdo->prepare("INSERT INTO users (id,name,email,password_hash,role,requested_role,email_verified_at) VALUES (?,?,?,?,'manager','manager',CURRENT_TIMESTAMP)")
-            ->execute([$id, 'Local LiqPay Smoke', $email, password_hash($password, PASSWORD_DEFAULT)]);
-        $cookieFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'nxf-liqpay-' . $id . '.cookies'; $cookies[] = $cookieFile;
-        [$code, , $login] = httpSmoke($base . '/api/login.php', ['email' => $email, 'password' => $password], $cookieFile);
-        assertSmoke($code === 200 && ($login['ok'] ?? false) && ($login['user']['role'] ?? '') === 'manager', "$plan: manager login failed");
+    $expectedDentalLimits = [
+        'dental_start' => ['doctors' => 1, 'patients' => 10, 'appointments_month' => 10],
+        'dental_growth' => ['doctors' => 2, 'patients' => 100, 'appointments_month' => 100],
+        'dental_team' => ['doctors' => 5, 'patients' => 500, 'appointments_month' => 1000],
+        'dental_business' => ['doctors' => 10, 'patients' => 3000, 'appointments_month' => 3000],
+    ];
+    $id = bin2hex(random_bytes(16)); $password = bin2hex(random_bytes(12)); $email = 'liqpay-smoke-' . $id . '@nexaflow.local';
+    $users[] = $id;
+    $pdo->prepare("INSERT INTO users (id,name,email,password_hash,role,requested_role,email_verified_at) VALUES (?,?,?,?,'manager','manager',CURRENT_TIMESTAMP)")
+        ->execute([$id, 'Local LiqPay Smoke', $email, password_hash($password, PASSWORD_DEFAULT)]);
+    $cookieFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'nxf-liqpay-' . $id . '.cookies'; $cookies[] = $cookieFile;
+    [$code, , $login] = httpSmoke($base . '/api/login.php', ['email' => $email, 'password' => $password], $cookieFile);
+    assertSmoke($code === 200 && ($login['ok'] ?? false) && ($login['user']['role'] ?? '') === 'manager', 'manager login failed');
+    foreach (array_merge(['growth', 'team', 'business'], array_keys($expectedDentalLimits)) as $plan) {
         [$code, , $selection] = httpSmoke($base . '/api/liqpay.php', ['action' => 'select_plan', 'plan' => $plan], $cookieFile);
         assertSmoke($code === 200 && ($selection['ok'] ?? false) && ($selection['plan_selected'] ?? false), "$plan: no-charge plan selection failed");
         [$code, , $profile] = httpSmoke($base . '/api/profile.php', null, $cookieFile);
         assertSmoke($code === 200 && ($profile['subscription']['key'] ?? '') === $plan && ($profile['subscription']['billing_enabled'] ?? true) === false && empty($profile['subscription']['billing']), "$plan: selected plan is not active without billing");
+        if (isset($expectedDentalLimits[$plan])) {
+            $subscription = $profile['subscription'];
+            assertSmoke(($subscription['module'] ?? '') === 'dentistry', "$plan: selected module is not dentistry");
+            $actualLimits = [];
+            foreach (($subscription['limits'] ?? []) as $limit) $actualLimits[$limit['key'] ?? ''] = $limit['limit'] ?? null;
+            foreach ($expectedDentalLimits[$plan] as $metric => $expected) assertSmoke((int)($actualLimits[$metric] ?? -1) === $expected, "$plan: $metric quota mismatch");
+            assertSmoke(!array_key_exists('offices', $actualLimits), "$plan: removed offices quota is still exposed");
+            $available = [];
+            foreach (($subscription['available_plans'] ?? []) as $item) if (($item['key'] ?? '') === $plan) $available = $item;
+            foreach ($expectedDentalLimits[$plan] as $metric => $expected) assertSmoke((int)($available['limits'][$metric] ?? -1) === $expected, "$plan: public plan $metric quota mismatch");
+            assertSmoke((int)($available['limits']['participants'] ?? 0) === ($plan === 'dental_start' ? 1 : 0), "$plan: executor limit missing from plan card data");
+            $features = $subscription['features'] ?? [];
+            assertSmoke(!empty($features['dental_medical_records']) && !empty($features['dental_patient_invoices']), "$plan: dental base features are unavailable");
+            assertSmoke((bool)($features['dental_tooth_chart'] ?? false), "$plan: tooth chart entitlement should be available");
+            assertSmoke(!empty($features['dental_treatment_plans']), "$plan: treatment plan entitlement should be available");
+            assertSmoke(!empty($available['features']['dental_treatment_plans']), "$plan: treatment plan entitlement missing from plan card data");
+            assertSmoke((int)($actualLimits['participants'] ?? 0) === ($plan === 'dental_start' ? 1 : 0), "$plan: executor limit mismatch");
+            assertSmoke((bool)($features['dental_inventory'] ?? false) === ($plan !== 'dental_start'), "$plan: inventory entitlement mismatch");
+            assertSmoke((bool)($features['dental_procurement'] ?? false) === in_array($plan, ['dental_team', 'dental_business'], true), "$plan: procurement entitlement mismatch");
+            assertSmoke((bool)($features['dental_equipment'] ?? false) === ($plan === 'dental_business'), "$plan: equipment entitlement mismatch");
+            assertSmoke(!empty($features['calendar']), "$plan: calendar entitlement should be available");
+            assertSmoke(!empty($features['services']), "$plan: patient service catalog entitlement mismatch");
+            assertSmoke(!empty($available['features']['calendar']), "$plan: calendar availability is missing from the plan card data");
+            echo strtoupper($plan) . ": active dental module, limits, and feature entitlements verified\n";
+        }
         $subQuery = $pdo->prepare('SELECT COUNT(*) FROM plan_subscriptions WHERE owner_id = ?'); $subQuery->execute([$id]);
         assertSmoke((int)$subQuery->fetchColumn() === 0, "$plan: no-charge selection unexpectedly created a payment subscription");
         echo strtoupper($plan) . ": selected and activated with no payment or subscription record\n";

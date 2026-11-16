@@ -1,0 +1,185 @@
+// Real HTTP/PDO/MySQL checks in a disposable database. Never changes the clinic DB.
+import { mkdtemp, cp, writeFile, rm, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import assert from 'node:assert/strict';
+import net from 'node:net';
+
+const php = process.env.PHP_BINARY || 'C:/laragon/bin/php/php-8.3.36-Win32-vs16-x64/php.exe';
+const root = process.cwd();
+const temp = await mkdtemp(path.join(tmpdir(), 'nexaflow-erp-check-'));
+const testDb = 'nexaflow_erp_check_' + Date.now();
+let server;
+function phpRun(code, args = []) {
+  const r = spawnSync(php, ['-r', code, ...args], { cwd: root, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(r.stderr || r.stdout);
+  return r.stdout;
+}
+try {
+  await cp(path.join(root, 'api'), path.join(temp, 'api'), { recursive: true });
+  await cp(path.join(root, 'database'), path.join(temp, 'database'), { recursive: true });
+  await cp(path.join(root, 'appsettings.json'), path.join(temp, 'appsettings.json'));
+  phpRun(`require 'api/runtime-config.php'; $c=appConfig(); if ($c['environment']!=='develop') throw new Exception('Local develop config required');
+    $pdo=new PDO('mysql:host='.$c['host'].';port='.$c['port'].';dbname='.$c['database'],$c['username'],$c['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+    $db=$argv[1]; if (!preg_match('/^nexaflow_erp_check_[0-9]+$/',$db)) throw new Exception('Invalid test database');
+    $pdo->exec('CREATE DATABASE \`'.$db.'\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $tables=$pdo->query("SHOW FULL TABLES WHERE Table_type='BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN); $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+    foreach($tables as $t) { $sql=$pdo->query('SHOW CREATE TABLE \`'.$t.'\`')->fetch(PDO::FETCH_NUM)[1]; $pdo->exec('USE \`'.$db.'\`'); $pdo->exec($sql); $pdo->exec('USE \`'.$c['database'].'\`'); }
+    $pdo->exec('SET FOREIGN_KEY_CHECKS=1'); $c['database']=$db; file_put_contents($argv[2].'/api/config.local.php','<?php return '.var_export($c,true).';');
+    $pdo->exec('USE \`'.$db.'\`');
+    $s=$pdo->prepare('INSERT INTO users(id,name,email,password_hash,role,active_client_module,plan_key) VALUES(?,?,?,?,?,?,?)');
+    foreach([['a','ERP manager','manager','dentistry'],['b','Other manager','manager','dentistry'],['c','Accounting manager','manager','accounting'],['d','Regular user','user','dentistry']] as $u) $s->execute([str_repeat($u[0],32),$u[1],$u[0].'@erp-check.invalid','unused',$u[2],$u[3],$u[3]==='dentistry'?'dental_business':'business']);
+    $pdo->prepare("INSERT INTO clients(id,name,legal_form,tax_system,created_by,module,module_data) VALUES(?,'Patient','','',?,'dentistry','{}')")->execute([str_repeat('e',32),str_repeat('a',32)]);
+    $pdo->prepare("INSERT INTO tasks(id,title,created_by,status,due_date,duration_minutes,is_client_appointment) VALUES(?,'ERP appointment',?,'todo',DATE_ADD(CURRENT_DATE,INTERVAL 2 DAY),60,1)")->execute([str_repeat('f',32),str_repeat('a',32)]);
+    $pdo->prepare('INSERT INTO task_clients(task_id,client_id) VALUES(?,?)')->execute([str_repeat('f',32),str_repeat('e',32)]);`, [testDb, temp]);
+  await writeFile(path.join(temp, 'router.php'), `<?php
+    putenv('NEXAFLOW_PRIVATE_STORAGE='.__DIR__.'/private');
+    session_start(); $_SESSION['user_id']=str_repeat($_SERVER['HTTP_X_TEST_ACTOR'] ?? 'a',32); session_write_close();
+    $uri=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH); if(!in_array($uri,['/api/dentistry-erp.php','/api/dentistry-care.php'],true)) { http_response_code(404); exit; } require __DIR__.$uri;
+  `);
+  const port = await new Promise(resolve => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const port = s.address().port; s.close(() => resolve(port)); }); });
+  let logs = '';
+  server = spawn(php, ['-d', 'error_log=', '-S', `127.0.0.1:${port}`, 'router.php'], { cwd: temp, windowsHide: true });
+  server.stderr.on('data', d => { logs += d; });
+  await new Promise((resolve, reject) => { const timeout = setTimeout(() => reject(new Error('PHP server startup timed out')), 5000); const listen = d => { if (d.toString().includes('started')) { clearTimeout(timeout); server.stderr.off('data', listen); resolve(); } }; server.stderr.on('data', listen); server.on('error', reject); });
+  let checks = 0;
+  const sql = (statement, params = []) => JSON.parse(phpRun(`$c=require $argv[1].'/api/config.local.php'; $p=new PDO('mysql:host='.$c['host'].';port='.$c['port'].';dbname='.$c['database'],$c['username'],$c['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]); $q=$p->prepare($argv[2]); $q->execute(json_decode($argv[3],true)); echo json_encode($q->columnCount()?$q->fetchAll():[]);`, [temp, statement, JSON.stringify(params)]));
+  const get = async (action, actor = 'a') => {
+    const r = await fetch(`http://127.0.0.1:${port}/api/dentistry-erp.php?action=${action}`, { headers: { 'X-Test-Actor': actor } });
+    const raw = await r.text(); try { return JSON.parse(raw); } catch { throw new Error(raw + '\n' + logs.slice(-4000)); }
+  };
+  const send = async (action, data = {}, actor = 'a', expected = true) => {
+    const r = await fetch(`http://127.0.0.1:${port}/api/dentistry-erp.php`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Test-Actor': actor }, body: JSON.stringify({ action, idempotency_key: crypto.randomUUID().replaceAll('-', ''), ...data }) });
+    const raw = await r.text(); let result; try { result = JSON.parse(raw); } catch { throw new Error(raw + '\n' + logs.slice(-4000)); }
+    assert.equal(result.ok, expected, `${action}: ${result.message}\n${logs.slice(-1200)}`); checks++; return result;
+  };
+  const care = async (action, data = {}, expected = true) => {
+    const r = await fetch(`http://127.0.0.1:${port}/api/dentistry-care.php`, { method:'POST',headers:{'Content-Type':'application/json','X-Test-Actor':'a'},body:JSON.stringify({action,patient_id:'e'.repeat(32),...data}) });
+    const raw=await r.text(); let result; try {result=JSON.parse(raw);} catch {throw new Error(raw+'\n'+logs.slice(-4000));}
+    assert.equal(result.ok,expected,`${action}: ${result.message}`);checks++;return result;
+  };
+  let overview = await get('overview'); assert.equal(overview.ok, true, JSON.stringify(overview)); checks++;
+  assert.equal((await get('overview', 'c')).ok, false); checks++;
+  assert.equal((await get('operations', 'd')).ok, false); checks++;
+  await send('save_location', { name: 'Surgery' }, 'd', false);
+  await send('save_supplier', { name: 'Test supplier' });
+  overview = await get('overview'); const supplier = overview.suppliers[0].id;
+  await send('save_inventory_item', { name: 'Composite', item_type: 'consumable', category_id: overview.categories[0].id, unit_id: overview.units[0].id, default_supplier_id: supplier, purchase_unit_cost: 20, minimum_stock: 5, optimal_stock: 20 });
+  overview = await get('overview'); const item = overview.items[0].id;
+  await send('create_purchase_order', { supplier_id: supplier, items: [{ inventory_item_id: item, quantity: 10, unit_price: 20 }] });
+  overview = await get('overview'); const order = overview.purchase_orders[0];
+  await send('approve_purchase_order', { purchase_order_id: order.id });
+  const receiptKey = crypto.randomUUID().replaceAll('-', '');
+  await send('receive_purchase_order', { purchase_order_id: order.id, idempotency_key: receiptKey, items: [{ purchase_order_item_id: order.items[0].id, quantity: 10, batch_number: 'BATCH-1', expiration_date: '2030-12-31' }] });
+  const replay = await send('receive_purchase_order', { purchase_order_id: order.id, idempotency_key: receiptKey, items: [{ purchase_order_item_id: order.items[0].id, quantity: 10 }] }); assert.equal(replay.idempotent_replay, true); checks++;
+  let ops = await get('operations'); assert.equal(ops.ok, true); assert.equal(ops.batches.length, 1); checks += 2;
+  const batch = ops.batches[0].id;
+  await send('stock_operation', { batch_id: batch, kind: 'write_off', quantity: 11, reason: 'Overdraw' }, 'a', false);
+  await send('reserve_stock', { batch_id: batch, appointment_id: 'f'.repeat(32), quantity: 4 });
+  await send('stock_operation', { batch_id: batch, kind: 'write_off', quantity: 7, reason: 'Reserved' }, 'a', false);
+  await send('stock_operation', { batch_id: batch, kind: 'count', quantity: 8, expected_quantity: 9, reason: 'Stale snapshot' }, 'a', false);
+  await send('save_location', { name: 'Surgery' }); ops = await get('operations');
+  const location = ops.locations.find(l => l.name === 'Surgery').id;
+  const transferKey = crypto.randomUUID().replaceAll('-', '');
+  await send('stock_operation', { idempotency_key: transferKey, batch_id: batch, kind: 'transfer', location_id: location, quantity: 2, reason: 'Restock surgery' });
+  await send('stock_operation', { idempotency_key: transferKey, batch_id: batch, kind: 'transfer', location_id: location, quantity: 2, reason: 'Restock surgery' });
+  ops = await get('operations'); assert.equal(ops.batches.reduce((s,b)=>s+Number(b.available_quantity),0),10); checks++;
+  await send('stock_operation', { batch_id: batch, kind: 'count', quantity: 7, expected_quantity: 8, reason: 'Physical count' });
+  await send('stock_operation', { batch_id: batch, kind: 'block', reason: 'Quarantine' });
+  await send('reserve_stock', { batch_id: batch, appointment_id: 'f'.repeat(32), quantity: 1 }, 'a', false);
+  await send('stock_operation', { batch_id: batch, kind: 'unblock', reason: 'Released by manager' });
+  await send('stock_operation', { batch_id: batch, kind: 'write_off', quantity: 1, reason: 'Damaged' }, 'b', false);
+  await send('save_procurement_settings', { auto_drafts: true, lead_days: 7 });
+  await send('create_expense_request', { category_id: overview.expense_categories[0].id, description: 'Rent', amount: 1000, expense_date: new Date().toISOString().slice(0,10), recurring: true, interval_months: 1 });
+  ops = await get('operations'); const request = ops.expense_requests[0];
+  await send('approve_expense', { request_id: request.id });
+  await send('approve_expense', { request_id: request.id }, 'a', false);
+  overview = await get('overview'); await send('mark_expense_paid', { expense_id: overview.expenses[0].id });
+  const paidAgain = await send('mark_expense_paid', { expense_id: overview.expenses[0].id });
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=','base64');
+  const upload=new FormData(); upload.set('action','upload_expense_document'); upload.set('expense_id',overview.expenses[0].id); upload.set('idempotency_key',crypto.randomUUID().replaceAll('-','')); upload.set('file',new Blob([png],{type:'image/png'}),'receipt.png');
+  const uploaded=await (await fetch(`http://127.0.0.1:${port}/api/dentistry-erp.php`,{method:'POST',headers:{'X-Test-Actor':'a'},body:upload})).json(); assert.equal(uploaded.ok,true,uploaded.message);checks++;
+  ops=await get('operations');const documentId=ops.expense_documents[0].id;
+  const download=await fetch(`http://127.0.0.1:${port}/api/dentistry-erp.php?action=expense_document&id=${documentId}`,{headers:{'X-Test-Actor':'a'}});assert.equal(download.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await download.arrayBuffer()),png);checks+=2;
+  const deniedDownload=await fetch(`http://127.0.0.1:${port}/api/dentistry-erp.php?action=expense_document&id=${documentId}`,{headers:{'X-Test-Actor':'b'}});assert.equal(deniedDownload.status,404);checks++;
+  await send('create_supplier_invoice',{supplier_id:supplier,purchase_order_id:order.id,invoice_number:'INV-1',invoice_date:new Date().toISOString().slice(0,10),amount:200,items:[{inventory_item_id:item,quantity:10,unit_price:20}]});
+  overview=await get('overview');const supplierInvoice=overview.supplier_invoices[0];
+  await send('stock_operation',{batch_id:batch,kind:'supplier_return',quantity:1,supplier_invoice_id:supplierInvoice.id,reason:'Returned packaging'});
+  await send('pay_supplier_invoice',{supplier_invoice_id:supplierInvoice.id,amount:200,payment_method:'bank_transfer'},'a',false);
+  const supplierPayKey=crypto.randomUUID().replaceAll('-','');
+  await send('pay_supplier_invoice',{supplier_invoice_id:supplierInvoice.id,amount:180,payment_method:'bank_transfer',idempotency_key:supplierPayKey});
+  await send('pay_supplier_invoice',{supplier_invoice_id:supplierInvoice.id,amount:180,payment_method:'bank_transfer',idempotency_key:supplierPayKey});
+  await send('pay_supplier_invoice',{supplier_invoice_id:supplierInvoice.id,amount:179,payment_method:'bank_transfer',idempotency_key:supplierPayKey},'a',false);
+  assert.equal(sql('SELECT COUNT(*) n FROM dental_erp_supplier_payment_allocations')[0].n,1);checks++;
+  await send('stock_operation',{batch_id:batch,kind:'supplier_return',quantity:1,supplier_invoice_id:supplierInvoice.id,reason:'Return after payment'});
+  await send('supplier_refund',{invoice_id:supplierInvoice.id,amount:20,reason:'Supplier repaid credit note'});
+  await send('supplier_refund',{invoice_id:supplierInvoice.id,amount:20,reason:'Duplicate credit refund'},'a',false);
+  sql('INSERT INTO service_catalog(id,package_id,name,client_price,responsible_amount,created_by,module) VALUES(?,NULL,?,1000,0,?,?)',['1'.repeat(32),'Procedure','a'.repeat(32),'dentistry']);
+  await send('save_service_material_template',{service_id:'1'.repeat(32),inventory_item_id:item,expected_quantity:3});
+  const plan=await care('create_treatment_plan',{title:'Treatment',doctor_id:'a'.repeat(32),items:[{service_id:'1'.repeat(32),quantity:1,tooth_number:11}]});
+  const planItem=sql('SELECT id FROM dental_treatment_plan_items WHERE plan_id=?',[plan.id])[0].id;
+  const material_usage=[{treatment_plan_item_id:planItem,inventory_item_id:item,quantity:3}];
+  sql("INSERT INTO tasks(id,title,created_by,status,due_date,is_client_appointment) VALUES(?,'Other visit',?,'todo',CURRENT_TIMESTAMP,1)",['2'.repeat(32),'a'.repeat(32)]);
+  sql('INSERT INTO task_clients(task_id,client_id) VALUES(?,?)',['2'.repeat(32),'e'.repeat(32)]);
+  await send('reserve_stock',{batch_id:batch,appointment_id:'2'.repeat(32),quantity:5});
+  await care('perform_treatment_plans',{appointment_id:'f'.repeat(32),treatment_plan_ids:[plan.id],material_usage},false);
+  assert.equal(sql('SELECT COUNT(*) n FROM dental_performed_services')[0].n,0);checks++;
+  ops=await get('operations');const otherReserve=ops.reservations.find(r=>r.appointment_id==='2'.repeat(32)&&r.status==='active');
+  await send('release_reservation',{reservation_id:otherReserve.id});
+  const stockBefore=ops.batches.reduce((sum,r)=>sum+Number(r.available_quantity),0);
+  const performed=await care('perform_treatment_plans',{appointment_id:'f'.repeat(32),treatment_plan_ids:[plan.id],material_usage});
+  await care('perform_treatment_plans',{appointment_id:'f'.repeat(32),treatment_plan_ids:[plan.id],material_usage},false);
+  ops=await get('operations');assert.equal(ops.batches.reduce((sum,r)=>sum+Number(r.available_quantity),0),stockBefore-3);checks++;
+  assert.equal(sql('SELECT COUNT(*) n FROM dental_invoices')[0].n,1);checks++;
+  const paymentKey=crypto.randomUUID().replaceAll('-','');
+  await care('create_payment',{amount:400,payment_method:'cash',allocations:[{invoice_id:performed.invoice_id,amount:400}],idempotency_key:paymentKey});
+  await care('create_payment',{amount:400,payment_method:'cash',allocations:[{invoice_id:performed.invoice_id,amount:400}],idempotency_key:paymentKey});
+  await care('refund_payment',{amount:100,payment_method:'cash',allocations:[{invoice_id:performed.invoice_id,amount:100}],idempotency_key:crypto.randomUUID().replaceAll('-','')});
+  const performedId=sql('SELECT id FROM dental_performed_services')[0].id;
+  await send('record_procedure_cost',{performed_service_id:performedId,laboratory_cost:50,labor_cost:90,other_cost:10,reason:'Lab invoice and payroll allocation'});
+  await send('record_procedure_cost',{performed_service_id:performedId,laboratory_cost:50,reason:'Duplicate'},'a',false);
+  ops=await get('operations');const proc=ops.profitability.procedures[0];
+  assert.equal(Number(proc.direct_cost),210);assert.equal(Number(proc.margin),790);checks+=2;
+  await send('pay_procedure_cost',{cost_id:proc.cost_id,amount:60});
+  await send('pay_procedure_cost',{cost_id:proc.cost_id,amount:1},'a',false);
+  const consumption=ops.consumptions.find(r=>r.source_id===performedId);
+  await send('stock_operation',{batch_id:consumption.batch_id,movement_id:consumption.id,kind:'material_return',quantity:0.5,reason:'Unused unopened material'});
+  await send('stock_operation',{batch_id:consumption.batch_id,movement_id:consumption.id,kind:'material_return',quantity:100,reason:'Over-return'},'a',false);
+  await send('save_payroll_rule',{user_id:'a'.repeat(32),calculation_type:'percentage',calculation_basis:'collected',percentage:30});
+  const today=new Date().toISOString().slice(0,10);
+  await send('calculate_payroll',{starts_on:today,ends_on:today});
+  overview=await get('overview');const accrual=overview.payroll_accruals[0];assert.equal(Number(accrual.accrued_amount),90);checks++;
+  await send('calculate_payroll',{starts_on:today,ends_on:today},'a',false);
+  await send('calculate_payroll',{starts_on:today.slice(0,8)+'01',ends_on:today},'a',false);
+  await send('payroll_adjustment',{accrual_id:accrual.id,adjustment_type:'bonus',amount:10,reason:'Bonus'});
+  await send('payroll_payment',{accrual_id:accrual.id,amount:100,payment_method:'bank_transfer'});
+  await send('payroll_adjustment',{accrual_id:accrual.id,adjustment_type:'deduction',amount:1,reason:'Below paid amount'},'a',false);
+  await send('save_equipment',{name:'Autoclave',purchase_date:'2026-08-01',purchase_cost:1200,useful_life_months:12,status:'active'});
+  overview=await get('overview');const equipment=overview.equipment[0];
+  await send('post_depreciation',{equipment_id:equipment.id,period_date:'2026-09-01'});
+  await send('save_equipment',{id:equipment.id,name:'Autoclave',purchase_date:'2026-08-01',purchase_cost:2400,useful_life_months:12,status:'active'},'a',false);
+  await send('post_depreciation',{equipment_id:equipment.id,period_date:'2026-09-01'},'a',false);
+  await send('post_depreciation',{equipment_id:equipment.id,period_date:'2026-11-01'},'a',false);
+  ops=await get('operations');assert.equal(Number(ops.depreciation[0].amount),100);checks++;
+  await send('generate_recurring_expenses',{until:today});
+  await send('generate_purchase_drafts');
+  await send('generate_purchase_drafts');
+  const drafts=sql("SELECT COUNT(*) n FROM dental_erp_purchase_orders WHERE status='pending_approval'")[0].n;assert.equal(drafts,1);checks++;
+  overview=await get('overview');const journal=overview.accounting_journals.find(j=>j.source_type==='expense');
+  await send('reverse_journal',{journal_id:journal.id,entry_date:today,reason:'Controlled correction'});
+  await send('reverse_journal',{journal_id:journal.id,entry_date:today,reason:'Second reversal'},'a',false);
+  const periodToClose=overview.accounting_periods.find(p=>today>=p.starts_on&&today<=p.ends_on);
+  await send('close_accounting_period',{period_id:periodToClose.id});
+  ops=await get('operations');const activeBatch=ops.batches.find(b=>Number(b.available_quantity)>0);
+  const beforeClose=Number(activeBatch.available_quantity);
+  await send('stock_operation',{batch_id:activeBatch.id,kind:'write_off',quantity:0.1,reason:'Closed period'},'a',false);
+  assert.equal(Number(sql('SELECT available_quantity FROM dental_erp_inventory_batches WHERE id=?',[activeBatch.id])[0].available_quantity),beforeClose);checks++;
+  ops = await get('operations');
+  assert.equal(ops.balances.reduce((sum,r)=>sum+Math.round(Number(r.debit)*100)-Math.round(Number(r.credit)*100),0),0); checks++;
+  overview = await get('overview'); assert.ok(overview.accounting_journals.every(j => j.entries.length >= 2)); checks++;
+  console.log(`PASS: ${checks} real HTTP/MySQL assertions; isolated database ${testDb}.`);
+} finally {
+  if (server) { const stopped = new Promise(resolve => server.once('exit', resolve)); server.kill(); await stopped; }
+  try { phpRun(`require 'api/runtime-config.php'; $c=appConfig(); $db=$argv[1]; if (!preg_match('/^nexaflow_erp_check_[0-9]+$/',$db)) exit(2); $p=new PDO('mysql:host='.$c['host'].';port='.$c['port'],$c['username'],$c['password']); $p->exec('DROP DATABASE IF EXISTS \`'.$db.'\`');`, [testDb]); } finally { await rm(temp, { recursive: true, force: true }); }
+}

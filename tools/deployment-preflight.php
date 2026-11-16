@@ -29,6 +29,19 @@ if (!is_array($webProfile) || ($webProfile['base_url'] ?? '') !== 'https://nexaf
     exit(4);
 }
 
+$runtimeSchemas = [
+    'dentistry_care.sql',
+    'dentistry_patient_ledger.sql',
+    'dentistry_erp.sql',
+    'dentistry_erp_operations.sql',
+];
+foreach ($runtimeSchemas as $schemaFile) {
+    if (!is_file(dirname(__DIR__) . '/database/' . $schemaFile)) {
+        fwrite(STDERR, "The release is missing a runtime schema file: {$schemaFile}.\n");
+        exit(10);
+    }
+}
+
 $configFile = null;
 foreach (['config.web.php', 'config.local.php', 'config.php'] as $candidate) {
     $path = $documentRoot . '/api/' . $candidate;

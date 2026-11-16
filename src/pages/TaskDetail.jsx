@@ -1,7 +1,7 @@
 import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import Layout from "../components/Layout.jsx";
 import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
@@ -83,7 +83,7 @@ export default function TaskDetail() {
     ]);
     if (!detail.ok) return navigate("/tasks");
     setData(detail);
-    setListData({ ...list, clients: clients.ok ? clients.clients || [] : [] });
+    setListData({ ...list, clients: clients.ok ? clients.clients || [] : [], active_client_module: clients.ok ? clients.active_client_module : "accounting" });
   }
   useEffect(() => {
     load();
@@ -95,6 +95,10 @@ export default function TaskDetail() {
       window.removeEventListener("focus", refreshOnFocus);
     };
   }, [id]);
+  useEffect(() => {
+    if (!data?.task || listData?.active_client_module !== "dentistry") return;
+    if (Number(data.task.is_client_appointment) === 1) navigate(`/appointments/${data.task.id}`, { replace: true });
+  }, [data, listData, navigate]);
   function edit() {
     setProjectIds(data.task.project_ids || []);
     setAssigneeIds(data.task.assignee_ids || []);
@@ -157,6 +161,9 @@ export default function TaskDetail() {
   if (!data || !listData)
     return <div className="loading-screen">Завантаження задачі…</div>;
   const task = data.task;
+  const isDentistry = listData.active_client_module === "dentistry";
+  const isAppointment = Number(task.is_client_appointment) === 1 || (isDentistry && /^Запис клієнта\b/i.test(String(task.title || "")));
+  if (isDentistry && isAppointment) return <div className="loading-screen">Відкриваємо запис…</div>;
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role);
   const priorityInfo = {
     low: ["Низький", <Icon name="low" />],
@@ -377,4 +384,24 @@ function Info({ label, value }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function DentistryTaskOverview({ task, client, isAppointment }) {
+  const patient = client?.module_data || {};
+  const scheduledAt = task.due_date ? new Date(String(task.due_date).replace(" ", "T")) : null;
+  const patientFacts = [
+    ["Телефон", patient.phone],
+    ["Email", patient.email],
+    ["Дата народження", patient.birth_date],
+    ["Тип пацієнта", patient.patient_type],
+    ["Медична картка", patient.medical_record],
+    ["Лікар", patient.doctor],
+  ].filter(([, value]) => value);
+  return <>
+    <section className="panel dentistry-task-detail-patient">
+      <div className="dentistry-task-detail-heading"><span className="dentistry-task-detail-avatar"><Icon name="user" /></span><div><p>КАРТКА ПАЦІЄНТА</p><h2>{client?.name || task.client_names || task.client_name || "Пацієнта не вказано"}</h2></div>{client && <Link to={`/patients/${client.id}`} className="outline-btn"><Icon name="users" /> Відкрити картку пацієнта</Link>}</div>
+      {patientFacts.length ? <div className="dentistry-task-detail-facts">{patientFacts.map(([label, value]) => <Info key={label} label={label} value={value} />)}</div> : <p className="muted-note">Додаткові дані пацієнта ще не заповнені.</p>}
+    </section>
+    {isAppointment && <section className="panel dentistry-task-detail-visit"><div className="panel-heading"><div><h2>Деталі прийому</h2><p>Запис пацієнта до лікаря. Послуги фіксуються в картці після огляду.</p></div><span className="dentistry-visit-icon"><Icon name="calendar" /></span></div><div className="dentistry-task-detail-facts"><Info label="Дата та час" value={scheduledAt && !Number.isNaN(scheduledAt.getTime()) ? scheduledAt.toLocaleString("uk-UA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Не заплановано"} /><Info label="Тривалість" value={formatMinutes(task.duration_minutes)} /><Info label="Відповідальний лікар" value={task.assignee_name || "Не призначено"} /><Info label="Кабінет" value={task.cabinet_id || "Не вказано"} />{task.appointment_reason && <Info label="Причина прийому" value={task.appointment_reason} />}</div>{task.appointment_comment && <div className="dentistry-task-detail-description">{task.appointment_comment}</div>}{!task.appointment_reason && task.description && <div className="dentistry-task-detail-description" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description, { USE_PROFILES: { html: true } }) }} />}{client && <div className="dentistry-task-detail-actions"><Link className="primary-action" to={`/patients/${client.id}`}><Icon name="users" /> Медична картка · послуги · рахунки</Link></div>}</section>}
+  </>;
 }

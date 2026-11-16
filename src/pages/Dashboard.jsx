@@ -2,6 +2,9 @@ import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
+import DentistryInventoryAlerts from "../components/DentistryInventoryAlerts.jsx";
+import DentistryManagerDashboard from "./DentistryManagerDashboard.jsx";
+import DentistryExecutorDashboard from "./DentistryExecutorDashboard.jsx";
 import { api, post } from "../services/api.js";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import ReminderModal from "../modules/tasks/ReminderModal.jsx";
@@ -45,6 +48,7 @@ const reminderLabel = (value) =>
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [activeClientModule, setActiveClientModule] = useState("");
   const [reminderTask, setReminderTask] = useState(null);
   const [notice, setNotice] = useState(() => {
     const message = window.sessionStorage.getItem("nexaflow.dashboard.notice") || "";
@@ -74,6 +78,18 @@ export default function Dashboard() {
     };
   }, [navigate]);
   useEffect(() => {
+    if (!data?.user?.id) return undefined;
+    let active = true;
+    const workspaceKey = `${data.user.id}.${data.user.active_workspace_id || data.user.subscription?.workspace_id || "default"}`;
+    try { setActiveClientModule(window.localStorage.getItem(`nexaflow.client.module.${workspaceKey}`) || data.user.active_client_module || ""); } catch {}
+    api("/api/clients.php").then(result => {
+      if (!active || !result.ok || !result.active_client_module) return;
+      setActiveClientModule(result.active_client_module);
+      try { window.localStorage.setItem(`nexaflow.client.module.${workspaceKey}`, result.active_client_module); } catch {}
+    });
+    return () => { active = false; };
+  }, [data?.user?.id, data?.user?.active_workspace_id, data?.user?.subscription?.workspace_id]);
+  useEffect(() => {
     window.localStorage.setItem("nexaflow.dashboard.projectSearch", projectSearch);
     window.localStorage.setItem("nexaflow.dashboard.projectProgressFilter", projectProgressFilter);
     window.localStorage.setItem("nexaflow.dashboard.reviewPanelOpen", String(reviewPanelOpen));
@@ -86,6 +102,7 @@ export default function Dashboard() {
   const hasAnalytics = Boolean(data.user.subscription?.features?.analytics);
   const taskLimitReached = isPlanLimitReached(data.user.subscription, "tasks_month");
   const projectLimitReached = isPlanLimitReached(data.user.subscription, "projects");
+  const dentistryCalendarUnavailable = activeClientModule === "dentistry" && data.user.subscription?.features?.calendar === false;
   const showProjectInsights = canManage && !isAdmin;
   const adminMetrics = isAdmin
     ? [
@@ -162,6 +179,8 @@ export default function Dashboard() {
     : projectProgressFilter === "in_progress"
       ? Number(b.in_progress || 0) - Number(a.in_progress || 0)
       : 0);
+  if (activeClientModule === "dentistry" && canManage) return <DentistryManagerDashboard dashboard={data} calendarAvailable={!dentistryCalendarUnavailable} />;
+  if (activeClientModule === "dentistry") return <DentistryExecutorDashboard dashboard={data} calendarAvailable={!dentistryCalendarUnavailable} />;
   async function saveReminder(reminderAt) {
     const result = await post("/api/tasks.php", {
       action: "set_reminder",
@@ -178,6 +197,7 @@ export default function Dashboard() {
     <Layout page="Dashboard" user={data.user}>
       <div className="content dashboard-page">
         {notice && <div className="team-notice success">{notice}</div>}
+        {activeClientModule === "dentistry" && canManage && <DentistryInventoryAlerts key={data.user.active_workspace_id || data.user.id} />}
         <section className="welcome-row">
           <div>
             <p className="eyebrow">ВАШ РОБОЧИЙ ПРОСТІР</p>
@@ -189,6 +209,9 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="dashboard-actions">
+            {activeClientModule === "dentistry" && !dentistryCalendarUnavailable && <Link className="primary-action dashboard-appointment-action" to="/appointments">
+              <Icon name="plus" /> Новий запис
+            </Link>}
             <Link aria-disabled={taskLimitReached} title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined} className={`primary-action${taskLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => taskLimitReached && event.preventDefault()} to="/tasks?create=1">
               <Icon name="plus" /> Створити задачу
             </Link>
@@ -227,7 +250,7 @@ export default function Dashboard() {
                   </span>
                   <div>
                     <strong>{task.title}</strong>
-                    <small>{task.project_name || "Без проєкту"}</small>
+                    <small>{task.client_name || task.client_names || task.project_name || "Без проєкту"}</small>
                   </div>
                   <time>{task.dashboard_reminder_kind === "deadline" ? "Дедлайн завтра" : reminderLabel(task.reminder_at)}</time>
                   <span className="reminder-arrow"><Icon name="right" /></span>

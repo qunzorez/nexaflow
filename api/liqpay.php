@@ -77,7 +77,11 @@ function liqpayFinishCallback(PDO $pdo, array $payload, string $publicKey): void
             $pdo->prepare("UPDATE plan_subscriptions SET status = 'active', liqpay_payment_id = ?, liqpay_subscription_id = ?, current_period_end = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 MONTH) WHERE id = ?")
                     ->execute([$paymentId, (string)($payload['liqpay_order_id'] ?? ''), $subscription['id']]);
             }
-            $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$subscription['plan_key'], $subscription['owner_id']]);
+            if (!$isRenewal) {
+                $module = (string)($subscription['module_key'] ?? planModuleForKey((string)$subscription['plan_key']));
+                $pdo->prepare('UPDATE users SET plan_key = ?, active_client_module = ? WHERE id = ?')->execute([$subscription['plan_key'], $module, $subscription['owner_id']]);
+                $pdo->prepare("UPDATE plan_subscriptions SET status = 'cancelled' WHERE owner_id = ? AND id <> ? AND status = 'active'")->execute([$subscription['owner_id'], $subscription['id']]);
+            }
         } elseif (in_array($status, ['error', 'failure', 'reversed'], true) && $subscription['status'] === 'pending') {
             $pdo->prepare("UPDATE plan_subscriptions SET status = 'failed', liqpay_payment_id = ? WHERE id = ?")->execute([$paymentId ?: null, $subscription['id']]);
         }
@@ -113,7 +117,7 @@ $data = body();
 $requestAction = (string)($data['action'] ?? '');
 $planKey = trim((string)($data['plan'] ?? ''));
 $plans = planDefinitions();
-if (in_array($requestAction, ['', 'select_plan'], true) && (!isset($plans[$planKey]) || $planKey === 'start')) jsonResponse(false, 'Оберіть платний тариф.', [], 422);
+if (in_array($requestAction, ['', 'select_plan'], true) && !isset($plans[$planKey])) jsonResponse(false, 'Оберіть тариф.', [], 422);
 $pdo = db();
 $userQuery = $pdo->prepare('SELECT id, role, email FROM users WHERE id = ? LIMIT 1');
 $userQuery->execute([(string)$_SESSION['user_id']]);
@@ -124,18 +128,27 @@ $workspaceOwnerId = (string)$planContext['owner_id'];
 ensurePlanSchema($pdo);
 $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if ($requestAction === 'activate_without_payment') {
-    if (!isset($plans[$planKey]) || $planKey === 'start') jsonResponse(false, 'Оберіть платний тариф.', [], 422);
+    if (!isset($plans[$planKey])) jsonResponse(false, 'Оберіть тариф.', [], 422);
     if ($billingEnabled) jsonResponse(false, 'Безоплатне підключення плану вимкнено, оскільки онлайн-оплата активна.', ['code' => 'billing_enabled'], 409);
-    requirePlanRoleCapacity($pdo, $planContext, $planKey);
-    normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
-    $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, $workspaceOwnerId]);
-    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплата наразі вимкнена, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
+    requirePlanRoleCapacity($pdo, $planContext, $planKey); if (($plans[$planKey]['module'] ?? 'accounting') === 'accounting') normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
+    $pdo->beginTransaction();
+    try { $pdo->prepare('UPDATE users SET plan_key = ?, active_client_module = ? WHERE id = ?')->execute([$planKey, $plans[$planKey]['module'] ?? 'accounting', $workspaceOwnerId]); $pdo->commit(); }
+    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося активувати тариф.', [], 500); }
+    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey, 'module' => $plans[$planKey]['module'] ?? 'accounting']);
+}
+if (in_array($requestAction, ['', 'select_plan'], true) && (float)($plans[$planKey]['amount'] ?? 0) === 0.0) {
+    requirePlanRoleCapacity($pdo, $planContext, $planKey); if (($plans[$planKey]['module'] ?? 'accounting') === 'accounting') normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
+    $pdo->beginTransaction();
+    try { $pdo->prepare('UPDATE users SET plan_key = ?, active_client_module = ? WHERE id = ?')->execute([$planKey, $plans[$planKey]['module'] ?? 'accounting', $workspaceOwnerId]); $pdo->commit(); }
+    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося активувати безкоштовний план.', [], 500); }
+    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» активовано без оплати.', ['plan_selected' => true, 'plan' => $planKey, 'module' => $plans[$planKey]['module'] ?? 'accounting']);
 }
 if (in_array($requestAction, ['', 'select_plan'], true) && !$billingEnabled) {
-    requirePlanRoleCapacity($pdo, $planContext, $planKey);
-    normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
-    $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$planKey, $workspaceOwnerId]);
-    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату наразі вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey]);
+    requirePlanRoleCapacity($pdo, $planContext, $planKey); if (($plans[$planKey]['module'] ?? 'accounting') === 'accounting') normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, $planKey);
+    $pdo->beginTransaction();
+    try { $pdo->prepare('UPDATE users SET plan_key = ?, active_client_module = ? WHERE id = ?')->execute([$planKey, $plans[$planKey]['module'] ?? 'accounting', $workspaceOwnerId]); $pdo->commit(); }
+    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося активувати тариф.', [], 500); }
+    jsonResponse(true, 'План «' . $plans[$planKey]['name'] . '» підключено. Оплату вимкнено, кошти не списуються.', ['plan_selected' => true, 'plan' => $planKey, 'module' => $plans[$planKey]['module'] ?? 'accounting']);
 }
 if ($requestAction === 'select_plan') $requestAction = '';
 if (in_array($requestAction, ['verify', 'cancel'], true) && !$billingEnabled) jsonResponse(false, 'Онлайн-оплата наразі вимкнена. Оберіть тариф без списання коштів.', ['code' => 'billing_disabled'], 409);
@@ -167,7 +180,9 @@ if ($requestAction === 'verify') {
                 normalizeProjectLeadAssignmentsForPlan($pdo, $planContext, (string)$lockedOrder['plan_key']);
                 $pdo->prepare("UPDATE plan_subscriptions SET status = 'active', liqpay_payment_id = ?, liqpay_subscription_id = ?, current_period_end = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 MONTH) WHERE id = ?")
                     ->execute([$paymentId, (string)($payment['liqpay_order_id'] ?? ''), $pending['id']]);
-                $pdo->prepare('UPDATE users SET plan_key = ? WHERE id = ?')->execute([$lockedOrder['plan_key'], $workspaceOwnerId]);
+                $lockedModule = planModuleForKey((string)$lockedOrder['plan_key']);
+                $pdo->prepare('UPDATE users SET plan_key = ?, active_client_module = ? WHERE id = ?')->execute([$lockedOrder['plan_key'], $lockedModule, $workspaceOwnerId]);
+                $pdo->prepare("UPDATE plan_subscriptions SET status = 'cancelled' WHERE owner_id = ? AND id <> ? AND status = 'active'")->execute([$workspaceOwnerId, $pending['id']]);
             }
             $pdo->commit();
         } catch (Throwable $error) {
@@ -207,21 +222,12 @@ $amount = (string)$plans[$planKey]['amount'];
 $currentQuery = $pdo->prepare("SELECT * FROM plan_subscriptions WHERE owner_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
 $currentQuery->execute([$workspaceOwnerId]);
 $current = $currentQuery->fetch();
-if ($current) {
-    if ($current['plan_key'] === $planKey) jsonResponse(false, 'Цей тариф уже активний.', ['code' => 'plan_already_active'], 409);
-    try {
-        $cancelResult = liqpayApiRequest(['public_key' => $publicKey, 'version' => 7, 'action' => 'unsubscribe', 'order_id' => $current['order_id']], $privateKey);
-        if (($cancelResult['status'] ?? '') !== 'unsubscribed' && ($cancelResult['result'] ?? '') !== 'ok') jsonResponse(false, 'Не вдалося зупинити попередню підписку. Новий тариф не виставлено.', ['gateway_status' => (string)($cancelResult['status'] ?? 'unknown')], 502);
-        $pdo->prepare("UPDATE plan_subscriptions SET status = 'cancelled' WHERE id = ? AND status = 'active'")->execute([$current['id']]);
-    } catch (Throwable $error) {
-        error_log('LiqPay plan replacement failed: ' . $error->getMessage());
-        jsonResponse(false, $error->getMessage(), [], 502);
-    }
-}
+if ($current && $current['plan_key'] === $planKey) jsonResponse(false, 'Цей тариф уже активний.', ['code' => 'plan_already_active'], 409);
 $orderId = 'nxf_' . bin2hex(random_bytes(20));
 $subscriptionId = bin2hex(random_bytes(16));
-$pdo->prepare("INSERT INTO plan_subscriptions (id, owner_id, plan_key, order_id, amount, currency, status) VALUES (?, ?, ?, ?, ?, 'USD', 'pending')")
-    ->execute([$subscriptionId, $workspaceOwnerId, $planKey, $orderId, $amount]);
+$moduleKey = (string)($plans[$planKey]['module'] ?? 'accounting');
+$pdo->prepare("INSERT INTO plan_subscriptions (id, owner_id, plan_key, module_key, order_id, amount, currency, status) VALUES (?, ?, ?, ?, ?, ?, 'USD', 'pending')")
+    ->execute([$subscriptionId, $workspaceOwnerId, $planKey, $moduleKey, $orderId, $amount]);
 $baseUrl = rtrim((string)appConfig()['base_url'], '/');
 $params = [
     'public_key' => $publicKey,

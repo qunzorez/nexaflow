@@ -6,7 +6,8 @@ import './auth.css';
 
 export default function Login({ initialMode = 'login' }) {
   const requestedPlan = new URLSearchParams(window.location.search).get('plan') || window.localStorage.getItem('nexaflow.pending-plan') || '';
-  if (['growth', 'team', 'business'].includes(requestedPlan)) window.localStorage.setItem('nexaflow.pending-plan', requestedPlan);
+  const supportedPlans = ['start', 'growth', 'team', 'business', 'dental_start', 'dental_growth', 'dental_team', 'dental_business'];
+  if (supportedPlans.includes(requestedPlan)) window.localStorage.setItem('nexaflow.pending-plan', requestedPlan);
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: requestedPlan ? 'manager' : 'user', terms: false });
   const [notice, setNotice] = useState(() => new URLSearchParams(window.location.search).get('verified') === '1' ? 'Пошту підтверджено. Увійдіть, щоб відкрити свій робочий простір.' : '');
@@ -38,15 +39,11 @@ export default function Login({ initialMode = 'login' }) {
       return;
     }
     const planToActivate = requestedPlan || window.localStorage.getItem('nexaflow.pending-plan') || '';
-    if (planToActivate && result.user?.role === 'manager') {
-      try {
-        const activation = await post('/api/liqpay.php', { action: 'activate_without_payment', plan: planToActivate });
-        window.sessionStorage.setItem('nexaflow.dashboard.notice', activation.message || (activation.ok ? 'План підключено.' : 'Не вдалося підключити вибраний план.'));
-      } catch {
-        window.sessionStorage.setItem('nexaflow.dashboard.notice', 'Не вдалося підключити вибраний план. Його можна обрати в налаштуваннях.');
-      }
-    }
     window.localStorage.removeItem('nexaflow.pending-plan');
+    if (supportedPlans.includes(planToActivate) && result.user?.role === 'manager') {
+      navigate(`/settings?plan=${encodeURIComponent(planToActivate)}`, { replace: true });
+      return;
+    }
     navigate('/dashboard', { replace: true });
   }
 

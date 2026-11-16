@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS plan_subscriptions (
     id CHAR(32) NOT NULL PRIMARY KEY,
     owner_id CHAR(32) NOT NULL,
     plan_key VARCHAR(24) NOT NULL,
+    module_key VARCHAR(24) NOT NULL DEFAULT 'accounting',
     order_id VARCHAR(64) NOT NULL UNIQUE,
     liqpay_subscription_id VARCHAR(100) NULL,
     liqpay_payment_id VARCHAR(100) NULL,

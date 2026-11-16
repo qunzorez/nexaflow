@@ -4,6 +4,7 @@ import './searchable-select.css';
 
 export default function SearchableSelect({ options = [], value = '', onChange, placeholder = 'Оберіть значення', name }) {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef(null);
   const selected = options.find(option => String(option.id) === String(value));
@@ -15,6 +16,27 @@ export default function SearchableSelect({ options = [], value = '', onChange, p
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const updatePlacement = () => {
+      const trigger = ref.current?.querySelector('.searchable-select-trigger');
+      const menu = ref.current?.querySelector('.searchable-select-menu');
+      if (!trigger || !menu) return;
+      const rect = trigger.getBoundingClientRect();
+      const below = window.innerHeight - rect.bottom;
+      const above = rect.top;
+      setDropUp(below < menu.scrollHeight + 8 && above > below);
+    };
+    const frame = requestAnimationFrame(updatePlacement);
+    window.addEventListener('resize', updatePlacement);
+    window.addEventListener('scroll', updatePlacement, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updatePlacement);
+      window.removeEventListener('scroll', updatePlacement, true);
+    };
+  }, [open, options.length]);
+
   function choose(option) { onChange(String(option.id)); setQuery(''); setOpen(false); }
 
   return <div className={`searchable-select${open ? ' is-open' : ''}`} ref={ref}>
@@ -22,7 +44,7 @@ export default function SearchableSelect({ options = [], value = '', onChange, p
       <span className={selected ? 'searchable-select-value' : 'searchable-select-placeholder'}>{selected?.name || placeholder}</span>
       <Icon name="down" />
     </button>
-    {open && <div className="searchable-select-menu">
+    {open && <div className={`searchable-select-menu${dropUp ? ' is-upward' : ''}`}>
       <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Пошук..." />
       <div className="searchable-select-options">{filtered.length ? filtered.map(option => <button type="button" className={`searchable-select-option${String(option.id) === String(value) ? ' selected' : ''}`} key={option.id} onClick={() => choose(option)}><span>{option.name}</span>{option.email && <small>{option.email}</small>}<Icon name={String(option.id) === String(value) ? 'check' : 'chevron-right'} /></button>) : <div className="searchable-select-empty">Нічого не знайдено</div>}</div>
     </div>}

@@ -30,12 +30,18 @@ export default function Sidebar({ user, open }) {
   });
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
+  const [activeClientModule, setActiveClientModule] = useState(() => {
+    try { return window.localStorage.getItem(`nexaflow.client.module.${workspaceCacheKey}`) || user?.active_client_module || ""; }
+    catch { return user?.active_client_module || ""; }
+  });
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const workspaceMenuRef = useRef(null);
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole);
   const isAdmin = ["admin", "owner"].includes(userRole);
   const canUseSupport = isAdmin || ["admin", "owner"].includes(String(user?.role || "").toLowerCase()) || Number(user?.is_support_agent) === 1 || Boolean(planFeatures.support);
+  const dentalNavFeatures = ["dental_inventory", "dental_procurement", "dental_management_accounting", "dental_doctor_payroll", "dental_equipment"];
+  const hasDentalNav = dentalNavFeatures.some(feature => Boolean(planFeatures[feature]));
   const activeWorkspace = workspaces.find(workspace => workspace.id === activeWorkspaceId);
   useEffect(() => {
     if (!workspaceMenuOpen) return undefined;
@@ -63,6 +69,10 @@ export default function Sidebar({ user, open }) {
         canUseSupport && location.pathname !== "/support" ? api("/api/support.php?action=unread") : Promise.resolve({ unread: 0 }),
       ]);
       if (!active) return;
+      if (clients.active_client_module) {
+        setActiveClientModule(clients.active_client_module);
+        window.localStorage.setItem(`nexaflow.client.module.${workspaceCacheKey}`, clients.active_client_module);
+      }
       if (dashboard.user?.subscription?.features) {
         const features = dashboard.user.subscription.features;
         setPlanFeatures(features);
@@ -87,7 +97,7 @@ export default function Sidebar({ user, open }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [canUseSupport, countsStorageKey, featuresStorageKey, location.pathname, user?.id]);
+  }, [canUseSupport, countsStorageKey, featuresStorageKey, location.pathname, user?.id, workspaceCacheKey]);
   function clearSupportUnread() {
     setCounts(current => {
       const next = { ...current, support: 0 };
@@ -145,18 +155,21 @@ export default function Sidebar({ user, open }) {
       <nav>
         <p className="nav-label">ОСНОВНЕ</p>
         <Link className="nav-item" to="/dashboard">
-          <span><Icon name="home" /></span> Огляд <b>{counts.tasks}</b>
+          <span><Icon name="home" /></span> Огляд {activeClientModule !== "dentistry" && <b>{counts.tasks}</b>}
         </Link>
         <Link className="nav-item" to="/clients">
           <span><Icon name="users" /></span> Клієнти <b>{counts.clients}</b>
         </Link>
-        <Link className="nav-item" to="/projects">
+        {activeClientModule !== "dentistry" && <Link className="nav-item" to="/projects">
           <span><Icon name="project" /></span> Проєкти <b>{counts.projects}</b>
-        </Link>
-        <Link className="nav-item" to="/tasks">
+        </Link>}
+        {activeClientModule !== "dentistry" && <Link className="nav-item" to="/tasks">
           <span><Icon name="tasks" /></span> Задачі <b>{counts.tasks}</b>
-        </Link>
-        {canManage && (
+        </Link>}
+        {activeClientModule === "dentistry" && planFeatures.calendar && <Link className="nav-item" to="/appointments">
+          <span><Icon name="calendar" /></span> Записи
+        </Link>}
+        {(canManage || (userRole === "user" && String(activeWorkspaceId) !== String(user?.id))) && (
           <Link className="nav-item" to="/team">
             <span className="nav-icon">
               <Icon name="users" />
@@ -167,6 +180,14 @@ export default function Sidebar({ user, open }) {
         {(isAdmin || (canManage && planFeatures.services)) && <Link className="nav-item" to="/services">
           <span><Icon name="subscription" /></span> Послуги
         </Link>}
+        {activeClientModule === "dentistry" && hasDentalNav && <>
+          <p className="nav-label">ОБЛІК КЛІНІКИ</p>
+          {planFeatures.dental_inventory && <Link className="nav-item" to="/dentistry/inventory"><span><Icon name="archive" /></span> Склад</Link>}
+          {planFeatures.dental_procurement && <Link className="nav-item" to="/dentistry/purchases"><span><Icon name="briefcase" /></span> Закупівлі</Link>}
+          {canManage && planFeatures.dental_management_accounting && <Link className="nav-item" to="/dentistry/accounting"><span><Icon name="chart" /></span> Бухгалтерія</Link>}
+          {canManage && planFeatures.dental_doctor_payroll && <Link className="nav-item" to="/dentistry/payroll"><span><Icon name="users" /></span> Зарплати</Link>}
+          {planFeatures.dental_equipment && <Link className="nav-item" to="/dentistry/equipment"><span><Icon name="settings" /></span> Обладнання</Link>}
+        </>}
         {isAdmin && (
           <Link className="nav-item" to="/notifications">
             <span className="nav-icon">

@@ -11,6 +11,17 @@ $userQuery->execute([$userId]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
+$userColumns = array_column($pdo->query('SHOW COLUMNS FROM users')->fetchAll(), 'Field');
+if (!in_array('active_client_module', $userColumns, true)) $pdo->exec("ALTER TABLE users ADD active_client_module VARCHAR(40) NOT NULL DEFAULT 'accounting'");
+$moduleQuery = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ?'); $moduleQuery->execute([(string)$planContext['owner_id']]);
+$activeClientModule = (string)($moduleQuery->fetchColumn() ?: 'accounting');
+if (in_array($user['role'], ['admin', 'owner'], true) && trim((string)($_GET['workspace_owner_id'] ?? '')) !== '') {
+    $selectedOwnerQuery = $pdo->prepare("SELECT active_client_module FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
+    $selectedOwnerQuery->execute([trim((string)$_GET['workspace_owner_id'])]);
+    $selectedOwnerModule = $selectedOwnerQuery->fetchColumn();
+    if ($selectedOwnerModule !== false) $activeClientModule = (string)$selectedOwnerModule;
+}
+if (!in_array($activeClientModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true)) $activeClientModule = 'accounting';
 $user['subscription'] = planSettingsPayload($planContext);
 $user['workspaces'] = $planContext['workspaces']; $user['active_workspace_id'] = $planContext['owner_id']; $user['workspace_role'] = $planContext['workspace_role'];
 $pdo->exec("CREATE TABLE IF NOT EXISTS clients (id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, legal_form VARCHAR(40) NOT NULL, tax_system VARCHAR(80) NOT NULL, has_vat TINYINT(1) NOT NULL DEFAULT 0, has_excise TINYINT(1) NOT NULL DEFAULT 0, has_employees TINYINT(1) NOT NULL DEFAULT 0, employee_count INT NULL, special_taxes TEXT NULL, services TEXT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting', module_data TEXT NULL, created_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_clients_created_by (created_by)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -78,6 +89,35 @@ if ($method === 'GET') {
         $client['module_data'] = $client['module_data'] ? (json_decode($client['module_data'], true) ?: []) : [];
     }
     unset($client);
+    $appointmentStatuses = [];
+    $appointmentTaskIds = [];
+    foreach ($clients as $client) {
+        if (($client['module'] ?? '') !== 'dentistry') continue;
+        foreach ((array)($client['services'] ?? []) as $service) {
+            $taskId = trim((string)($service['appointment_task_id'] ?? ''));
+            if (preg_match('/^[a-f0-9]{32}$/i', $taskId)) $appointmentTaskIds[$taskId] = true;
+        }
+    }
+    if ($appointmentTaskIds) {
+        try {
+            $taskIds = array_keys($appointmentTaskIds);
+            $taskMarks = implode(',', array_fill(0, count($taskIds), '?'));
+            $taskStatusQuery = $pdo->prepare("SELECT id, status FROM tasks WHERE is_client_appointment = 1 AND id IN ({$taskMarks})");
+            $taskStatusQuery->execute($taskIds);
+            foreach ($taskStatusQuery->fetchAll() as $task) $appointmentStatuses[(string)$task['id']] = (string)$task['status'];
+        } catch (Throwable $ignored) {
+            // Older installations can load clients before the task appointment migration runs.
+        }
+        foreach ($clients as &$client) {
+            if (($client['module'] ?? '') !== 'dentistry') continue;
+            foreach ($client['services'] as &$service) {
+                $taskId = (string)($service['appointment_task_id'] ?? '');
+                if ($taskId !== '') $service['appointment_status'] = $appointmentStatuses[$taskId] ?? null;
+            }
+            unset($service);
+        }
+        unset($client);
+    }
     // Match accounting groups in PHP: older production tables can use different
     // collations for group names and user IDs, making the joined SQL query fail.
     $availableUsers = [];
@@ -164,13 +204,63 @@ if ($method === 'GET') {
         }
         unset($clientAccountants);
     }
+    $teamMemberIds = array_fill_keys($workspaceIds, true);
+    if ($isAdmin) {
+        $selectedTeamOwnerId = trim((string)($_GET['workspace_owner_id'] ?? ''));
+        if ($selectedTeamOwnerId !== '') {
+            $selectedOwnerRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+            $selectedOwnerRoleQuery->execute([$selectedTeamOwnerId]);
+            $selectedOwnerRole = (string)($selectedOwnerRoleQuery->fetchColumn() ?: 'manager');
+            $selectedOwnerContext = workspacePlan($pdo, $selectedTeamOwnerId, $selectedOwnerRole);
+            $teamMemberIds = array_fill_keys(array_map('strval', $selectedOwnerContext['member_ids'] ?? [$selectedTeamOwnerId]), true);
+        } else {
+            $teamMemberIds = array_fill_keys(array_keys($serviceUsers), true);
+        }
+    }
+    $teamUsers = array_values(array_filter($serviceUsers, static fn(array $person): bool => isset($teamMemberIds[(string)$person['id']]) && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true)));
+    $doctorIds = [];
+    if ($activeClientModule === 'dentistry') {
+        $doctorWorkspaceOwner = $isAdmin && trim((string)($_GET['workspace_owner_id'] ?? '')) !== ''
+            ? trim((string)$_GET['workspace_owner_id'])
+            : (string)$planContext['owner_id'];
+        foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+            $policy = groupPolicy($group['permissions'] ?? null);
+            if (($policy['owner_id'] ?? '') !== $doctorWorkspaceOwner || mb_strtolower(trim((string)$group['name']), 'UTF-8') !== 'лікар') continue;
+            $doctorGroupQuery = $pdo->prepare('SELECT user_id FROM project_group_members WHERE group_id = ?');
+            $doctorGroupQuery->execute([(string)$group['id']]);
+            foreach ($doctorGroupQuery->fetchAll(PDO::FETCH_COLUMN) as $doctorId) $doctorIds[(string)$doctorId] = true;
+        }
+    }
+    foreach ($teamUsers as &$teamUser) $teamUser['is_doctor'] = isset($doctorIds[(string)$teamUser['id']]);
+    unset($teamUser);
+    usort($teamUsers, static fn(array $left, array $right): int => strcmp($left['name'], $right['name']) ?: strcmp($left['email'], $right['email']));
     $adminWorkspaces = $isAdmin ? $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('manager','admin','owner') ORDER BY name")->fetchAll() : [];
-    jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'available_users' => $availableUsers, 'available_users_by_client' => $availableByClient, 'admin_workspaces' => $adminWorkspaces, 'permissions' => ['manage' => $canManage, 'delete' => !$isProjectLead]]);
+    jsonResponse(true, 'Клієнтів завантажено.', ['user' => $user, 'clients' => $clients, 'active_client_module' => $activeClientModule, 'available_users' => $availableUsers, 'team_users' => $teamUsers, 'available_users_by_client' => $availableByClient, 'admin_workspaces' => $adminWorkspaces, 'permissions' => ['manage' => $canManage, 'delete' => !$isProjectLead]]);
 }
 if (!$canManage) jsonResponse(false, 'Створювати клієнтів можуть лише адміністратор, менеджер або керівник проєкту.', [], 403);
 $action = (string)($data['action'] ?? 'create');
 if ($action === 'delete') {
     $id = trim((string)($data['id'] ?? ''));
+    $patientQuery = $pdo->prepare('SELECT module FROM clients WHERE id = ? LIMIT 1');
+    $patientQuery->execute([$id]);
+    if ((string)$patientQuery->fetchColumn() === 'dentistry') {
+        $taskColumns = array_column($pdo->query('SHOW COLUMNS FROM tasks')->fetchAll(), 'Field');
+        if (!in_array('is_client_appointment', $taskColumns, true)) $pdo->exec("ALTER TABLE tasks ADD is_client_appointment TINYINT(1) NOT NULL DEFAULT 0");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS task_clients (task_id CHAR(32) NOT NULL, client_id CHAR(32) NOT NULL, PRIMARY KEY (task_id, client_id), INDEX idx_task_clients_client (client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $visitCount = $pdo->prepare('SELECT COUNT(*) FROM tasks t JOIN task_clients tc ON tc.task_id = t.id WHERE tc.client_id = ? AND t.is_client_appointment = 1');
+        $visitCount->execute([$id]);
+        if ((int)$visitCount->fetchColumn() > 0) jsonResponse(false, 'Картку пацієнта з історією прийомів не можна видалити. Збережіть її як архівну картку.', ['code' => 'patient_has_history'], 409);
+        $careTables = ['dental_medical_records', 'dental_treatment_plans', 'dental_performed_services', 'dental_invoices', 'dental_payments', 'dental_documents'];
+        foreach ($careTables as $table) {
+            $exists = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+            $exists->execute([$table]);
+            if ((int)$exists->fetchColumn() === 0) continue;
+            $count = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE patient_id = ?");
+            $count->execute([$id]);
+            if ((int)$count->fetchColumn() > 0) jsonResponse(false, 'Картку пацієнта з медичною або фінансовою історією не можна видалити. Збережіть її як архівну картку.', ['code' => 'patient_has_history'], 409);
+        }
+    }
+    $pdo->prepare('DELETE FROM client_members WHERE client_id = ?')->execute([$id]);
     $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
     jsonResponse(true, 'Клієнта видалено.');
 }
@@ -187,31 +277,51 @@ $specialTaxes = array_values(array_intersect((array)($data['special_taxes'] ?? [
 $requestedModule = (string)($data['module'] ?? 'accounting');
 $module = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : 'accounting';
 $moduleData = json_encode((array)($data['module_data'] ?? []), JSON_UNESCAPED_UNICODE);
-$services = array_values(array_filter(array_map(static function ($service): array {
+$services = array_values(array_filter(array_map(static function ($service) use ($pdo): array {
     if (!is_array($service)) return [];
     $allowedPeriods = ['Щогодини', 'Щодня', 'Щотижня', 'Місяць', 'Квартал', 'Рік', 'Разово'];
     $parameters = array_values(array_filter(array_map(static fn($item): string => trim((string)$item), (array)($service['parameters'] ?? [])), static fn(string $item): bool => $item !== ''));
+    $allowedTeeth = [11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28,31,32,33,34,35,36,37,38,41,42,43,44,45,46,47,48];
+    $toothNumbers = array_values(array_unique(array_intersect($allowedTeeth, array_map('intval', (array)($service['tooth_numbers'] ?? [])))));
+    $packageId = trim((string)($service['package_id'] ?? ''));
+    $isPackage = !empty($service['is_package']) || $packageId !== '';
+    $calendarEnabled = false;
+    if ($packageId !== '' && preg_match('/^[a-f0-9]{32}$/i', $packageId)) {
+        $packageCalendar = $pdo->prepare('SELECT calendar_enabled FROM service_packages WHERE id = ? LIMIT 1');
+        $packageCalendar->execute([$packageId]);
+        $calendarEnabled = (bool)$packageCalendar->fetchColumn();
+    }
     return [
         'name' => trim((string)($service['name'] ?? '')),
         'price' => max(0, (float)($service['price'] ?? 0)),
+        'unit_price' => max(0, (float)($service['unit_price'] ?? ($service['price'] ?? 0))),
         'responsible_amount' => max(0, (float)(($service['responsible_mode'] ?? 'amount') === 'percent' ? ((float)($service['price'] ?? 0) * min(100, max(0, (float)($service['responsible_percent'] ?? 0))) / 100) : ($service['responsible_amount'] ?? 0))),
         'responsible_mode' => in_array((string)($service['responsible_mode'] ?? 'amount'), ['amount', 'percent'], true) ? (string)$service['responsible_mode'] : 'amount',
         'responsible_percent' => min(100, max(0, (float)($service['responsible_percent'] ?? 0))),
         'period' => in_array((string)($service['period'] ?? 'Місяць'), $allowedPeriods, true) ? (string)$service['period'] : 'Місяць',
         'official_due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($service['official_due_date'] ?? '')) ? (string)$service['official_due_date'] : '',
         'accountant_id' => trim((string)($service['accountant_id'] ?? '')),
-        'is_package' => !empty($service['is_package']) || trim((string)($service['package_id'] ?? '')) !== '',
-        'package_id' => trim((string)($service['package_id'] ?? '')),
+        'is_package' => $isPackage,
+        'package_id' => $packageId,
         'package_name' => trim((string)($service['package_name'] ?? '')),
         'package_services' => array_values(array_filter(array_map(static fn($item): string => trim((string)$item), (array)($service['package_services'] ?? [])), static fn(string $item): bool => $item !== '')),
         'package_responsible_amount' => max(0, (float)($service['package_responsible_amount'] ?? 0)),
         'internal_days_before' => min(90, max(0, (int)($service['internal_days_before'] ?? 5))),
         'parameters' => $parameters,
+        'tooth_numbers' => $toothNumbers,
         'reminders_enabled' => array_key_exists('reminders_enabled', $service) ? !empty($service['reminders_enabled']) : true,
         'create_task' => !empty($service['create_task']),
         'task_id' => preg_match('/^[a-f0-9]{32}$/', (string)($service['task_id'] ?? '')) ? (string)$service['task_id'] : '',
+        'calendar_enabled' => $isPackage && $calendarEnabled,
+        'add_to_calendar' => !empty($service['add_to_calendar']) && (!$isPackage || $calendarEnabled),
+        'appointment_at' => preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', (string)($service['appointment_at'] ?? '')) ? (string)$service['appointment_at'] : '',
+        'appointment_duration_minutes' => in_array((int)($service['appointment_duration_minutes'] ?? 60), [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480], true) ? (int)($service['appointment_duration_minutes'] ?? 60) : 60,
+        'appointment_reminder_minutes' => in_array((int)($service['appointment_reminder_minutes'] ?? 1440), [0, 15, 60, 1440, 4320], true) ? (int)($service['appointment_reminder_minutes'] ?? 1440) : 1440,
+        'appointment_task_id' => preg_match('/^[a-f0-9]{32}$/', (string)($service['appointment_task_id'] ?? '')) ? (string)$service['appointment_task_id'] : '',
     ];
 }, (array)($data['services'] ?? [])), static fn(array $service): bool => $service['name'] !== ''));
+$preserveDentistryLegacyServices = $module === 'dentistry' && $action === 'update';
+if ($module === 'dentistry') $services = [];
 $existingAccountantIds = [];
 $existingPackageKeys = [];
 $previousServices = [];
@@ -232,7 +342,7 @@ foreach ($services as $service) {
     $serviceKey = $packageId !== ''
         ? 'package:' . $packageId
         : 'service:' . mb_strtolower(trim((string)$service['name']), 'UTF-8');
-    if (isset($seenServiceKeys[$serviceKey])) {
+    if (isset($seenServiceKeys[$serviceKey]) && !($module === 'dentistry' && $packageId === '')) {
         $duplicateLabel = $packageId !== '' ? (string)($service['package_name'] ?: $service['name']) : (string)$service['name'];
         jsonResponse(false, '«' . $duplicateLabel . '» уже додано до клієнта. Приберіть повторну позицію.', ['code' => 'duplicate_client_service'], 422);
     }
@@ -281,32 +391,28 @@ if ($requestedAccountantIds) {
     }
 }
 $servicesJson = json_encode($services, JSON_UNESCAPED_UNICODE);
-if ($action === 'update' && ($planContext['plan']['services_per_client'] ?? null) !== null && $addedStandalone > 0) {
+$serviceKey = static fn(array $service): string => (string)($service['name'] ?? '') . '|' . (string)($service['package_id'] ?? '');
+$previousServiceCounts = [];
+foreach ($previousServices as $previousService) {
+    $key = $serviceKey($previousService);
+    $previousServiceCounts[$key] = ($previousServiceCounts[$key] ?? 0) + 1;
+}
+$currentServiceCounts = [];
+$addedStandalone = 0;
+foreach ($services as $service) {
+    $key = $serviceKey($service);
+    $currentServiceCounts[$key] = ($currentServiceCounts[$key] ?? 0) + 1;
+    if ($currentServiceCounts[$key] <= ($previousServiceCounts[$key] ?? 0)) continue;
+    if (empty($planContext['plan']['services']) && $service['package_id'] !== '') requirePlanFeature($planContext, 'services');
+    $addedStandalone++;
+}
+$serviceLimit = $planContext['plan']['services_per_client'] ?? null;
+$standaloneCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
+if ($action === 'update' && $serviceLimit !== null && $addedStandalone > 0) {
     acquirePlanCapacityLock($planContext, 'services_per_client');
-    $standaloneCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
-    if ($standaloneCount > (int)$planContext['plan']['services_per_client']) jsonResponse(false, 'У плані «' . $planContext['plan']['name'] . '» можна додати не більше ' . (int)$planContext['plan']['services_per_client'] . ' послуг на одного клієнта.', ['code' => 'plan_limit_reached', 'metric' => 'services_per_client', 'limit' => (int)$planContext['plan']['services_per_client'], 'current' => (int)$planContext['plan']['services_per_client'], 'plan' => $planContext['key']], 403);
+    if ($standaloneCount > (int)$serviceLimit) jsonResponse(false, 'У плані «' . $planContext['plan']['name'] . '» можна додати не більше ' . (int)$serviceLimit . ' послуг на одного клієнта.', ['code' => 'plan_limit_reached', 'metric' => 'services_per_client', 'limit' => (int)$serviceLimit, 'current' => (int)$serviceLimit, 'plan' => $planContext['key']], 403);
 }
-if (empty($planContext['plan']['services'])) {
-    $serviceKey = static fn(array $service): string => (string)($service['name'] ?? '') . '|' . (string)($service['package_id'] ?? '');
-    $previousKeys = array_fill_keys(array_map($serviceKey, $previousServices), true);
-    $addedStandalone = 0;
-    foreach ($services as $service) {
-        $key = $serviceKey($service);
-        if (isset($previousKeys[$key])) continue;
-        if ($service['package_id'] !== '') requirePlanFeature($planContext, 'services');
-        $addedStandalone++;
-    }
-    $serviceLimit = $planContext['plan']['services_per_client'] ?? null;
-    if ($serviceLimit !== null) {
-        $standaloneCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
-        if ($standaloneCount > (int)$serviceLimit && $addedStandalone > 0) {
-            notifyPlanCapacityReached($planContext, 'services_per_client', (int)$serviceLimit, (int)$serviceLimit);
-            jsonResponse(false, 'У плані «' . $planContext['plan']['name'] . '» можна додати не більше ' . (int)$serviceLimit . ' послуг на одного клієнта.', ['code' => 'plan_limit_reached', 'metric' => 'services_per_client', 'limit' => (int)$serviceLimit, 'current' => (int)$serviceLimit, 'plan' => $planContext['key']], 403);
-        }
-    } elseif ($addedStandalone > 0) {
-        requirePlanFeature($planContext, 'services');
-    }
-}
+if (empty($planContext['plan']['services']) && $serviceLimit === null && $addedStandalone > 0) requirePlanFeature($planContext, 'services');
 if ($action === 'update' && $id !== '') {
     $existingClientQuery = $pdo->prepare('SELECT id FROM clients WHERE id = ? LIMIT 1');
     $existingClientQuery->execute([$id]);
@@ -318,8 +424,10 @@ if ($action === 'update' && $id !== '') {
         if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для клієнта.', [], 422);
         $ownerId = (string)$data['workspace_owner_id'];
     }
-    $updateSql = 'UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ?'.($ownerId !== null ? ', created_by = ?' : '').' WHERE id = ?';
-    $updateValues = [$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData];
+    $updateSql = 'UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?'.($preserveDentistryLegacyServices ? '' : ', services = ?').', module = ?, module_data = ?'.($ownerId !== null ? ', created_by = ?' : '').' WHERE id = ?';
+    $updateValues = [$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE)];
+    if (!$preserveDentistryLegacyServices) $updateValues[] = $servicesJson;
+    $updateValues[] = $module; $updateValues[] = $moduleData;
     if ($ownerId !== null) $updateValues[] = $ownerId;
     $updateValues[] = $id;
     $pdo->prepare($updateSql)->execute($updateValues);
@@ -337,12 +445,48 @@ if ($isAdmin && !empty($data['workspace_owner_id'])) {
     if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для клієнта.', [], 422);
     $ownerId = (string)$data['workspace_owner_id'];
 }
-if (!$isAdmin) requirePlanCapacity($planContext, 'clients');
+$requestedClientMemberIds = array_values(array_unique(array_filter(array_map('strval', (array)($data['client_member_ids'] ?? [])))));
+$moduleDataValues = (array)($data['module_data'] ?? []);
+$doctorId = trim((string)($moduleDataValues['doctor_id'] ?? ''));
+if ($doctorId !== '') $requestedClientMemberIds[] = $doctorId;
+foreach ($services as $service) {
+    $accountantId = trim((string)($service['accountant_id'] ?? ''));
+    if ($accountantId !== '') $requestedClientMemberIds[] = $accountantId;
+}
+$requestedClientMemberIds = array_values(array_unique(array_filter($requestedClientMemberIds)));
+if ($requestedClientMemberIds) {
+    if ($isAdmin && !empty($data['workspace_owner_id'])) {
+        $memberRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+        $memberRoleQuery->execute([$ownerId]);
+        $memberWorkspace = workspacePlan($pdo, $ownerId, (string)($memberRoleQuery->fetchColumn() ?: 'manager'));
+        $allowedClientMemberIds = array_fill_keys(array_map('strval', $memberWorkspace['member_ids'] ?? [$ownerId]), true);
+    } elseif ($isAdmin) {
+        $allowedClientMemberIds = array_fill_keys(array_map('strval', $pdo->query("SELECT id FROM users WHERE role IN ('admin','owner','manager','user')")->fetchAll(PDO::FETCH_COLUMN)), true);
+    } else {
+        $allowedClientMemberIds = array_fill_keys(array_map('strval', $planContext['member_ids'] ?? [$userId]), true);
+    }
+    foreach ($requestedClientMemberIds as $memberId) {
+        if (!isset($allowedClientMemberIds[$memberId])) jsonResponse(false, 'Вибраного виконавця не знайдено в команді цього простору.', [], 422);
+    }
+}
+if (!$isAdmin) requirePlanCapacity($planContext, ($planContext['module'] ?? '') === 'dentistry' ? 'patients' : 'clients');
 $newId = bin2hex(random_bytes(16));
-$pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $ownerId]);
+$pdo->beginTransaction();
+try {
+    $pdo->prepare('INSERT INTO clients (id, name, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, services, module, module_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$newId, $name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData, $ownerId]);
+    if ($requestedClientMemberIds) {
+        $assignMember = $pdo->prepare('INSERT IGNORE INTO client_members (client_id, user_id, assigned_by) VALUES (?, ?, ?)');
+        foreach ($requestedClientMemberIds as $memberId) $assignMember->execute([$newId, $memberId, $userId]);
+    }
+    $pdo->commit();
+} catch (Throwable $exception) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    throw $exception;
+}
 releasePlanCapacityLocks((string)$planContext['owner_id']);
-    $clientPlanLimit = $planContext['plan']['clients'] ?? null;
-    if ($clientPlanLimit !== null && (int)$planContext['counts']['clients'] + 1 >= (int)$clientPlanLimit) notifyPlanCapacityReached($planContext, 'clients', (int)$clientPlanLimit, (int)$clientPlanLimit);
+    $clientMetric = ($planContext['module'] ?? '') === 'dentistry' ? 'patients' : 'clients';
+    $clientPlanLimit = $planContext['plan'][$clientMetric] ?? null;
+    if ($clientPlanLimit !== null && (int)($planContext['counts'][$clientMetric] ?? 0) + 1 >= (int)$clientPlanLimit) notifyPlanCapacityReached($planContext, $clientMetric, (int)$clientPlanLimit, (int)$clientPlanLimit);
     $clientServiceLimit = $planContext['plan']['services_per_client'] ?? null;
     $clientStandaloneServiceCount = count(array_filter($services, static fn(array $service): bool => $service['package_id'] === ''));
     if ($clientServiceLimit !== null && $clientStandaloneServiceCount >= (int)$clientServiceLimit) notifyPlanCapacityReached($planContext, 'services_per_client', (int)$clientServiceLimit, (int)$clientServiceLimit);
