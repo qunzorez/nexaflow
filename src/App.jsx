@@ -41,6 +41,11 @@ export default function App() {
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/patients/:id" element={<DentistryModuleRoute><DentistryPatientPage /></DentistryModuleRoute>} />
       <Route path="/dentistry-erp" element={<DentistryModuleRoute><DentistryERPPage /></DentistryModuleRoute>} />
+      <Route path="/dentistry/inventory" element={<DentistryModuleRoute><DentistryERPPage key="inventory" module="inventory" /></DentistryModuleRoute>} />
+      <Route path="/dentistry/purchases" element={<DentistryModuleRoute><DentistryERPPage key="procurement" module="procurement" /></DentistryModuleRoute>} />
+      <Route path="/dentistry/accounting" element={<DentistryModuleRoute><DentistryERPPage key="accounting" module="accounting" /></DentistryModuleRoute>} />
+      <Route path="/dentistry/payroll" element={<DentistryModuleRoute><DentistryERPPage key="payroll" module="payroll" /></DentistryModuleRoute>} />
+      <Route path="/dentistry/equipment" element={<DentistryModuleRoute><DentistryERPPage key="equipment" module="equipment" /></DentistryModuleRoute>} />
       <Route path="/calendar" element={<PlanFeatureRoute feature="calendar"><Calendar /></PlanFeatureRoute>} />
       <Route path="/appointments" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><Appointments /></DentistryModuleRoute></PlanFeatureRoute>} />
       <Route path="/appointments/:id" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><AppointmentDetailPage /></DentistryModuleRoute></PlanFeatureRoute>} />

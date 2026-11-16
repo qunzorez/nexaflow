@@ -178,9 +178,14 @@ export default function Sidebar({ user, open }) {
         {(isAdmin || (canManage && planFeatures.services)) && <Link className="nav-item" to="/services">
           <span><Icon name="subscription" /></span> Послуги
         </Link>}
-        {activeClientModule === "dentistry" && <Link className="nav-item" to="/dentistry-erp">
-          <span><Icon name="briefcase" /></span> Фінанси та склад
-        </Link>}
+        {activeClientModule === "dentistry" && <>
+          <p className="nav-label">ОБЛІК КЛІНІКИ</p>
+          <Link className="nav-item" to="/dentistry/inventory"><span><Icon name="archive" /></span> Склад</Link>
+          <Link className="nav-item" to="/dentistry/purchases"><span><Icon name="briefcase" /></span> Закупівлі</Link>
+          {canManage && <Link className="nav-item" to="/dentistry/accounting"><span><Icon name="chart" /></span> Бухгалтерія</Link>}
+          {canManage && <Link className="nav-item" to="/dentistry/payroll"><span><Icon name="users" /></span> Зарплати</Link>}
+          <Link className="nav-item" to="/dentistry/equipment"><span><Icon name="settings" /></span> Обладнання</Link>
+        </>}
         {isAdmin && (
           <Link className="nav-item" to="/notifications">
             <span className="nav-icon">

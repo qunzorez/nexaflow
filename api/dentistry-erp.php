@@ -23,7 +23,11 @@ foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $careSch
 
 $schema = file_get_contents(__DIR__ . '/../database/dentistry_erp.sql');
 if ($schema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічної ERP.', [], 500);
-foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $schema) ?: [])) as $statement) $pdo->exec($statement);
+require_once __DIR__ . '/dentistry-erp-schema.php';
+dentalErpApplySchema($pdo, $schema);
+$operationsSchema = file_get_contents(__DIR__ . '/../database/dentistry_erp_operations.sql');
+if ($operationsSchema === false) jsonResponse(false, 'Не вдалося завантажити складські операції.', [], 500);
+foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $operationsSchema) ?: [])) as $statement) $pdo->exec($statement);
 $seedCategories = ['Анестетики', 'Пломбувальні матеріали', 'Засоби захисту', 'Одноразові матеріали', 'Дезінфекція', 'Інструменти', 'Обладнання', 'Медикаменти', 'Інше'];
 $seedCategory = $pdo->prepare('INSERT IGNORE INTO dental_erp_inventory_categories (id, owner_id, name) VALUES (?, ?, ?)');
 foreach ($seedCategories as $name) $seedCategory->execute([md5($ownerId . '|dental-category|' . $name), $ownerId, $name]);
@@ -38,10 +42,10 @@ require_once __DIR__ . '/dentistry-erp-ledger.php';
 $ledgerAccounts = dentalErpLedgerAccounts($pdo, $ownerId);
 
 $canManage = in_array((string)($context['workspace_role'] ?? ''), ['manager', 'admin', 'owner'], true)
-    || in_array((string)$user['role'], ['manager', 'admin', 'owner'], true);
+    || ($ownerId === $userId && in_array((string)$user['role'], ['manager', 'admin', 'owner'], true));
 $canViewFinance = $canManage;
 $method = (string)($_SERVER['REQUEST_METHOD'] ?? 'GET');
-$data = $method === 'POST' ? body() : [];
+$data = $method === 'POST' ? (str_contains((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') ? $_POST : body()) : [];
 $action = trim((string)($_GET['action'] ?? $data['action'] ?? 'overview'));
 $reportFrom = trim((string)($_GET['from'] ?? date('Y-m-01')));
 $reportTo = trim((string)($_GET['to'] ?? date('Y-m-d')));
@@ -65,6 +69,8 @@ $audit = static function (string $entityType, string $entityId, string $event, a
         ->execute([bin2hex(random_bytes(16)), $ownerId, $userId, $entityType, $entityId, $event, json_encode($details, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]);
 };
 
+require __DIR__ . '/dentistry-erp-operations.php';
+
 if ($method === 'GET' && $action === 'overview') {
     $categories = $pdo->prepare('SELECT id, name FROM dental_erp_inventory_categories WHERE owner_id = ? AND is_active = 1 ORDER BY name');
     $units = $pdo->prepare('SELECT id, name, symbol, decimal_places FROM dental_erp_inventory_units WHERE owner_id = ? AND is_active = 1 ORDER BY name');
@@ -83,7 +89,7 @@ if ($method === 'GET' && $action === 'overview') {
     $orderRows = $orders->fetchAll();
     foreach ($orderRows as &$orderRow) $orderRow['items'] = $orderItemsByOrder[(string)$orderRow['id']] ?? [];
     unset($orderRow);
-    $supplierInvoices = $pdo->prepare('SELECT i.*, s.name AS supplier_name, o.order_number FROM dental_erp_supplier_invoices i JOIN dental_erp_suppliers s ON s.owner_id = i.owner_id AND s.id = i.supplier_id LEFT JOIN dental_erp_purchase_orders o ON o.owner_id = i.owner_id AND o.id = i.purchase_order_id WHERE i.owner_id = ? ORDER BY i.invoice_date DESC, i.created_at DESC LIMIT 100');
+    $supplierInvoices = $pdo->prepare('SELECT i.*, COALESCE((SELECT SUM(r.credit_amount) FROM dental_erp_supplier_returns r WHERE r.owner_id=i.owner_id AND r.supplier_invoice_id=i.id),0) credit_amount, COALESCE((SELECT SUM(r.amount) FROM dental_erp_supplier_refunds r WHERE r.owner_id=i.owner_id AND r.invoice_id=i.id),0) refunded_amount, s.name AS supplier_name, o.order_number FROM dental_erp_supplier_invoices i JOIN dental_erp_suppliers s ON s.owner_id = i.owner_id AND s.id = i.supplier_id LEFT JOIN dental_erp_purchase_orders o ON o.owner_id = i.owner_id AND o.id = i.purchase_order_id WHERE i.owner_id = ? ORDER BY i.invoice_date DESC, i.created_at DESC LIMIT 100');
     $supplierInvoices->execute([$ownerId]);
     $expenseCategories = $pdo->prepare('SELECT id, name FROM dental_erp_expense_categories WHERE owner_id = ? AND is_active = 1 ORDER BY name'); $expenseCategories->execute([$ownerId]);
     $expenses = $pdo->prepare('SELECT e.*, c.name AS category_name, s.name AS supplier_name FROM dental_erp_expenses e JOIN dental_erp_expense_categories c ON c.owner_id = e.owner_id AND c.id = e.category_id LEFT JOIN dental_erp_suppliers s ON s.owner_id = e.owner_id AND s.id = e.supplier_id WHERE e.owner_id = ? ORDER BY e.expense_date DESC, e.created_at DESC LIMIT 200'); $expenses->execute([$ownerId]);
@@ -114,7 +120,8 @@ if ($method === 'GET' && $action === 'overview') {
     $accountingPeriods = $pdo->prepare('SELECT * FROM dental_erp_accounting_periods WHERE owner_id = ? ORDER BY starts_on DESC LIMIT 36'); $accountingPeriods->execute([$ownerId]);
     $journalLines = $pdo->prepare('SELECT e.journal_id, a.account_code, a.name AS account_name, e.debit, e.credit, e.memo FROM dental_erp_accounting_entries e JOIN dental_erp_accounting_accounts a ON a.owner_id = e.owner_id AND a.id = e.account_id JOIN dental_erp_accounting_journals j ON j.owner_id = e.owner_id AND j.id = e.journal_id WHERE e.owner_id = ? ORDER BY j.entry_date DESC, e.created_at'); $journalLines->execute([$ownerId]);
     $accountLines = []; foreach ($journalLines->fetchAll() as $line) $accountLines[(string)$line['journal_id']][] = $line;
-    foreach ($journalRows as &$journalRow) $journalRow['entries'] = $accountLines[(string)$journalRow['id']] ?? []; unset($journalRow);
+    $journalResult = $journalRows->fetchAll();
+    foreach ($journalResult as &$journalRow) $journalRow['entries'] = $accountLines[(string)$journalRow['id']] ?? []; unset($journalRow);
     $financial = ['revenue' => 0, 'collected' => 0, 'expenses' => 0, 'cash_expenses' => 0, 'payroll' => 0, 'material_cost' => 0, 'receivables' => 0, 'supplier_debt' => 0, 'inventory_value' => 0];
     $patientScope = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN DATE(i.created_at) BETWEEN ? AND ? THEN i.total_amount ELSE 0 END),0) revenue, COALESCE(SUM(i.remaining_amount),0) receivables FROM dental_invoices i JOIN clients c ON c.id = i.patient_id WHERE c.created_by = ? AND i.status <> 'cancelled'"); $patientScope->execute([$reportFrom, $reportTo, $ownerId]); $invoiceTotals = $patientScope->fetch();
     $paidScope = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN p.payment_type = 'refund' THEN -p.amount ELSE p.amount END),0) FROM dental_payments p JOIN clients c ON c.id = p.patient_id WHERE c.created_by = ? AND DATE(p.payment_date) BETWEEN ? AND ?"); $paidScope->execute([$ownerId, $reportFrom, $reportTo]);
@@ -122,8 +129,18 @@ if ($method === 'GET' && $action === 'overview') {
     $expenseTotals = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN expense_date BETWEEN ? AND ? THEN amount ELSE 0 END),0) expenses, COALESCE(SUM(CASE WHEN payment_status = 'paid' AND DATE(paid_at) BETWEEN ? AND ? THEN amount ELSE 0 END),0) cash_expenses FROM dental_erp_expenses WHERE owner_id = ? AND payment_status <> 'cancelled'"); $expenseTotals->execute([$reportFrom, $reportTo, $reportFrom, $reportTo, $ownerId]); $expenseRow = $expenseTotals->fetch(); $financial['expenses'] = (float)$expenseRow['expenses']; $financial['cash_expenses'] = (float)$expenseRow['cash_expenses'];
     $materialTotals = $pdo->prepare('SELECT COALESCE(SUM(m.total_cost),0) FROM dental_erp_performed_service_materials m JOIN dental_performed_services s ON s.id = m.performed_service_id JOIN clients c ON c.id = s.patient_id WHERE m.owner_id = ? AND c.created_by = ? AND DATE(s.performed_at) BETWEEN ? AND ?'); $materialTotals->execute([$ownerId, $ownerId, $reportFrom, $reportTo]); $financial['material_cost'] = (float)$materialTotals->fetchColumn();
     $payrollTotals = $pdo->prepare('SELECT COALESCE(SUM(a.accrued_amount),0) FROM dental_erp_payroll_accruals a JOIN dental_erp_payroll_periods p ON p.owner_id = a.owner_id AND p.id = a.period_id WHERE a.owner_id = ? AND p.starts_on BETWEEN ? AND ?'); $payrollTotals->execute([$ownerId, $reportFrom, $reportTo]); $financial['payroll'] = (float)$payrollTotals->fetchColumn();
-    $debtTotals = $pdo->prepare("SELECT COALESCE(SUM(amount - paid_amount),0) FROM dental_erp_supplier_invoices WHERE owner_id = ? AND status <> 'cancelled'"); $debtTotals->execute([$ownerId]); $financial['supplier_debt'] = (float)$debtTotals->fetchColumn();
+    $debtTotals = $pdo->prepare("SELECT COALESCE(SUM(GREATEST(0,i.amount-i.paid_amount-COALESCE((SELECT SUM(r.credit_amount) FROM dental_erp_supplier_returns r WHERE r.owner_id=i.owner_id AND r.supplier_invoice_id=i.id),0))),0) FROM dental_erp_supplier_invoices i WHERE i.owner_id=? AND i.status<>'cancelled'"); $debtTotals->execute([$ownerId]); $financial['supplier_debt'] = (float)$debtTotals->fetchColumn();
     $stockTotals = $pdo->prepare('SELECT COALESCE(SUM(b.available_quantity * b.purchase_unit_cost),0) FROM dental_erp_inventory_batches b WHERE b.owner_id = ? AND b.is_blocked = 0 AND (b.expiration_date IS NULL OR b.expiration_date >= CURRENT_DATE)'); $stockTotals->execute([$ownerId]); $financial['inventory_value'] = (float)$stockTotals->fetchColumn();
+    $periodLedger = dentalErpRows($pdo,"SELECT a.account_code,SUM(e.debit-e.credit) net,SUM(e.credit) credit FROM dental_erp_accounting_entries e JOIN dental_erp_accounting_accounts a ON a.id=e.account_id AND a.owner_id=e.owner_id JOIN dental_erp_accounting_journals j ON j.id=e.journal_id AND j.owner_id=e.owner_id WHERE e.owner_id=? AND j.entry_date BETWEEN ? AND ? GROUP BY a.account_code",[$ownerId,$reportFrom,$reportTo]);
+    $ledgerTotals = array_column($periodLedger,null,'account_code');
+    $financial['material_cost'] = (float)($ledgerTotals['801']['net']??0);
+    $financial['expenses'] = (float)($ledgerTotals['811']['net']??0);
+    $financial['payroll'] = (float)($ledgerTotals['821']['net']??0);
+    $financial['direct_expenses'] = (float)($ledgerTotals['831']['net']??0);
+    $financial['depreciation'] = (float)($ledgerTotals['841']['net']??0);
+    $financial['cash_outflows'] = (float)($ledgerTotals['101']['credit']??0);
+    $financial['gross_margin'] = $financial['revenue']-$financial['material_cost']-$financial['direct_expenses'];
+    $financial['operating_profit'] = $financial['gross_margin']-$financial['expenses']-$financial['payroll']-$financial['depreciation'];
     $recommendations = [];
     foreach ($itemRows as $stockItem) if ((int)$stockItem['is_active'] && (float)$stockItem['available_stock'] < (float)$stockItem['minimum_stock']) $recommendations[] = ['item_id' => $stockItem['id'], 'name' => $stockItem['name'], 'available' => $stockItem['available_stock'], 'minimum' => $stockItem['minimum_stock'], 'optimal' => $stockItem['optimal_stock'], 'suggested_quantity' => max(0, (float)$stockItem['optimal_stock'] - (float)$stockItem['available_stock']), 'unit_symbol' => $stockItem['unit_symbol'], 'supplier_id' => $stockItem['default_supplier_id'], 'supplier_name' => $stockItem['supplier_name']];
     jsonResponse(true, 'Дані стоматологічної ERP завантажено.', [
@@ -134,7 +151,7 @@ if ($method === 'GET' && $action === 'overview') {
         'movements' => $movements->fetchAll(), 'equipment' => $equipment->fetchAll(), 'maintenance' => $maintenance->fetchAll(), 'instrument_sets' => $instrumentSets->fetchAll(), 'sterilization_cycles' => $sterilizationCycles->fetchAll(),
         'team' => $canViewFinance ? $users : [], 'payroll_rules' => $canViewFinance ? $payrollRules->fetchAll() : [], 'payroll_periods' => $canViewFinance ? $payrollPeriods->fetchAll() : [], 'payroll_accruals' => $canViewFinance ? $payrollAccruals->fetchAll() : [],
         'accounting_accounts' => $canViewFinance ? $pdo->query("SELECT id, account_code, name, account_type FROM dental_erp_accounting_accounts WHERE owner_id = " . $pdo->quote($ownerId) . " AND is_active = 1 ORDER BY account_code")->fetchAll() : [],
-        'accounting_journals' => $canViewFinance ? $journalRows->fetchAll() : [], 'accounting_periods' => $canViewFinance ? $accountingPeriods->fetchAll() : [], 'financial' => $canViewFinance ? $financial : null, 'purchase_recommendations' => $recommendations,
+        'accounting_journals' => $canViewFinance ? $journalResult : [], 'accounting_periods' => $canViewFinance ? $accountingPeriods->fetchAll() : [], 'financial' => $canViewFinance ? $financial : null, 'purchase_recommendations' => dentalErpRecommendations($pdo, $ownerId),
         'financial_period' => ['from' => $reportFrom, 'to' => $reportTo],
         'permissions' => ['manage' => $canManage, 'view_finance' => $canViewFinance],
     ]);
@@ -165,12 +182,15 @@ if ($action === 'calculate_payroll') {
     $periodId = $id();
     $pdo->beginTransaction();
     try {
+        $workspaceLock = $pdo->prepare('SELECT id FROM users WHERE id=? FOR UPDATE'); $workspaceLock->execute([$ownerId]);
+        $overlap = dentalErpRows($pdo,'SELECT id FROM dental_erp_payroll_periods WHERE owner_id=? AND starts_on<=? AND ends_on>=? AND NOT(starts_on=? AND ends_on=?) FOR UPDATE',[$ownerId,$ends,$starts,$starts,$ends]);
+        if ($overlap) throw new DomainException('Розрахунковий період перетинається з уже створеним. Оберіть інші дати.');
         $pdo->prepare("INSERT IGNORE INTO dental_erp_payroll_periods (id, owner_id, starts_on, ends_on, status, created_by) VALUES (?, ?, ?, ?, 'open', ?)")->execute([$periodId, $ownerId, $starts, $ends, $userId]);
         $periodQuery = $pdo->prepare('SELECT id, status FROM dental_erp_payroll_periods WHERE owner_id = ? AND starts_on = ? AND ends_on = ? FOR UPDATE'); $periodQuery->execute([$ownerId, $starts, $ends]); $period = $periodQuery->fetch();
         if (!$period || $period['status'] !== 'open') throw new DomainException('Період уже розраховано або закрито. Створіть новий період для коригування.');
         $rules = $pdo->prepare('SELECT * FROM dental_erp_payroll_rules WHERE owner_id = ? AND is_active = 1 FOR UPDATE'); $rules->execute([$ownerId]);
         $performed = $pdo->prepare('SELECT COALESCE(SUM(s.total_price),0) amount, COUNT(*) procedures FROM dental_performed_services s JOIN clients c ON c.id = s.patient_id WHERE c.created_by = ? AND s.doctor_id = ? AND DATE(s.performed_at) BETWEEN ? AND ?');
-        $collected = $pdo->prepare("SELECT COALESCE(SUM(ii.total_price * a.amount / NULLIF(i.total_amount,0) * CASE WHEN p.payment_type = 'refund' THEN -1 ELSE 1 END),0) amount, COUNT(DISTINCT s.id) procedures FROM dental_performed_services s JOIN clients c ON c.id = s.patient_id JOIN dental_invoice_items ii ON ii.performed_service_id = s.id JOIN dental_invoices i ON i.id = ii.invoice_id JOIN dental_payment_allocations a ON a.invoice_id = i.id JOIN dental_payments p ON p.id = a.payment_id WHERE c.created_by = ? AND s.doctor_id = ? AND DATE(p.payment_date) BETWEEN ? AND ? AND i.status <> 'cancelled'");
+        $collected = $pdo->prepare("SELECT COALESCE(SUM(ii.total_price * a.amount / NULLIF(i.subtotal,0) * CASE WHEN p.payment_type = 'refund' THEN -1 ELSE 1 END),0) amount, COUNT(DISTINCT s.id) procedures FROM dental_performed_services s JOIN clients c ON c.id = s.patient_id JOIN dental_invoice_items ii ON ii.performed_service_id = s.id JOIN dental_invoices i ON i.id = ii.invoice_id JOIN dental_payment_allocations a ON a.invoice_id = i.id JOIN dental_payments p ON p.id = a.payment_id WHERE c.created_by = ? AND s.doctor_id = ? AND DATE(p.payment_date) BETWEEN ? AND ? AND i.status <> 'cancelled'");
         $saveAccrual = $pdo->prepare('INSERT INTO dental_erp_payroll_accruals (id, owner_id, period_id, user_id, basis_amount, procedures_count, accrued_amount, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE basis_amount = VALUES(basis_amount), procedures_count = VALUES(procedures_count), accrued_amount = VALUES(accrued_amount), details = VALUES(details)');
         foreach ($rules->fetchAll() as $rule) {
             ($rule['calculation_basis'] === 'collected' ? $collected : $performed)->execute([$ownerId, $rule['user_id'], $starts, $ends]);
@@ -192,7 +212,7 @@ if ($action === 'calculate_payroll') {
         $pdo->prepare("UPDATE dental_erp_payroll_periods SET status = 'calculated' WHERE id = ? AND owner_id = ? AND status = 'open'")->execute([$period['id'], $ownerId]);
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося розрахувати зарплату. Перевірте записи та правила оплати.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося розрахувати зарплату. Перевірте записи та правила оплати.', [], 500); }
     jsonResponse(true, 'Нарахування за період збережені та проведені у внутрішньому обліку.');
 }
 
@@ -204,8 +224,9 @@ if ($action === 'payroll_payment') {
     try {
         $accrual = $pdo->prepare('SELECT a.*, u.name AS user_name FROM dental_erp_payroll_accruals a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND a.owner_id = ? FOR UPDATE'); $accrual->execute([$accrualId, $ownerId]); $row = $accrual->fetch();
         if (!$row) throw new DomainException('Нарахування не знайдено.');
-        $exists = $pdo->prepare('SELECT id FROM dental_erp_payroll_payments WHERE owner_id = ? AND idempotency_key = ?'); $exists->execute([$ownerId, $key]);
-        if (!$exists->fetchColumn()) {
+        $exists = $pdo->prepare('SELECT id,accrual_id,amount FROM dental_erp_payroll_payments WHERE owner_id = ? AND idempotency_key = ?'); $exists->execute([$ownerId, $key]); $previousPayment=$exists->fetch();
+        if ($previousPayment && ($previousPayment['accrual_id']!==$accrualId || (int)round((float)$previousPayment['amount']*100)!==(int)round((float)$amount*100))) throw new DomainException('Ключ запиту вже використано для іншої виплати.');
+        if (!$previousPayment) {
             $cents = (int)round((float)$amount * 100); $remaining = (int)round(((float)$row['accrued_amount'] - (float)$row['paid_amount']) * 100);
             if ($cents <= 0 || $cents > $remaining) throw new DomainException('Сума виплати перевищує залишок нарахування.');
             $paymentId = $id();
@@ -220,7 +241,7 @@ if ($action === 'payroll_payment') {
         }
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося записати виплату.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося записати виплату.', [], 500); }
     jsonResponse(true, 'Виплату записано.');
 }
 
@@ -234,6 +255,9 @@ if ($action === 'save_equipment') {
     $cost = $decimal('purchase_cost'); $life = trim((string)($data['useful_life_months'] ?? ''));
     if ($life !== '' && (!ctype_digit($life) || (int)$life < 1 || (int)$life > 1200)) jsonResponse(false, 'Строк корисного використання має бути від 1 до 1200 місяців.', [], 422);
     if ($equipmentId !== '') {
+        $original = dentalErpRows($pdo,'SELECT * FROM dental_erp_equipment WHERE id=? AND owner_id=?',[$equipmentId,$ownerId])[0]??null;
+        $hasDepreciation = dentalErpRows($pdo,'SELECT id FROM dental_erp_depreciation WHERE equipment_id=? AND owner_id=? LIMIT 1',[$equipmentId,$ownerId]);
+        if ($original && $hasDepreciation && ((float)$original['purchase_cost'] !== (float)$cost || (string)$original['purchase_date'] !== (string)$purchaseDate || (string)$original['useful_life_months'] !== $life)) jsonResponse(false,'Після нарахування амортизації не можна змінювати первісну вартість, дату чи строк використання.',[],409);
         $stmt = $pdo->prepare('UPDATE dental_erp_equipment SET name = ?, inventory_number = ?, serial_number = ?, purchase_date = ?, purchase_cost = ?, supplier_id = ?, warranty_until = ?, location = ?, status = ?, useful_life_months = ? WHERE id = ? AND owner_id = ?');
         $stmt->execute([$name, $text('inventory_number', 80), $text('serial_number', 120), $purchaseDate, $cost, $supplierId, $warranty, $text('location', 190), $status, $life !== '' ? (int)$life : null, $equipmentId, $ownerId]);
         if (!$stmt->rowCount()) { $check = $pdo->prepare('SELECT id FROM dental_erp_equipment WHERE id = ? AND owner_id = ?'); $check->execute([$equipmentId, $ownerId]); if (!$check->fetchColumn()) jsonResponse(false, 'Обладнання не знайдено.', [], 404); }
@@ -264,7 +288,7 @@ if ($action === 'save_equipment_maintenance') {
         }
         $audit('equipment_maintenance', $maintenanceId, 'created', ['equipment_id' => $equipmentId, 'cost' => $cost]);
         $pdo->commit();
-    } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зберегти обслуговування обладнання.', [], 500); }
+    } catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зберегти обслуговування обладнання.', [], 500); }
     jsonResponse(true, 'Обслуговування збережено.');
 }
 
@@ -290,7 +314,7 @@ if ($action === 'complete_sterilization_cycle') {
     $setId = trim((string)($data['instrument_set_id'] ?? '')); $cycleNumber = $text('cycle_number', 80); $result = (string)($data['result'] ?? 'passed');
     if (!in_array($result, ['passed', 'failed'], true)) jsonResponse(false, 'Оберіть результат циклу.', [], 422);
     $started = trim((string)($data['started_at'] ?? date('Y-m-d H:i:s'))); $completed = trim((string)($data['completed_at'] ?? date('Y-m-d H:i:s')));
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/', $started) || !preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/', $completed)) jsonResponse(false, 'Перевірте час початку та завершення стерилізації.', [], 422);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/', $started) || !preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/', $completed) || strtotime($completed) < strtotime($started)) jsonResponse(false, 'Перевірте час початку та завершення стерилізації.', [], 422);
     $pdo->beginTransaction();
     try {
         $set = $pdo->prepare('SELECT id, name FROM dental_erp_instrument_sets WHERE id = ? AND owner_id = ? FOR UPDATE'); $set->execute([$setId, $ownerId]); $setRow = $set->fetch();
@@ -301,7 +325,7 @@ if ($action === 'complete_sterilization_cycle') {
         $audit('sterilization_cycle', $cycleId, $result, ['instrument_set_id' => $setId, 'cycle_number' => $cycleNumber]);
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зареєструвати цикл стерилізації.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зареєструвати цикл стерилізації.', [], 500); }
     jsonResponse(true, $result === 'passed' ? 'Цикл пройдено; набір доступний.' : 'Цикл не пройдено; набір позначено для ремонту.');
 }
 
@@ -315,7 +339,7 @@ if ($action === 'close_accounting_period') {
         $audit('accounting_period', $periodId, 'closed');
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося закрити період.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося закрити період.', [], 500); }
     jsonResponse(true, 'Період закрито від нових проведень.');
 }
 
@@ -381,6 +405,9 @@ if ($action === 'save_inventory_item') {
     $fields = [$categoryId, $unitId, $supplierId, $name, $sku, $itemType, $cost, $minimum, $optimal];
     if ($itemId !== '') {
         if (!preg_match('/^[a-f0-9]{32}$/i', $itemId)) jsonResponse(false, 'Некоректна складська позиція.', [], 422);
+        $original = dentalErpRows($pdo,'SELECT item_type,unit_id FROM dental_erp_inventory_items WHERE id=? AND owner_id=?',[$itemId,$ownerId])[0]??null;
+        $hasHistory = dentalErpRows($pdo,'SELECT id FROM dental_erp_inventory_batches WHERE item_id=? AND owner_id=? LIMIT 1',[$itemId,$ownerId]);
+        if ($original && $hasHistory && ($original['item_type']!==$itemType || $original['unit_id']!==$unitId)) jsonResponse(false,'Позиція вже має партії. Для іншої одиниці чи типу обліку створіть нову позицію.',[],409);
         $query = $pdo->prepare('UPDATE dental_erp_inventory_items SET category_id = ?, unit_id = ?, default_supplier_id = ?, name = ?, sku = ?, item_type = ?, purchase_unit_cost = ?, minimum_stock = ?, optimal_stock = ? WHERE id = ? AND owner_id = ?');
         $query->execute([...$fields, $itemId, $ownerId]);
         if (!$query->rowCount()) { $exists = $pdo->prepare('SELECT id FROM dental_erp_inventory_items WHERE id = ? AND owner_id = ?'); $exists->execute([$itemId, $ownerId]); if (!$exists->fetchColumn()) jsonResponse(false, 'Складську позицію не знайдено.', [], 404); }
@@ -422,7 +449,7 @@ if ($action === 'create_purchase_order') {
         $insertLine = $pdo->prepare('INSERT INTO dental_erp_purchase_order_items (id, owner_id, purchase_order_id, inventory_item_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?)');
         foreach ($prepared as $line) $insertLine->execute([$id(), $ownerId, $orderId, $line['item_id'], $line['quantity'], $line['unit_price'], $line['total_price']]);
         $pdo->commit();
-    } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося створити заявку на закупівлю.', [], 500); }
+    } catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося створити заявку на закупівлю.', [], 500); }
     jsonResponse(true, 'Заявку на закупівлю створено для погодження.', ['id' => $orderId, 'order_number' => $orderNumber]);
 }
 
@@ -488,9 +515,9 @@ if ($action === 'receive_purchase_order') {
             $lineUpdate->execute([$qty, $lineId, $ownerId]); $inserted++;
         }
         if (!$inserted) throw new DomainException('Вкажіть хоча б одну отриману позицію.');
-        $totals = $pdo->prepare('SELECT COUNT(*) AS lines, SUM(CASE WHEN received_quantity >= quantity THEN 1 ELSE 0 END) AS complete FROM dental_erp_purchase_order_items WHERE owner_id = ? AND purchase_order_id = ?');
+        $totals = $pdo->prepare('SELECT COUNT(*) AS line_count, SUM(CASE WHEN received_quantity >= quantity THEN 1 ELSE 0 END) AS complete FROM dental_erp_purchase_order_items WHERE owner_id = ? AND purchase_order_id = ?');
         $totals->execute([$ownerId, $orderId]); $state = $totals->fetch();
-        $nextStatus = (int)$state['complete'] === (int)$state['lines'] ? 'received' : 'partially_received';
+        $nextStatus = (int)$state['complete'] === (int)$state['line_count'] ? 'received' : 'partially_received';
         $pdo->prepare('UPDATE dental_erp_purchase_orders SET status = ? WHERE id = ? AND owner_id = ?')->execute([$nextStatus, $orderId, $ownerId]);
         if ($receiptTotalCents > 0) dentalErpPostJournal($pdo, $ownerId, $userId, 'goods_receipt', $newReceiptId, date('Y-m-d'), 'Оприбуткування поставки ' . $receiptNumber, [
             ['account' => 'inventory', 'debit_cents' => $receiptTotalCents, 'credit_cents' => 0],
@@ -499,7 +526,7 @@ if ($action === 'receive_purchase_order') {
         $audit('purchase_order', $orderId, 'goods_received', ['receipt_id' => $newReceiptId, 'amount_cents' => $receiptTotalCents, 'status' => $nextStatus]);
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося оприбуткувати поставку.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося оприбуткувати поставку.', [], 500); }
     jsonResponse(true, 'Отримання оприбутковано у партії складу. Рахунок постачальника та оплату потрібно внести окремо.', ['receipt_id' => $newReceiptId, 'receipt_number' => $receiptNumber]);
 }
 
@@ -515,15 +542,31 @@ if ($action === 'create_supplier_invoice') {
     $invoiceId = $id(); $invoiceCents = (int)round((float)$amount * 100);
     $pdo->beginTransaction();
     try {
+        $invoiceLines = $data['items'] ?? [];
+        if (!is_array($invoiceLines)) throw new DomainException('Некоректні позиції рахунку.');
+        $preparedLines = []; $lineTotalCents = 0;
+        foreach ($invoiceLines as $line) {
+            if (!is_array($line)) throw new DomainException('Некоректна позиція рахунку.');
+            $itemId = (string)($line['inventory_item_id'] ?? '');
+            $item = dentalErpRows($pdo, 'SELECT id FROM dental_erp_inventory_items WHERE id=? AND owner_id=?', [$itemId,$ownerId]);
+            if (!$item) throw new DomainException('Матеріал не належить цьому простору.');
+            $qty = dentalErpNumber($line['quantity'] ?? '',true); $price = dentalErpNumber($line['unit_price'] ?? '');
+            $cents = (int)round((float)$qty*(float)$price*100); $lineTotalCents += $cents;
+            $preparedLines[] = [$id(),$ownerId,$invoiceId,$itemId,$qty,$price,number_format($cents/100,2,'.','')];
+        }
+        if ($preparedLines && $lineTotalCents !== $invoiceCents) throw new DomainException('Сума позицій не збігається із сумою рахунку.');
         $pdo->prepare("INSERT INTO dental_erp_supplier_invoices (id, owner_id, supplier_id, purchase_order_id, invoice_number, invoice_date, due_date, amount, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")->execute([$invoiceId, $ownerId, $supplierId, $purchaseOrderId, $number, $invoiceDate, $dueDate ?: null, $amount, $text('note', 1000), $userId]);
+        $lineInsert = $pdo->prepare('INSERT INTO dental_erp_supplier_invoice_items(id,owner_id,invoice_id,inventory_item_id,quantity,unit_price,total_price) VALUES(?,?,?,?,?,?,?)');
+        foreach ($preparedLines as $line) $lineInsert->execute($line);
         dentalErpPostJournal($pdo, $ownerId, $userId, 'supplier_invoice', $invoiceId, $invoiceDate, 'Рахунок постачальника ' . $number, [
             ['account' => $purchaseOrderId !== null ? 'receipt_accrual' : 'goods_in_transit', 'debit_cents' => $invoiceCents, 'credit_cents' => 0],
             ['account' => 'payable', 'debit_cents' => 0, 'credit_cents' => $invoiceCents],
         ]);
         $audit('supplier_invoice', $invoiceId, 'registered', ['amount' => $amount, 'supplier_id' => $supplierId, 'purchase_order_id' => $purchaseOrderId]);
         $pdo->commit();
-    } catch (PDOException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Такий номер рахунку цього постачальника вже зареєстрований.', [], 409); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зареєструвати рахунок постачальника.', [], 500); }
+    } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
+    catch (PDOException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Такий номер рахунку цього постачальника вже зареєстрований.', [], 409); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зареєструвати рахунок постачальника.', [], 500); }
     jsonResponse(true, 'Рахунок постачальника зареєстровано як заборгованість.');
 }
 
@@ -549,7 +592,7 @@ if ($action === 'save_expense') {
         ]);
         $audit('expense', $expenseId, 'created', ['amount' => $amount, 'payment_status' => $status, 'category_id' => $categoryId]);
         $pdo->commit();
-    } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зберегти витрату.', [], 500); }
+    } catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зберегти витрату.', [], 500); }
     jsonResponse(true, 'Витрату збережено.');
 }
 
@@ -570,7 +613,7 @@ if ($action === 'mark_expense_paid') {
         }
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося позначити витрату оплаченою.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося позначити витрату оплаченою.', [], 500); }
     jsonResponse(true, 'Витрату позначено оплаченою.');
 }
 
@@ -612,14 +655,17 @@ if ($action === 'pay_supplier_invoice') {
     try {
         $invoice = $pdo->prepare('SELECT * FROM dental_erp_supplier_invoices WHERE id = ? AND owner_id = ? FOR UPDATE'); $invoice->execute([$invoiceId, $ownerId]); $invoiceRow = $invoice->fetch();
         if (!$invoiceRow || $invoiceRow['status'] === 'cancelled') throw new DomainException('Рахунок постачальника не знайдено або він скасований.');
-        $exists = $pdo->prepare('SELECT id FROM dental_erp_supplier_payments WHERE owner_id = ? AND idempotency_key = ?'); $exists->execute([$ownerId, $key]);
-        if (!$exists->fetchColumn()) {
-            if ((float)$invoiceRow['amount'] - (float)$invoiceRow['paid_amount'] + 0.0000001 < (float)$amount) throw new DomainException('Оплата перевищує залишок заборгованості.');
+        $exists = $pdo->prepare('SELECT id,supplier_invoice_id,amount FROM dental_erp_supplier_payments WHERE owner_id = ? AND idempotency_key = ?'); $exists->execute([$ownerId, $key]); $previousPayment=$exists->fetch();
+        if ($previousPayment && ($previousPayment['supplier_invoice_id']!==$invoiceId || (int)round((float)$previousPayment['amount']*100)!==(int)round((float)$amount*100))) throw new DomainException('Ключ запиту вже використано для іншої оплати.');
+        if (!$previousPayment) {
+            $credited = dentalErpRows($pdo,'SELECT COALESCE(SUM(credit_amount),0) amount FROM dental_erp_supplier_returns WHERE owner_id=? AND supplier_invoice_id=?',[$ownerId,$invoiceId])[0]['amount'];
+            if ((float)$invoiceRow['amount'] - (float)$invoiceRow['paid_amount'] - (float)$credited + 0.0000001 < (float)$amount) throw new DomainException('Оплата перевищує залишок заборгованості.');
             $pdo->prepare('INSERT INTO dental_erp_supplier_payments (id, owner_id, supplier_invoice_id, amount, payment_method, payment_date, idempotency_key, comment, created_by) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)')->execute([$id(), $ownerId, $invoiceId, $amount, $data['payment_method'], $key, $text('comment', 1000), $userId]);
             $paid = (float)$invoiceRow['paid_amount'] + (float)$amount;
-            $status = $paid + 0.0000001 >= (float)$invoiceRow['amount'] ? 'paid' : 'partially_paid';
+            $status = $paid + (float)$credited + 0.0000001 >= (float)$invoiceRow['amount'] ? 'paid' : 'partially_paid';
             $pdo->prepare('UPDATE dental_erp_supplier_invoices SET paid_amount = ?, status = ? WHERE id = ? AND owner_id = ?')->execute([number_format($paid, 2, '.', ''), $status, $invoiceId, $ownerId]);
             $paymentLookup = $pdo->prepare('SELECT id FROM dental_erp_supplier_payments WHERE owner_id = ? AND idempotency_key = ?'); $paymentLookup->execute([$ownerId, $key]); $paymentId = (string)$paymentLookup->fetchColumn();
+            $pdo->prepare('INSERT INTO dental_erp_supplier_payment_allocations(id,owner_id,payment_id,invoice_id,amount) VALUES(?,?,?,?,?)')->execute([$id(),$ownerId,$paymentId,$invoiceId,$amount]);
             $paymentCents = (int)round((float)$amount * 100);
             dentalErpPostJournal($pdo, $ownerId, $userId, 'supplier_payment', $paymentId, date('Y-m-d'), 'Оплата рахунку постачальника ' . $invoiceRow['invoice_number'], [
                 ['account' => 'payable', 'debit_cents' => $paymentCents, 'credit_cents' => 0],
@@ -629,7 +675,7 @@ if ($action === 'pay_supplier_invoice') {
         }
         $pdo->commit();
     } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, $error->getMessage(), [], 422); }
-    catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зафіксувати оплату постачальнику.', [], 500); }
+    catch (Throwable $error) { error_log('Dentistry ERP ' . $action . ': ' . $error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false, 'Не вдалося зафіксувати оплату постачальнику.', [], 500); }
     jsonResponse(true, 'Оплату постачальнику зареєстровано.');
 }
 

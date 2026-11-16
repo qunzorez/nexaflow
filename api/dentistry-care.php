@@ -52,6 +52,8 @@ function dentalAudit(PDO $pdo, string $actor, string $type, string $id, string $
 function dentalConsumeServiceMaterials(PDO $pdo, string $ownerId, string $userId, string $serviceId, string $planItemId, string $performedId, array $provided): float
 {
     if ($serviceId === '') return 0.0;
+    $lock = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE'); $lock->execute([$ownerId]);
+    $appointment = $pdo->prepare('SELECT appointment_id FROM dental_performed_services WHERE id = ?'); $appointment->execute([$performedId]); $appointmentId = (string)$appointment->fetchColumn();
     $templateQuery = $pdo->prepare('SELECT t.id, t.inventory_item_id, t.expected_quantity, i.name AS item_name FROM dental_erp_service_material_templates t JOIN dental_erp_inventory_items i ON i.owner_id = t.owner_id AND i.id = t.inventory_item_id WHERE t.owner_id = ? AND t.service_id = ? AND t.is_active = 1 ORDER BY t.created_at FOR UPDATE');
     $templateQuery->execute([$ownerId, $serviceId]);
     $templates = $templateQuery->fetchAll();
@@ -77,7 +79,7 @@ function dentalConsumeServiceMaterials(PDO $pdo, string $ownerId, string $userId
     $locationQuery->execute([$ownerId]);
     $locationId = (string)($locationQuery->fetchColumn() ?: '');
     if ($locationId === '') throw new RuntimeException('Для списання матеріалів не налаштовано складське місце.');
-    $batchQuery = $pdo->prepare('SELECT id, available_quantity, purchase_unit_cost FROM dental_erp_inventory_batches WHERE owner_id = ? AND item_id = ? AND location_id = ? AND is_blocked = 0 AND available_quantity > 0 AND (expiration_date IS NULL OR expiration_date >= CURRENT_DATE) ORDER BY (expiration_date IS NULL) ASC, expiration_date ASC, received_at ASC, id ASC FOR UPDATE');
+    $batchQuery = $pdo->prepare("SELECT b.id,b.location_id,b.purchase_unit_cost,GREATEST(0,b.available_quantity-COALESCE((SELECT SUM(r.quantity) FROM dental_erp_stock_reservations r WHERE r.owner_id=b.owner_id AND r.batch_id=b.id AND r.status='active' AND r.appointment_id<>?),0)) AS available_quantity FROM dental_erp_inventory_batches b JOIN dental_erp_inventory_locations l ON l.id=b.location_id AND l.owner_id=b.owner_id WHERE b.owner_id=? AND b.item_id=? AND l.is_active=1 AND b.is_blocked=0 AND b.available_quantity>0 AND (b.expiration_date IS NULL OR b.expiration_date>=CURRENT_DATE) ORDER BY (b.expiration_date IS NULL),b.expiration_date,b.received_at,b.id FOR UPDATE");
     $batchUpdate = $pdo->prepare('UPDATE dental_erp_inventory_batches SET available_quantity = available_quantity - ? WHERE id = ? AND owner_id = ? AND available_quantity >= ?');
     $movementInsert = $pdo->prepare("INSERT INTO dental_erp_stock_movements (id, owner_id, item_id, batch_id, location_id, movement_type, quantity, unit_cost, source_type, source_id, idempotency_key, note, actor_id) VALUES (?, ?, ?, ?, ?, 'consumption', ?, ?, 'performed_service', ?, ?, ?, ?)");
     $materialInsert = $pdo->prepare('INSERT INTO dental_erp_performed_service_materials (id, owner_id, performed_service_id, template_id, inventory_item_id, batch_id, stock_movement_id, quantity, unit_cost, total_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
@@ -85,18 +87,28 @@ function dentalConsumeServiceMaterials(PDO $pdo, string $ownerId, string $userId
     foreach ($templates as $template) {
         $itemId = (string)$template['inventory_item_id']; $remaining = (float)$usage[$itemId];
         if ($remaining <= 0) continue;
-        $batchQuery->execute([$ownerId, $itemId, $locationId]); $batches = $batchQuery->fetchAll();
+        $batchQuery->execute([$appointmentId, $ownerId, $itemId]); $batches = $batchQuery->fetchAll();
         $available = array_sum(array_map(static fn(array $batch): float => (float)$batch['available_quantity'], $batches));
         if ($available + 0.0000001 < $remaining) throw new RuntimeException('Недостатній придатний залишок матеріалу «' . $template['item_name'] . '». Перевірте партії або отримайте товар.');
         foreach ($batches as $batch) {
             if ($remaining <= 0.0000001) break;
             $used = min($remaining, (float)$batch['available_quantity']);
+            if ($used <= 0) continue;
             $usedText = number_format($used, 4, '.', ''); $unitCost = number_format((float)$batch['purchase_unit_cost'], 4, '.', '');
             $lineCost = round($used * (float)$unitCost, 4); $movementId = dentalId();
             $batchUpdate->execute([$usedText, $batch['id'], $ownerId, $usedText]);
             if ($batchUpdate->rowCount() !== 1) throw new RuntimeException('Залишок партії змінився. Оновіть картку та повторіть підтвердження.');
             $movementKey = 'service:' . $performedId . ':' . $batch['id'];
-            $movementInsert->execute([$movementId, $ownerId, $itemId, $batch['id'], $locationId, $usedText, $unitCost, $performedId, $movementKey, 'Матеріал списано під час підтвердження послуги.', $userId]);
+            $movementInsert->execute([$movementId, $ownerId, $itemId, $batch['id'], $batch['location_id'], $usedText, $unitCost, $performedId, $movementKey, 'Матеріал списано під час підтвердження послуги.', $userId]);
+            $reservations = $pdo->prepare("SELECT id,quantity FROM dental_erp_stock_reservations WHERE owner_id=? AND batch_id=? AND appointment_id=? AND status='active' ORDER BY id FOR UPDATE"); $reservations->execute([$ownerId,$batch['id'],$appointmentId]);
+            $toConsume = $used;
+            foreach ($reservations->fetchAll() as $reservation) {
+                if ($toConsume <= 0) break;
+                $take = min($toConsume,(float)$reservation['quantity']);
+                if ($take >= (float)$reservation['quantity']) $pdo->prepare("UPDATE dental_erp_stock_reservations SET status='consumed' WHERE id=? AND owner_id=?")->execute([$reservation['id'],$ownerId]);
+                else $pdo->prepare('UPDATE dental_erp_stock_reservations SET quantity=quantity-? WHERE id=? AND owner_id=?')->execute([number_format($take,4,'.',''),$reservation['id'],$ownerId]);
+                $toConsume -= $take;
+            }
             $materialInsert->execute([dentalId(), $ownerId, $performedId, $template['id'], $itemId, $batch['id'], $movementId, $usedText, $unitCost, number_format($lineCost, 4, '.', '')]);
             $totalCost += $lineCost; $remaining -= $used;
         }
@@ -165,7 +177,11 @@ if ($schema === false) jsonResponse(false, 'Не вдалося завантаж
 foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $schema) ?: [])) as $statement) $pdo->exec($statement);
 $erpSchema = file_get_contents(__DIR__ . '/../database/dentistry_erp.sql');
 if ($erpSchema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічної ERP.', [], 500);
-foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $erpSchema) ?: [])) as $statement) $pdo->exec($statement);
+require_once __DIR__ . '/dentistry-erp-schema.php';
+dentalErpApplySchema($pdo, $erpSchema);
+$erpOperationsSchema = file_get_contents(__DIR__ . '/../database/dentistry_erp_operations.sql');
+if ($erpOperationsSchema === false) jsonResponse(false, 'Не вдалося завантажити складські операції.', [], 500);
+foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $erpOperationsSchema) ?: [])) as $statement) $pdo->exec($statement);
 $pdo->prepare('INSERT IGNORE INTO dental_erp_inventory_locations (id, owner_id, name) VALUES (?, ?, ?)')->execute([md5($ownerId . '|dental-location|main'), $ownerId, 'Основний склад']);
 require_once __DIR__ . '/dentistry-erp-ledger.php';
 $planItemColumns = array_column($pdo->query('SHOW COLUMNS FROM dental_treatment_plan_items')->fetchAll(), 'Field');
@@ -495,7 +511,11 @@ if ($action === 'perform_service') {
         $doctorId = (string)($appointment['assignee_id'] ?: $userId);
         $pdo->prepare('INSERT INTO dental_performed_services (id, patient_id, appointment_id, doctor_id, service_id, service_name, treatment_plan_item_id, tooth_number, quantity, unit_price, total_price, performed_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([$performedId, $patientId, $appointmentId, $doctorId, $catalog['id'], $catalog['name'], $planItemId ?: null, $tooth, $quantity, dentalMoney($unitCents), dentalMoney($totalCents), $dateTime($data['performed_at'] ?? $appointment['due_date']), $userId]);
-        dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)$catalog['id'], $planItemId, $performedId, $materialUsage);
+        $materialCost = dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)$catalog['id'], $planItemId, $performedId, $materialUsage);
+        $costCents = (int)round($materialCost*100);
+        if ($costCents > 0) dentalErpPostJournal($pdo,$ownerId,$userId,'procedure_materials',$performedId,date('Y-m-d'),'Списання матеріалів · '.$catalog['name'],[
+            ['account'=>'material_expense','debit_cents'=>$costCents],['account'=>'inventory','credit_cents'=>$costCents],
+        ]);
         dentalAudit($pdo, $userId, 'performed_service', $performedId, 'created', ['appointment_id' => $appointmentId, 'total_price' => dentalMoney($totalCents)]);
         $pdo->commit();
         jsonResponse(true, 'Виконану послугу збережено окремо від оплати.', ['id' => $performedId, 'unit_price' => dentalMoney($unitCents), 'total_price' => dentalMoney($totalCents)]);

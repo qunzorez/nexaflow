@@ -20,6 +20,11 @@ function dentalErpLedgerAccounts(PDO $pdo, string $ownerId): array
         'material_expense' => ['801', 'Витрати матеріалів процедур', 'expense'],
         'operating_expense' => ['811', 'Операційні витрати клініки', 'expense'],
         'labor_expense' => ['821', 'Витрати на оплату праці', 'expense'],
+        'direct_expense' => ['831', 'Лабораторні та інші прямі витрати', 'expense'],
+        'equipment_asset' => ['104', 'Первісна вартість обладнання', 'asset'],
+        'depreciation' => ['131', 'Накопичена амортизація', 'asset'],
+        'depreciation_expense' => ['841', 'Амортизаційні витрати', 'expense'],
+        'stock_adjustment' => ['719', 'Результат інвентаризації', 'income'],
     ];
     $insert = $pdo->prepare('INSERT IGNORE INTO dental_erp_accounting_accounts (id, owner_id, account_code, name, account_type) VALUES (?, ?, ?, ?, ?)');
     foreach ($accounts as [$code, $name, $type]) $insert->execute([md5($ownerId . '|dental-account|' . $code), $ownerId, $code, $name, $type]);

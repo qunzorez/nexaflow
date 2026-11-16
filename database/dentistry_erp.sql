@@ -388,6 +388,7 @@ CREATE TABLE IF NOT EXISTS dental_erp_payroll_accruals (
   details JSON NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_dental_erp_payroll_accrual (owner_id, period_id, user_id),
+  UNIQUE KEY uq_dental_erp_payroll_accrual_owner_id (owner_id, id),
   CONSTRAINT chk_dental_erp_payroll_accrual CHECK (basis_amount >= 0 AND accrued_amount >= 0 AND paid_amount >= 0 AND paid_amount <= accrued_amount),
   CONSTRAINT fk_dental_erp_payroll_accrual_period FOREIGN KEY (owner_id, period_id) REFERENCES dental_erp_payroll_periods(owner_id, id) ON DELETE RESTRICT,
   CONSTRAINT fk_dental_erp_payroll_accrual_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT

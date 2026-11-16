@@ -2,6 +2,7 @@ import Icon from '../components/Icon.jsx';
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
+import DentistryInventoryAlerts from "../components/DentistryInventoryAlerts.jsx";
 import { api, post } from "../services/api.js";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import ReminderModal from "../modules/tasks/ReminderModal.jsx";
@@ -192,6 +193,7 @@ export default function Dashboard() {
     <Layout page="Dashboard" user={data.user}>
       <div className="content dashboard-page">
         {notice && <div className="team-notice success">{notice}</div>}
+        {activeClientModule === "dentistry" && canManage && <DentistryInventoryAlerts key={data.user.active_workspace_id || data.user.id} />}
         <section className="welcome-row">
           <div>
             <p className="eyebrow">ВАШ РОБОЧИЙ ПРОСТІР</p>
