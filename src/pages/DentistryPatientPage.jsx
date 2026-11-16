@@ -26,6 +26,15 @@ function printInvoice(invoice, patient) {
 const tabs = ["Огляд", "Прийоми", "Медична карта", "Зубна формула", "План лікування", "Виконані послуги", "Рахунки", "Оплати", "Документи"];
 
 const emptyRecord = { id: "", appointment_id: "", complaints: "", diagnosis: "", examination: "", recommendations: "", tooth_numbers: [] };
+const emptyPlan = () => ({ title: "", comment: "", items: [{ service_id: "", quantity: 1, tooth_number: "", comment: "" }] });
+const emptyPerformed = { appointment_id: "", service_id: "", quantity: 1, tooth_number: "", treatment_plan_item_id: "" };
+const emptyPayment = { type: "payment", payment_method: "cash", amount: "", invoice_id: "", allocated_amount: "", comment: "" };
+const readPatientDraft = patientId => {
+  try {
+    const stored = sessionStorage.getItem(`dentistry-patient-draft:${patientId}`);
+    return stored ? JSON.parse(stored) : {};
+  } catch { return {}; }
+};
 const validDentalTeeth = new Set([11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28,31,32,33,34,35,36,37,38,41,42,43,44,45,46,47,48]);
 const normalizeTeeth = value => {
   if (Array.isArray(value)) return value.map(Number).filter(tooth => validDentalTeeth.has(tooth));
@@ -42,22 +51,44 @@ const normalizeTeeth = value => {
 export default function DentistryPatientPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [loadedDraftFor, setLoadedDraftFor] = useState(id);
+  const [initialDraft] = useState(() => readPatientDraft(id));
   const [user, setUser] = useState(null);
   const [patient, setPatient] = useState(null);
   const [teamUsers, setTeamUsers] = useState([]);
   const [care, setCare] = useState(null);
   const [services, setServices] = useState([]);
-  const [tab, setTab] = useState(tabs[0]);
-  const [record, setRecord] = useState(emptyRecord);
-  const [plan, setPlan] = useState({ title: "", comment: "", items: [{ service_id: "", quantity: 1, tooth_number: "", comment: "" }] });
-  const [planTeeth, setPlanTeeth] = useState([]);
-  const [performed, setPerformed] = useState({ appointment_id: "", service_id: "", quantity: 1, tooth_number: "", treatment_plan_item_id: "" });
-  const [payment, setPayment] = useState({ type: "payment", payment_method: "cash", amount: "", invoice_id: "", allocated_amount: "", comment: "" });
-  const [advanceAllocation, setAdvanceAllocation] = useState({ payment_id: "", invoice_id: "", amount: "" });
+  const [tab, setTab] = useState(initialDraft.tab || tabs[0]);
+  const [record, setRecord] = useState(initialDraft.record || emptyRecord);
+  const [plan, setPlan] = useState(initialDraft.plan || emptyPlan());
+  const [planTeeth, setPlanTeeth] = useState(initialDraft.planTeeth || []);
+  const [performed, setPerformed] = useState(initialDraft.performed || emptyPerformed);
+  const [payment, setPayment] = useState(initialDraft.payment || emptyPayment);
+  const [advanceAllocation, setAdvanceAllocation] = useState(initialDraft.advanceAllocation || { payment_id: "", invoice_id: "", amount: "" });
   const [documentFile, setDocumentFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (loadedDraftFor === id) return;
+    const draft = readPatientDraft(id);
+    setTab(draft.tab || tabs[0]);
+    setRecord(draft.record || emptyRecord);
+    setPlan(draft.plan || emptyPlan());
+    setPlanTeeth(draft.planTeeth || []);
+    setPerformed(draft.performed || emptyPerformed);
+    setPayment(draft.payment || emptyPayment);
+    setAdvanceAllocation(draft.advanceAllocation || { payment_id: "", invoice_id: "", amount: "" });
+    setLoadedDraftFor(id);
+  }, [id, loadedDraftFor]);
+
+  useEffect(() => {
+    if (loadedDraftFor !== id) return;
+    try {
+      sessionStorage.setItem(`dentistry-patient-draft:${id}`, JSON.stringify({ tab, record, plan, planTeeth, performed, payment, advanceAllocation }));
+    } catch { /* Draft saving should never block patient care. */ }
+  }, [id, loadedDraftFor, tab, record, plan, planTeeth, performed, payment, advanceAllocation]);
 
   const refresh = useCallback(async () => {
     const [clientsResult, careResult, serviceResult] = await Promise.all([
@@ -109,7 +140,7 @@ export default function DentistryPatientPage() {
     const items = plan.items.flatMap(item => (planTeeth.length ? planTeeth : [null]).map(tooth => ({ ...item, tooth_number: tooth ? String(tooth) : "" })));
     const result = await runAction("create_treatment_plan", { ...plan, items }, "План лікування створено.");
     if (result) {
-      setPlan({ title: "", comment: "", items: [{ service_id: "", quantity: 1, tooth_number: "", comment: "" }] });
+      setPlan(emptyPlan());
       setPlanTeeth([]);
     }
   }
@@ -177,7 +208,7 @@ export default function DentistryPatientPage() {
 
       {tab === "План лікування" && <div className="dentistry-care-grid">
         <form className="dentistry-care-panel dentistry-care-form" onSubmit={createPlan}>
-          <header><div><h2>Створити план лікування</h2><p>Оберіть зуби один раз — усі додані послуги застосуються до них.</p></div></header>
+          <header><div><h2>Створити план лікування</h2><p>Оберіть зуби один раз — усі додані послуги застосуються до них. Чернетка зберігається автоматично й відновиться після оновлення сторінки.</p></div></header>
           <label>Назва плану<input required value={plan.title} onChange={event => setPlan({ ...plan, title: event.target.value })} placeholder="Наприклад, лікування карієсу" /></label>
           <label>Коментар<textarea value={plan.comment} onChange={event => setPlan({ ...plan, comment: event.target.value })} rows="2" /></label>
           <label>Відповідальний лікар<select value={plan.doctor_id || ""} onChange={event => setPlan({ ...plan, doctor_id: event.target.value })}><option value="">Поточний користувач</option>{teamUsers.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
