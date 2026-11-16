@@ -114,6 +114,22 @@ export default function DentistryPatientPage() {
   }, [id, navigate]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    let refreshing = false;
+    const refreshWhenVisible = async () => {
+      if (document.visibilityState !== "visible" || refreshing) return;
+      refreshing = true;
+      try { await refresh(); } finally { refreshing = false; }
+    };
+    const interval = window.setInterval(refreshWhenVisible, 15000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refresh]);
 
   const availableAppointments = useMemo(() => (care?.appointments || []).filter(item => !["cancelled", "archived"].includes(item.status) && !["cancelled", "archived"].includes(item.appointment_status)), [care]);
   const recordAppointments = useMemo(() => (care?.appointments || []).filter(item => !["cancelled", "archived"].includes(item.status) && !["cancelled", "archived"].includes(item.appointment_status)), [care]);
