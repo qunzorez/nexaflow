@@ -300,6 +300,8 @@ $services = array_values(array_filter(array_map(static function ($service) use (
         'appointment_task_id' => preg_match('/^[a-f0-9]{32}$/', (string)($service['appointment_task_id'] ?? '')) ? (string)$service['appointment_task_id'] : '',
     ];
 }, (array)($data['services'] ?? [])), static fn(array $service): bool => $service['name'] !== ''));
+$preserveDentistryLegacyServices = $module === 'dentistry' && $action === 'update';
+if ($module === 'dentistry') $services = [];
 $existingAccountantIds = [];
 $existingPackageKeys = [];
 $previousServices = [];
@@ -402,8 +404,10 @@ if ($action === 'update' && $id !== '') {
         if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Оберіть наявний простір для клієнта.', [], 422);
         $ownerId = (string)$data['workspace_owner_id'];
     }
-    $updateSql = 'UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?, services = ?, module = ?, module_data = ?'.($ownerId !== null ? ', created_by = ?' : '').' WHERE id = ?';
-    $updateValues = [$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE), $servicesJson, $module, $moduleData];
+    $updateSql = 'UPDATE clients SET name = ?, legal_form = ?, tax_system = ?, has_vat = ?, has_excise = ?, has_employees = ?, employee_count = ?, special_taxes = ?'.($preserveDentistryLegacyServices ? '' : ', services = ?').', module = ?, module_data = ?'.($ownerId !== null ? ', created_by = ?' : '').' WHERE id = ?';
+    $updateValues = [$name, $legalForm, $taxSystem, $hasVat, $hasExcise, $hasEmployees, $employeeCount, json_encode($specialTaxes, JSON_UNESCAPED_UNICODE)];
+    if (!$preserveDentistryLegacyServices) $updateValues[] = $servicesJson;
+    $updateValues[] = $module; $updateValues[] = $moduleData;
     if ($ownerId !== null) $updateValues[] = $ownerId;
     $updateValues[] = $id;
     $pdo->prepare($updateSql)->execute($updateValues);

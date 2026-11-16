@@ -75,7 +75,7 @@ export default function ClientEditPage() {
     setError("");
     setNotice("");
     const submittedName = new FormData(event.currentTarget).get("name");
-    if ((form.services || []).some((service) => service.add_to_calendar)) {
+    if (form.module !== "dentistry" && (form.services || []).some((service) => service.add_to_calendar)) {
       if (!user?.subscription?.features?.calendar) return setError("У вашому тарифі немає доступу до календаря.");
       const latestTasks = await api("/api/tasks.php");
       const appointmentError = validateAppointmentServices(form.services, latestTasks.ok ? latestTasks.tasks || [] : calendarTasks, form.module_data);
@@ -85,6 +85,10 @@ export default function ClientEditPage() {
     const result = await post("/api/clients.php", { ...submittedForm, workspace_owner_id: workspaceOwnerId, action: "update", id });
     if (!result.ok) return setError(result.message);
     if (result.client?.name) setForm((current) => ({ ...current, name: result.client.name }));
+    if (form.module === "dentistry") {
+      setNotice(result.message);
+      return;
+    }
     const services = [...(submittedForm.services || [])];
     let taskError = "";
     let tasksChanged = false;

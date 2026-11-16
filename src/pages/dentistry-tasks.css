@@ -21,3 +21,4 @@
 .records-section .dentistry-task-section-heading{margin-bottom:10px}
 
 .dentistry-task-section.records-section .dentistry-task-section-heading{border-radius:14px}
+.dentistry-task-detail-actions{display:flex;justify-content:flex-start;margin-top:18px;padding-top:14px;border-top:1px solid #dfe9e3}.dentistry-task-detail-actions .primary-action{display:inline-flex;align-items:center;gap:8px;text-decoration:none}.dentistry-task-detail-actions svg{width:15px}

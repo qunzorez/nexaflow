@@ -207,7 +207,7 @@ export default function TaskDetail() {
         <section className="task-detail-header">
           <div>
             <p className="eyebrow">{isDentistry ? (isAppointment ? "ЗАПИС ПАЦІЄНТА" : "ЗАДАЧА ПАЦІЄНТА") : "ЗАДАЧА"}</p>
-            <h1>{task.title}</h1>
+            <h1>{isDentistry && isAppointment ? "Прийом пацієнта" : task.title}</h1>
             {!(isDentistry && isAppointment) && <div className="detail-badges">
               <TaskStatusDropdown
                 task={task}
@@ -393,9 +393,6 @@ function Info({ label, value }) {
 
 function DentistryTaskOverview({ task, client, isAppointment }) {
   const patient = client?.module_data || {};
-  const services = client?.services || [];
-  const currentService = services.find(service => String(service.appointment_task_id || "") === String(task.id));
-  const serviceAppointments = services.filter(service => service.appointment_task_id && String(service.appointment_task_id) !== String(task.id) && service.add_to_calendar && service.appointment_at);
   const scheduledAt = task.due_date ? new Date(String(task.due_date).replace(" ", "T")) : null;
   const patientFacts = [
     ["Телефон", patient.phone],
@@ -407,11 +404,9 @@ function DentistryTaskOverview({ task, client, isAppointment }) {
   ].filter(([, value]) => value);
   return <>
     <section className="panel dentistry-task-detail-patient">
-      <div className="dentistry-task-detail-heading"><span className="dentistry-task-detail-avatar"><Icon name="user" /></span><div><p>КАРТКА ПАЦІЄНТА</p><h2>{client?.name || task.client_names || task.client_name || "Пацієнта не вказано"}</h2></div>{client && <Link to={`/clients/${client.id}/edit`} className="outline-btn"><Icon name="edit" /> Картка пацієнта</Link>}</div>
+      <div className="dentistry-task-detail-heading"><span className="dentistry-task-detail-avatar"><Icon name="user" /></span><div><p>КАРТКА ПАЦІЄНТА</p><h2>{client?.name || task.client_names || task.client_name || "Пацієнта не вказано"}</h2></div>{client && <Link to={`/patients/${client.id}`} className="outline-btn"><Icon name="users" /> Відкрити картку пацієнта</Link>}</div>
       {patientFacts.length ? <div className="dentistry-task-detail-facts">{patientFacts.map(([label, value]) => <Info key={label} label={label} value={value} />)}</div> : <p className="muted-note">Додаткові дані пацієнта ще не заповнені.</p>}
     </section>
-    {isAppointment && <section className="panel dentistry-task-detail-visit"><div className="panel-heading"><div><h2>Деталі прийому</h2><p>Час і відповідальний за візит.</p></div><span className="dentistry-visit-icon"><Icon name="calendar" /></span></div><div className="dentistry-task-detail-facts"><Info label="Дата та час" value={scheduledAt && !Number.isNaN(scheduledAt.getTime()) ? scheduledAt.toLocaleString("uk-UA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Не заплановано"} /><Info label="Тривалість" value={formatMinutes(task.duration_minutes)} /><Info label="Відповідальний" value={task.assignee_name || "Не призначено"} /><Info label="Послуга" value={currentService?.name || task.title.replace(/^Запис клієнта\s*[·—-]?\s*/, "") || "Загальний прийом"} />{currentService?.tooth_numbers?.length > 0 && <Info label="Зуби" value={currentService.tooth_numbers.join(", ")} />}</div>{task.description && <div className="dentistry-task-detail-description" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description, { USE_PROFILES: { html: true } }) }} />}</section>}
-    <section className="panel dentistry-task-detail-services"><div className="panel-heading"><div><h2>Послуги пацієнта</h2><p>Послуги та ціни з картки клієнта.</p></div><span className="appointment-count">{services.length}</span></div>{services.length ? <div className="dentistry-task-detail-service-list">{services.map((service, index) => <article key={`${service.name}-${index}`}><div><strong>{service.name}</strong>{service.tooth_numbers?.length > 0 && <small>Зуби: {service.tooth_numbers.join(", ")}</small>}</div><b>{Number(service.price || 0).toLocaleString("uk-UA")} грн</b></article>)}</div> : <p className="muted-note">Послуги пацієнта ще не додані.</p>}</section>
-    {serviceAppointments.length > 0 && <section className="panel dentistry-task-detail-services"><div className="panel-heading"><div><h2>Записи з картки пацієнта</h2><p>Заплановані прийоми, додані до його послуг.</p></div></div><div className="dentistry-task-detail-service-list">{serviceAppointments.map((service, index) => { const date = new Date(String(service.appointment_at).replace(" ", "T")); return <article key={`${service.name}-${index}`}><div><strong>{service.name}</strong><small>{Number(service.appointment_duration_minutes || 60)} хв · {service.accountant_name || patient.doctor || "Відповідальний не вказаний"}</small></div><b>{Number.isNaN(date.getTime()) ? service.appointment_at : date.toLocaleString("uk-UA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</b></article>; })}</div></section>}
+    {isAppointment && <section className="panel dentistry-task-detail-visit"><div className="panel-heading"><div><h2>Деталі прийому</h2><p>Запис пацієнта до лікаря. Послуги фіксуються в картці після огляду.</p></div><span className="dentistry-visit-icon"><Icon name="calendar" /></span></div><div className="dentistry-task-detail-facts"><Info label="Дата та час" value={scheduledAt && !Number.isNaN(scheduledAt.getTime()) ? scheduledAt.toLocaleString("uk-UA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Не заплановано"} /><Info label="Тривалість" value={formatMinutes(task.duration_minutes)} /><Info label="Відповідальний лікар" value={task.assignee_name || "Не призначено"} /><Info label="Кабінет" value={task.cabinet_id || "Не вказано"} />{task.appointment_reason && <Info label="Причина прийому" value={task.appointment_reason} />}</div>{task.appointment_comment && <div className="dentistry-task-detail-description">{task.appointment_comment}</div>}{!task.appointment_reason && task.description && <div className="dentistry-task-detail-description" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description, { USE_PROFILES: { html: true } }) }} />}{client && <div className="dentistry-task-detail-actions"><Link className="primary-action" to={`/patients/${client.id}`}><Icon name="users" /> Медична картка · послуги · рахунки</Link></div>}</section>}
   </>;
 }

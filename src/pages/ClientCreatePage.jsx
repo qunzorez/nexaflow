@@ -66,7 +66,7 @@ export default function ClientCreatePage() {
     event.preventDefault();
     setError("");
     const submittedName = new FormData(event.currentTarget).get("name");
-    if ((form.services || []).some((service) => service.add_to_calendar)) {
+    if (form.module !== "dentistry" && (form.services || []).some((service) => service.add_to_calendar)) {
       if (!user?.subscription?.features?.calendar) return setError("У вашому тарифі немає доступу до календаря.");
       const latestTasks = await api("/api/tasks.php");
       const appointmentError = validateAppointmentServices(form.services, latestTasks.ok ? latestTasks.tasks || [] : calendarTasks, form.module_data);
@@ -76,7 +76,7 @@ export default function ClientCreatePage() {
     const result = await post("/api/clients.php", { ...submittedForm, workspace_owner_id: workspaceOwnerId, action: "create" });
     if (!result.ok) return setError(result.message);
     const clientId = result.id || result.data?.id;
-    const services = [...(submittedForm.services || [])];
+    const services = form.module === "dentistry" ? [] : [...(submittedForm.services || [])];
     const createdTaskIds = [];
     const rollback = async () => {
       await Promise.all(createdTaskIds.map((taskId) => post("/api/tasks.php", { action: "delete", id: taskId })));

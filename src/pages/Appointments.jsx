@@ -5,7 +5,6 @@ import Layout from "../components/Layout.jsx";
 import DateTimePicker from "../components/DateTimePicker.jsx";
 import SearchableSelect from "../components/SearchableSelect.jsx";
 import { api, post } from "../services/api.js";
-import { serviceAppointmentTaskPayload } from "./Clients.jsx";
 import "./appointments.css";
 
 const pad = value => String(value).padStart(2, "0");
@@ -21,7 +20,6 @@ export default function Appointments() {
   const [params] = useSearchParams();
   const [data, setData] = useState(null);
   const [clientId, setClientId] = useState(params.get("client") || "");
-  const [serviceIndex, setServiceIndex] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [doctorFilter, setDoctorFilter] = useState("");
   const [cabinet, setCabinet] = useState("");
@@ -46,14 +44,6 @@ export default function Appointments() {
 
   const clients = data?.clients || [];
   const client = clients.find(item => String(item.id) === String(clientId));
-  const clientServices = client?.services || [];
-  const selectedService = serviceIndex === "" ? null : clientServices[Number(serviceIndex)];
-  const appointmentById = useMemo(() => new Map((data?.tasks || []).map(task => [String(task.id), task])), [data?.tasks]);
-  const isServiceAlreadyBooked = service => {
-    if (service.is_package && !service.calendar_enabled) return true;
-    const linkedAppointment = appointmentById.get(String(service.appointment_task_id || ""));
-    return Boolean(linkedAppointment && linkedAppointment.status !== "cancelled");
-  };
   const tasksOnDate = useMemo(() => (data?.tasks || []).filter(task =>
     Number(task.is_client_appointment) === 1 && task.due_date && String(task.due_date).slice(0, 10) === date && !["done", "cancelled", "archived"].includes(task.status)
   ), [data, date]);
@@ -106,26 +96,13 @@ export default function Appointments() {
     setSaving(true);
     setError("");
     const appointmentAt = `${date}T${time}`;
-    const serviceForBooking = selectedService ? { ...selectedService, add_to_calendar: true, appointment_at: appointmentAt, appointment_duration_minutes: Number(duration) } : null;
-    const appointmentPayload = serviceForBooking
-      ? { ...serviceAppointmentTaskPayload({ ...client, workspace_owner_id: client.created_by }, serviceForBooking, client.id), assignee_ids: responsibleId ? [responsibleId] : [] }
-      : {
-          action: "create",
-          appointment_booking: true,
-          workspace_owner_id: client.created_by || "",
-          title: "Запис клієнта",
-          description: `Загальний прийом пацієнта «${client.name}».`,
-          client_name: client.name,
-          client_ids: [client.id],
-          assignee_ids: responsibleId ? [responsibleId] : [],
-          project_ids: [],
-          due_date: appointmentAt,
-          cabinet_id: cabinet,
-          duration_minutes: Number(duration),
-          status: "todo",
-          priority: "normal",
-        };
-    appointmentPayload.cabinet_id = cabinet;
+    const appointmentPayload = {
+      action: "create", appointment_booking: true, workspace_owner_id: client.created_by || "",
+      title: "Запис клієнта", description: reason ? `Причина прийому: ${reason}` : `Прийом пацієнта «${client.name}».`,
+      client_name: client.name, client_ids: [client.id], assignee_ids: [responsibleId], project_ids: [],
+      due_date: appointmentAt, duration_minutes: Number(duration), cabinet_id: cabinet,
+      status: "todo", priority: "normal",
+    };
     const result = await post("/api/tasks.php", appointmentPayload);
     if (!result.ok) {
       setSaving(false);
@@ -136,18 +113,6 @@ export default function Appointments() {
       await post("/api/tasks.php", { action: "delete", id: result.task_id });
       setSaving(false);
       return setError(`Запис не додано: ${appointmentDetails.message}`);
-    }
-    if (selectedService && result.task_id) {
-      const services = clientServices.map((service, index) => index === Number(serviceIndex)
-        ? { ...serviceForBooking, appointment_task_id: result.task_id }
-        : service);
-      const linkedSave = await post("/api/clients.php", { ...client, workspace_owner_id: client.created_by || "", services, action: "update", id: client.id });
-      if (!linkedSave.ok) {
-        await post("/api/dentistry-care.php", { action: "delete_appointment_details", patient_id: client.id, appointment_id: result.task_id });
-        await post("/api/tasks.php", { action: "delete", id: result.task_id });
-        setSaving(false);
-        return setError(`Запис не збережено в картці послуг: ${linkedSave.message}`);
-      }
     }
     setSaving(false);
     setNotice("Запис додано до календаря.");
@@ -164,8 +129,8 @@ export default function Appointments() {
           <div className="panel-heading"><div><h2>Новий запис</h2><p>Оберіть клієнта, відповідального та вільний час.</p></div><span className="appointment-heading-icon"><Icon name="calendar" /></span></div>
           {error && <div className="appointment-alert error" role="alert">{error}</div>}{notice && <div className="appointment-alert success" role="status">{notice}</div>}
           <form className="appointment-form" onSubmit={save}>
-            <label>Клієнт<SearchableSelect options={clients.map(item => ({ id: item.id, name: item.name, email: [item.module_data?.phone, item.module_data?.email].filter(Boolean).join(" · ") }))} value={clientId} placeholder="Оберіть клієнта" onChange={value => { const nextClient = clients.find(item => String(item.id) === String(value)); const doctorId = String(nextClient?.module_data?.doctor_id || ""); const isTeamDoctor = (data.team_users || []).some(person => String(person.id) === doctorId); setClientId(value); setServiceIndex(""); setResponsibleId(isTeamDoctor ? doctorId : ""); }} /></label>
-            {client && <><div className="appointment-client-summary"><div><strong>{client.name}</strong><small>{[client.module_data?.phone, client.module_data?.email].filter(Boolean).join(" · ") || "Контактні дані не вказані"}</small></div><Link to={`/clients/${client.id}/edit`} target="_blank" rel="noreferrer" className="appointment-add-service"><Icon name="plus" /> Додати послугу</Link></div><div className="appointment-client-services"><div className="appointment-service-head"><div><strong>Послуги клієнта</strong><small>{clientServices.length ? "Оберіть незаплановану послугу. Для повторного прийому додайте її ще раз у картці пацієнта." : "Наявних послуг немає"}</small></div></div>{clientServices.length ? <div className="appointment-service-list">{clientServices.map((service, index) => { const booked = isServiceAlreadyBooked(service); return <button type="button" disabled={booked} className={`appointment-service-option${String(index) === serviceIndex ? " selected" : ""}${booked ? " is-booked" : ""}`} key={`${service.name}-${index}`} onClick={() => { setServiceIndex(current => current === String(index) ? "" : String(index)); setDuration(Number(service.appointment_duration_minutes || 60)); }}><span><strong>{service.name}</strong>{service.tooth_numbers?.length > 0 && <small>Зуби: {service.tooth_numbers.join(", ")}</small>}{booked && <small>Прийом уже заплановано</small>}</span><b>{Number(service.price || service.client_price || 0).toLocaleString("uk-UA")} грн</b></button>; })}</div> : <p className="appointment-no-services">Додайте послугу в картці пацієнта або створіть загальний запис без прив’язки до послуги.</p>}</div></>}
+            <label>Клієнт<SearchableSelect options={clients.map(item => ({ id: item.id, name: item.name, email: [item.module_data?.phone, item.module_data?.email].filter(Boolean).join(" · ") }))} value={clientId} placeholder="Оберіть пацієнта" onChange={value => { const nextClient = clients.find(item => String(item.id) === String(value)); const doctorId = String(nextClient?.module_data?.doctor_id || ""); const isTeamDoctor = (data.team_users || []).some(person => String(person.id) === doctorId); setClientId(value); setResponsibleId(isTeamDoctor ? doctorId : ""); }} /></label>
+            {client && <div className="appointment-client-summary"><div><strong>{client.name}</strong><small>{[client.module_data?.phone, client.module_data?.email].filter(Boolean).join(" · ") || "Контактні дані не вказані"}</small></div><Link to={`/patients/${client.id}`} className="appointment-add-service">Відкрити картку пацієнта</Link></div>}
             <div className="appointment-fields"><label>Відповідальний<SearchableSelect options={[{ id: "", name: "Не призначено" }, ...(data.team_users || []).map(person => ({ id: person.id, name: person.name, email: person.email }))]} value={responsibleId} placeholder="Оберіть відповідального" onChange={setResponsibleId} /></label><label>Дата запису<DateTimePicker value={date} onChange={setDate} required /></label><label>Тривалість<select value={duration} onChange={event => setDuration(Number(event.target.value))}>{[15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480].map(minutes => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} хв` : `${minutes / 60} год${minutes % 60 ? ` ${minutes % 60} хв` : ""}`}</option>)}</select></label><label>Вільний час<select value={time} onChange={event => setTime(event.target.value)} disabled={!availableTimes.length}>{availableTimes.length ? availableTimes.map(slot => <option key={slot} value={slot}>{slot}</option>) : <option value="">Немає вільних слотів</option>}</select></label></div>
             <div className="appointment-fields"><label>Кабінет<input value={cabinet} onChange={event => setCabinet(event.target.value)} placeholder="Наприклад, Кабінет 2" /></label><label>Причина прийому<input value={reason} onChange={event => setReason(event.target.value)} placeholder="Консультація, огляд…" /></label><label className="appointment-field-wide">Коментар<textarea value={comment} onChange={event => setComment(event.target.value)} rows="2" /></label></div>
             {!availableTimes.length && <p className="appointment-no-slots">На цю дату немає вільного часу для обраної тривалості.</p>}
