@@ -107,6 +107,11 @@ function dentalRecalculateInvoice(PDO $pdo, string $invoiceId): void
 $schema = file_get_contents(__DIR__ . '/../database/dentistry_care.sql');
 if ($schema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічних даних.', [], 500);
 foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $schema) ?: [])) as $statement) $pdo->exec($statement);
+$planItemColumns = array_column($pdo->query('SHOW COLUMNS FROM dental_treatment_plan_items')->fetchAll(), 'Field');
+if (!in_array('completed_quantity', $planItemColumns, true)) {
+    $pdo->exec('ALTER TABLE dental_treatment_plan_items ADD completed_quantity SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER quantity');
+    $pdo->exec("UPDATE dental_treatment_plan_items i JOIN (SELECT treatment_plan_item_id, SUM(quantity) AS completed FROM dental_performed_services WHERE treatment_plan_item_id IS NOT NULL GROUP BY treatment_plan_item_id) s ON s.treatment_plan_item_id = i.id SET i.completed_quantity = LEAST(i.quantity, s.completed), i.status = CASE WHEN s.completed >= i.quantity THEN 'completed' ELSE 'in_progress' END");
+}
 
 if ($action === 'download_document') {
     $documentId = trim((string)($_GET['id'] ?? ''));
@@ -304,6 +309,78 @@ if ($action === 'update_treatment_plan') {
         dentalAudit($pdo, $userId, 'treatment_plan', $planId, 'status_updated', ['status' => $status]);
         $pdo->commit();
         jsonResponse(true, 'Статус плану оновлено.');
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        jsonResponse(false, $error->getMessage(), [], 422);
+    }
+}
+
+if ($action === 'perform_treatment_plans') {
+    $appointmentId = trim((string)($data['appointment_id'] ?? ''));
+    $planIds = array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($data['treatment_plan_ids'] ?? [])))));
+    if (!$planIds) jsonResponse(false, 'Оберіть один або кілька планів лікування.', [], 422);
+    foreach ($planIds as $planId) if (!preg_match('/^[a-f0-9]{32}$/i', $planId)) jsonResponse(false, 'Некоректний список планів лікування.', [], 422);
+    $appointment = dentalAppointment($pdo, $appointmentId, $patientId);
+    $pdo->beginTransaction();
+    $appointmentLock = $pdo->prepare('SELECT t.id, t.status, t.assignee_id FROM tasks t JOIN task_clients tc ON tc.task_id = t.id WHERE t.id = ? AND tc.client_id = ? AND t.is_client_appointment = 1 FOR UPDATE');
+    try {
+        $appointmentLock->execute([$appointmentId, $patientId]);
+        $lockedAppointment = $appointmentLock->fetch();
+        if (!$lockedAppointment || in_array((string)$lockedAppointment['status'], ['cancelled', 'done', 'archived'], true)) throw new RuntimeException('Цей прийом уже завершений або недоступний.');
+        $appointment = $lockedAppointment;
+        $marks = implode(',', array_fill(0, count($planIds), '?'));
+        $selectedPlanQuery = $pdo->prepare("SELECT id FROM dental_treatment_plans WHERE patient_id = ? AND status = 'active' AND id IN ({$marks}) FOR UPDATE");
+        $selectedPlanQuery->execute(array_merge([$patientId], $planIds));
+        if (count($selectedPlanQuery->fetchAll()) !== count($planIds)) throw new RuntimeException('Один із вибраних планів уже закритий або недоступний.');
+        $planQuery = $pdo->prepare("SELECT i.id, i.plan_id, i.service_id, i.service_name, i.tooth_number, i.quantity, i.completed_quantity, i.planned_price FROM dental_treatment_plan_items i JOIN dental_treatment_plans p ON p.id = i.plan_id WHERE p.patient_id = ? AND p.status = 'active' AND p.id IN ({$marks}) AND i.completed_quantity < i.quantity ORDER BY p.created_at, i.created_at FOR UPDATE");
+        $planQuery->execute(array_merge([$patientId], $planIds));
+        $items = $planQuery->fetchAll();
+        if (!$items) throw new RuntimeException('У вибраних планах немає послуг, що очікують виконання.');
+
+        $performedIds = [];
+        $totalCents = 0;
+        $doctorId = (string)($appointment['assignee_id'] ?: $userId);
+        $performedAt = date('Y-m-d H:i:s');
+        $insertPerformed = $pdo->prepare('INSERT INTO dental_performed_services (id, patient_id, appointment_id, doctor_id, service_id, service_name, treatment_plan_item_id, tooth_number, quantity, unit_price, total_price, performed_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        foreach ($items as $item) {
+            $quantity = max(0, (int)$item['quantity'] - (int)$item['completed_quantity']);
+            if ($quantity < 1) continue;
+            $unitCents = dentalCents($item['planned_price']);
+            $lineCents = $unitCents * $quantity;
+            $performedId = dentalId();
+            $insertPerformed->execute([$performedId, $patientId, $appointmentId, $doctorId, $item['service_id'], $item['service_name'], $item['id'], $item['tooth_number'], $quantity, dentalMoney($unitCents), dentalMoney($lineCents), $performedAt, $userId]);
+            $performedIds[] = $performedId;
+            $totalCents += $lineCents;
+            $pdo->prepare("UPDATE dental_treatment_plan_items SET completed_quantity = quantity, status = 'completed' WHERE id = ?")->execute([$item['id']]);
+        }
+        if (!$performedIds || $totalCents <= 0) throw new RuntimeException('Сума вибраних послуг має бути більшою за нуль.');
+
+        foreach ($planIds as $planId) {
+            $remaining = $pdo->prepare("SELECT COUNT(*) FROM dental_treatment_plan_items WHERE plan_id = ? AND status <> 'completed'");
+            $remaining->execute([$planId]);
+            if ((int)$remaining->fetchColumn() === 0) $pdo->prepare("UPDATE dental_treatment_plans SET status = 'completed' WHERE id = ? AND patient_id = ?")->execute([$planId, $patientId]);
+        }
+
+        $invoiceId = dentalId();
+        $invoiceNumber = 'DN-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+        $amount = dentalMoney($totalCents);
+        $pdo->prepare("INSERT INTO dental_invoices (id, invoice_number, patient_id, subtotal, total_amount, remaining_amount, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'issued', ?)")
+            ->execute([$invoiceId, $invoiceNumber, $patientId, $amount, $amount, $amount, $userId]);
+        $insertInvoiceItem = $pdo->prepare('INSERT INTO dental_invoice_items (id, invoice_id, performed_service_id, service_name, tooth_number, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $performedQuery = $pdo->prepare('SELECT id, service_name, tooth_number, quantity, unit_price, total_price FROM dental_performed_services WHERE id = ? AND patient_id = ?');
+        foreach ($performedIds as $performedId) {
+            $performedQuery->execute([$performedId, $patientId]);
+            $performedRow = $performedQuery->fetch();
+            $insertInvoiceItem->execute([dentalId(), $invoiceId, $performedRow['id'], $performedRow['service_name'], $performedRow['tooth_number'], $performedRow['quantity'], $performedRow['unit_price'], $performedRow['total_price']]);
+        }
+
+        $pdo->prepare("UPDATE tasks SET status = 'archived' WHERE id = ? AND is_client_appointment = 1 AND status NOT IN ('cancelled', 'done', 'archived')")->execute([$appointmentId]);
+        $pdo->prepare("INSERT INTO dental_appointment_details (appointment_id, appointment_status, updated_by) VALUES (?, 'completed', ?) ON DUPLICATE KEY UPDATE appointment_status = 'completed', updated_by = VALUES(updated_by)")->execute([$appointmentId, $userId]);
+        $pdo->prepare('INSERT INTO task_history (id, task_id, user_id, action, message) VALUES (?, ?, ?, ?, ?)')->execute([dentalId(), $appointmentId, $userId, 'appointment_completed_with_invoice', 'Прийом завершено після підтвердження послуг. Створено рахунок ' . $invoiceNumber . '.']);
+        dentalAudit($pdo, $userId, 'appointment', $appointmentId, 'treatment_completed', ['plan_ids' => $planIds, 'performed_service_ids' => $performedIds, 'invoice_id' => $invoiceId, 'invoice_number' => $invoiceNumber, 'total_amount' => $amount]);
+        dentalAudit($pdo, $userId, 'invoice', $invoiceId, 'issued', ['invoice_number' => $invoiceNumber, 'total_amount' => $amount, 'appointment_id' => $appointmentId]);
+        $pdo->commit();
+        jsonResponse(true, 'Прийом завершено. Виконані послуги та рахунок створено.', ['invoice_id' => $invoiceId, 'invoice_number' => $invoiceNumber, 'total_amount' => $amount, 'performed_count' => count($performedIds)]);
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         jsonResponse(false, $error->getMessage(), [], 422);
