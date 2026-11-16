@@ -63,7 +63,7 @@ export default function DentistryClientsPage({ data, onCreate, onEdit, onDelete,
             <button type="button" className={filter === "none" ? "active" : ""} onClick={() => setFilter("none")}>Без прийому</button>
           </div>
         </div>
-        {patients.length ? <div className="dentistry-patient-grid">{patients.map((patient) => <article className="dentistry-patient-card" key={patient.id}>
+        {patients.length ? <div className="dentistry-patient-grid">{patients.map((patient) => <article className="dentistry-patient-card" key={patient.id} role="link" tabIndex={0} aria-label={`Відкрити картку пацієнта ${patient.name}`} onClick={event => { if (!event.target.closest("button, a")) navigate(`/patients/${patient.id}`); }} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); navigate(`/patients/${patient.id}`); } }}>
           <header className="dentistry-patient-card-head"><span className="dentistry-patient-avatar">{patient.name?.trim().charAt(0).toLocaleUpperCase("uk") || "П"}</span><div><h2>{patient.name}</h2><small>{patient.moduleData.patient_type || "Пацієнт"}{patient.moduleData.medical_record ? ` · Картка ${patient.moduleData.medical_record}` : ""}</small></div><span className={`dentistry-patient-status${patient.nextAppointment ? " has-appointment" : ""}`}>{patient.nextAppointment ? "Заплановано" : "Без запису"}</span></header>
           <div className="dentistry-patient-details">
             {patient.moduleData.phone && <span><Icon name="contact" />{patient.moduleData.phone}</span>}

@@ -13,6 +13,21 @@ const roleNames = {
   user: "Користувач",
   viewer: "Переглядач",
 };
+const dentalFeatureNames = {
+  dental_medical_records: "Базова медична картка", dental_service_catalog: "Каталог послуг", dental_patient_invoices: "Рахунки й оплати пацієнтів",
+  dental_documents: "Документи пацієнтів",
+  dental_tooth_chart: "Зубна формула", dental_treatment_plans: "Плани лікування", dental_inventory: "Складський облік",
+  dental_basic_reports: "Базові фінансові звіти", dental_procurement: "Закупівлі та постачальники",
+  dental_procedure_costing: "Собівартість процедур", dental_doctor_payroll: "Зарплати лікарів", dental_financial_analytics: "Фінансова аналітика",
+  dental_equipment: "Облік обладнання", dental_advanced_analytics: "Розширена аналітика", dental_management_accounting: "Управлінська бухгалтерія",
+  dental_priority_support: "Пріоритетна підтримка",
+};
+const dentalPlanDescriptions = {
+  dental_start: "Для приватного стоматологічного кабінету",
+  dental_growth: "Для практики, що розвивається",
+  dental_team: "Для команди стоматологічної клініки",
+  dental_business: "Для багатопрофільної клініки",
+};
 export default function Settings() {
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
@@ -28,10 +43,7 @@ export default function Settings() {
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
   const [bio, setBio] = useState("");
-  const [clientModule, setClientModule] = useState(
-    () => window.localStorage.getItem("nexaflow.client.module") || "accounting",
-  );
-  const [savingClientModule, setSavingClientModule] = useState(false);
+  const [selectedPlanModule, setSelectedPlanModule] = useState("accounting");
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -39,6 +51,7 @@ export default function Settings() {
   const [cancelingPlan, setCancelingPlan] = useState(false);
   const [verifyingPlan, setVerifyingPlan] = useState(false);
   const requestedPlan = new URLSearchParams(window.location.search).get("plan") || "";
+  useEffect(() => { if (subscription?.module) setSelectedPlanModule(subscription.module); }, [subscription?.module]);
   async function startPlanCheckout(planKey) {
     if (payingPlan) return;
     setPayingPlan(planKey);
@@ -156,10 +169,11 @@ export default function Settings() {
     });
   }, []);
   useEffect(() => {
-    if (user?.role !== "manager" || !["growth", "team", "business"].includes(requestedPlan)) return;
+    const managerRole = user?.workspace_role || user?.role;
+    if (!["manager", "owner", "admin"].includes(managerRole) || !["start", "growth", "team", "business", "dental_start", "dental_growth", "dental_team", "dental_business"].includes(requestedPlan)) return;
     startPlanCheckout(requestedPlan);
     window.history.replaceState({}, "", "/settings");
-  }, [user?.role]);
+  }, [user?.workspace_role, user?.role]);
   function chooseAvatar(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -204,7 +218,6 @@ export default function Settings() {
     );
     setNotice(result.message);
     event.currentTarget.reset();
-    window.localStorage.setItem("nexaflow.client.module", clientModule);
   }
   async function toggleEmailNotifications(event) {
     if (emailSaving) return;
@@ -418,7 +431,7 @@ export default function Settings() {
                   <small>{subscription?.price || "Безкоштовно"}{subscription?.billing?.status === "active" ? " · щомісячна підписка" : ""}</small>
                 </div>
                 <span className={`subscription-state ${subscription?.billing?.status === "active" ? "is-active" : ""}`}>
-                  {subscription?.billing_enabled === false ? (subscription?.key === "start" ? "Безкоштовний план" : "Активний · без списань") : subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : subscription?.key === "start" ? "Безкоштовний план" : "Потрібна оплата"}
+                  {subscription?.billing_enabled === false ? (["start", "dental_start"].includes(subscription?.key) ? "Безкоштовний план" : "Активний · без списань") : subscription?.billing?.status === "active" ? "Оплачено" : subscription?.billing?.status === "cancelled" ? "Скасовано · доступ активний" : subscription?.billing?.status === "failed" ? "Оплату відхилено" : ["start", "dental_start"].includes(subscription?.key) ? "Безкоштовний план" : "Потрібна оплата"}
                 </span>
               </div>
               {subscription?.pending_plan && <div className="subscription-pending-plan">
@@ -426,38 +439,10 @@ export default function Settings() {
                 <div><strong>Очікує активації: {subscription.pending_plan.name}</strong><small>{subscription.pending_plan.price} · тариф увімкнеться після остаточного підтвердження LiqPay</small></div>
                 {(user?.workspace_role || user?.role) === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
               </div>}
-              {((user?.workspace_role || user?.role) === "manager" || user?.role === "admin" || user?.role === "owner") && <div className="subscription-module-select">
-                <div className="subscription-module-label">
-                  <span><Icon name="sparkle" /></span>
-                  <div>
-                    <strong>Модуль клієнтів</strong>
-                    <small>Оберіть напрям для форми клієнта</small>
-                  </div>
-                </div>
-                <label className="subscription-module-control">
-                  <select
-                    value={clientModule}
-                    disabled={savingClientModule}
-                    onChange={async (event) => {
-                      const nextModule = event.target.value;
-                      setSavingClientModule(true);
-                      setError("");
-                      const saved = await post("/api/client-module.php", { module: nextModule });
-                      setSavingClientModule(false);
-                      if (!saved.ok) return setError(saved.message || "Не вдалося змінити модуль.");
-                      setClientModule(nextModule);
-                      window.localStorage.setItem("nexaflow.client.module", nextModule);
-                      setNotice(saved.message || "Модуль клієнтів збережено.");
-                    }}
-                  >
-                    <option value="accounting">Бухгалтерія</option>
-                    <option value="dentistry">Стоматологія</option>
-                    <option value="legal">Юридичні послуги</option>
-                    <option value="real_estate">Нерухомість</option>
-                  </select>
-                  <span><Icon name="down" /></span>
-                </label>
-              </div>}
+              <div className="plan-direction-switch" role="group" aria-label="Напрям тарифного плану">
+                <button type="button" className={selectedPlanModule === "accounting" ? "active" : ""} onClick={() => setSelectedPlanModule("accounting")}>Бухгалтерія</button>
+                <button type="button" className={selectedPlanModule === "dentistry" ? "active" : ""} onClick={() => setSelectedPlanModule("dentistry")}>Стоматологія</button>
+              </div>
             </div>
             <div className="subscription-meta">
               <div>
@@ -478,41 +463,53 @@ export default function Settings() {
                 </div>;
               })}
             </div>
-            <div className="plan-feature-list">
+            {selectedPlanModule === "dentistry" ? <div className="plan-feature-list dental-current-features">{Object.entries(dentalFeatureNames).filter(([feature]) => subscription?.features?.[feature]).map(([, label]) => <span className="enabled" key={label}>✓ {label}</span>)}</div> : <div className="plan-feature-list">
               <span className={subscription?.features.calendar ? "enabled" : "locked"}>{subscription?.features.calendar ? "✓" : "×"} Календар</span>
               <span className={subscription?.features.analytics ? "enabled" : "locked"}>{subscription?.features.analytics ? "✓" : "×"} Аналітика</span>
               <span className={subscription?.features.services || subscription?.services_per_client ? "enabled" : "locked"}>{subscription?.features.services ? "✓ Створення послуг і пакетів" : subscription?.services_per_client ? `✓ До ${subscription.services_per_client} послуг на клієнта · без пакетів` : "× Створення послуг і пакетів"}</span>
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
               <span className={subscription?.features.support ? "enabled" : "locked"}>{subscription?.features.support ? "✓" : "×"} Онлайн-підтримка</span>
-            </div>
+            </div>}
             {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план — ми відкриємо його можливості без списання коштів.</span></div>}
             <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
             <div className="plan-comparison-grid">
-              {(subscription?.available_plans || []).map((plan) => <article className={`plan-tier plan-tier-${plan.key}${plan.key === subscription?.key ? " current" : ""}`} key={plan.key}>
+              {(subscription?.available_plans || []).filter(plan => (plan.module || "accounting") === selectedPlanModule).map((plan) => <article className={`plan-tier plan-tier-${plan.key}${selectedPlanModule === "dentistry" ? " dental-plan-tier" : ""}${plan.key === subscription?.key ? " current" : ""}`} key={plan.key}>
                 <header className="plan-tier-heading">
                   <span className="plan-tier-icon"><Icon name={plan.key === "business" ? "briefcase" : plan.key === "team" ? "users" : plan.key === "growth" ? "chart" : "sparkle"} /></span>
                   <div><strong>{plan.name}</strong><span>{plan.price}</span></div>
                   {plan.key === subscription?.key && <b className="current-plan-label">Ваш план</b>}
                 </header>
-                <p className="plan-tier-audience">{plan.limits.participants === 49 ? "До 50 учасників загалом" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
-                <div className="plan-tier-metrics">
-                  <span><strong>{plan.limits.projects ?? "∞"}</strong><small>проєктів</small></span>
-                  <span><strong>{plan.limits.tasks_month ?? "∞"}</strong><small>задач / міс.</small></span>
-                  <span><strong>{plan.limits.clients ?? "∞"}</strong><small>клієнтів</small></span>
-                </div>
+                {selectedPlanModule === "dentistry" ? <><p className="plan-tier-audience">{dentalPlanDescriptions[plan.key] || "Для стоматологічної практики"}</p><div className={`plan-tier-metrics dental-plan-metrics${plan.limits.participants != null ? " has-executor-limit" : ""}`}>
+                  <span><strong>{plan.limits.doctors ?? "∞"}</strong><small>лікарів</small></span>
+                  <span><strong>{plan.limits.patients ?? "∞"}</strong><small>пацієнтів</small></span>
+                  <span><strong>{plan.limits.appointments_month ?? "∞"}</strong><small>записів / міс.</small></span>{plan.limits.participants != null && <span><strong>{plan.limits.participants}</strong><small>виконавців</small></span>}
+                </div></> : <>
+                  <p className="plan-tier-audience">{plan.limits.participants === 49 ? "До 50 учасників загалом" : `${plan.limits.managers} менеджер · до ${plan.limits.participants} учасників`}</p>
+                  <div className="plan-tier-metrics">
+                    <span><strong>{plan.limits.projects ?? "∞"}</strong><small>проєктів</small></span>
+                    <span><strong>{plan.limits.tasks_month ?? "∞"}</strong><small>задач / міс.</small></span>
+                    <span><strong>{plan.limits.clients ?? "∞"}</strong><small>клієнтів</small></span>
+                  </div>
+                </>}
                 <div className="plan-tier-details">
-                  <div className="plan-tier-features">
-                    <span className={plan.features.calendar ? "available" : "unavailable"}>{plan.features.calendar ? "✓" : "–"} Календар</span>
-                    <span className={plan.features.analytics ? "available" : "unavailable"}>{plan.features.analytics ? "✓" : "–"} Аналітика</span>
-                    <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "– Послуги"}</span>
-                    <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "–"} Telegram</span>
-                    <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "– Онлайн-підтримка"}</span>
+                  <div className={selectedPlanModule === "dentistry" ? "dental-plan-feature-groups" : "plan-tier-features"}>
+                    {selectedPlanModule === "dentistry" ? <>
+                      <section className="dental-plan-feature-section"><h4>Доступно в плані</h4><div className="dental-plan-feature-list">{Object.entries(dentalFeatureNames).filter(([feature]) => plan.features[feature]).map(([feature, label]) => <span className="available" key={feature}><i>✓</i>{label}</span>)}</div></section>
+                      {Object.entries(dentalFeatureNames).some(([feature]) => !plan.features[feature]) && <section className="dental-plan-feature-section is-locked"><h4>Недоступно в цьому плані</h4><div className="dental-plan-feature-list">{Object.entries(dentalFeatureNames).filter(([feature]) => !plan.features[feature]).map(([feature, label]) => <span className="unavailable" key={feature}><i>×</i>{label}</span>)}</div></section>}
+                    </> : <>
+                      <span className={plan.features.calendar ? "available" : "unavailable"}>{plan.features.calendar ? "✓" : "–"} Календар</span>
+                      <span className={plan.features.analytics ? "available" : "unavailable"}>{plan.features.analytics ? "✓" : "–"} Аналітика</span>
+                      <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "– Послуги"}</span>
+                      <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "–"} Telegram</span>
+                      <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "– Онлайн-підтримка"}</span>
+                    </>}
                   </div>
                   {(plan.limits.project_leads > 0 || plan.limits.moderators > 0) && <small className="plan-tier-roles">{plan.limits.project_leads > 0 ? `${plan.limits.project_leads === 1 ? "1 керівник проєкту" : `До ${plan.limits.project_leads} керівників проєктів`}` : ""}{plan.limits.project_leads > 0 && plan.limits.moderators > 0 ? " · " : ""}{plan.limits.moderators > 0 ? `До ${plan.limits.moderators} модераторів` : ""}</small>}
                 </div>
-                {plan.key !== "start" && (user?.workspace_role || user?.role) === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled ? "Обрати план" : "Підключити план"}</button>}
+                {(plan.key !== "start" || plan.module === "dentistry") && (user?.workspace_role || user?.role) === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || Number(plan.amount) === 0 || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled && Number(plan.amount) > 0 ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || Number(plan.amount) === 0 || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled && Number(plan.amount) > 0 ? "Обрати план" : "Підключити план"}</button>}
               </article>)}
             </div>
+            {selectedPlanModule !== subscription?.module && <p className="plan-switch-hint">Зміна напряму відбудеться лише після успішного підключення плану.</p>}
             {subscription?.billing_enabled && (user?.workspace_role || user?.role) === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}
             {(user?.workspace_role || user?.role) !== "manager" && <small className="billing-manager-note">Змінювати тариф робочого простору може його менеджер.</small>}
           </section>}

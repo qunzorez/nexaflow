@@ -59,6 +59,18 @@ function dentalErpProfitability(PDO $pdo, string $owner, string $from, string $t
     return ['procedures'=>$procedures,'services'=>array_values($services),'doctors'=>array_values($doctors)];
 }
 
+$dentalOperationFeatures = [
+    'save_location' => 'dental_inventory', 'set_location_active' => 'dental_inventory', 'receive_inventory' => 'dental_inventory', 'stock_operation' => 'dental_inventory', 'reserve_stock' => 'dental_inventory', 'release_reservation' => 'dental_inventory',
+    'supplier_refund' => 'dental_procurement', 'save_procurement_settings' => 'dental_procurement', 'generate_purchase_drafts' => 'dental_procurement', 'cancel_purchase_order' => 'dental_procurement',
+    'create_expense_request' => 'dental_financial_analytics', 'generate_recurring_expenses' => 'dental_financial_analytics', 'stop_recurring_expense' => 'dental_financial_analytics', 'approve_expense' => 'dental_financial_analytics', 'reject_expense' => 'dental_financial_analytics',
+    'record_procedure_cost' => 'dental_procedure_costing', 'pay_procedure_cost' => 'dental_procedure_costing', 'post_depreciation' => 'dental_equipment', 'payroll_adjustment' => 'dental_doctor_payroll',
+    'reverse_journal' => 'dental_management_accounting', 'upload_expense_document' => 'dental_financial_analytics',
+];
+if (isset($dentalOperationFeatures[$action])) requirePlanFeature($context, $dentalOperationFeatures[$action]);
+if ($method === 'GET' && $action === 'alerts') requirePlanFeature($context, 'dental_inventory');
+if ($method === 'GET' && $action === 'operations') requirePlanFeature($context, 'dental_basic_reports');
+if ($method === 'GET' && $action === 'expense_document') requirePlanFeature($context, 'dental_financial_analytics');
+
 if ($method==='GET' && in_array($action,['overview','operations','alerts'],true)) {
     $pdo->prepare("UPDATE dental_erp_stock_reservations r JOIN tasks t ON t.id=r.appointment_id SET r.status='released' WHERE r.owner_id=? AND r.status='active' AND t.status IN ('done','archived','cancelled')")->execute([$ownerId]);
 }
@@ -70,28 +82,31 @@ if ($method==='GET' && $action==='alerts') {
 
 if ($method==='GET' && $action==='operations') {
     $manage();
+    $canProcure=!empty($context['plan']['dental_procurement']); $canCost=!empty($context['plan']['dental_procedure_costing']);
+    $canAdvancedFinance=!empty($context['plan']['dental_financial_analytics']); $canPayroll=!empty($context['plan']['dental_doctor_payroll']);
+    $canEquipment=!empty($context['plan']['dental_equipment']); $canManagementAccounting=!empty($context['plan']['dental_management_accounting']);
     $batches=dentalErpRows($pdo,"SELECT b.*,i.name item_name,u.symbol unit_symbol,l.name location_name,COALESCE((SELECT SUM(r.quantity) FROM dental_erp_stock_reservations r WHERE r.owner_id=b.owner_id AND r.batch_id=b.id AND r.status='active'),0) reserved FROM dental_erp_inventory_batches b JOIN dental_erp_inventory_items i ON i.id=b.item_id AND i.owner_id=b.owner_id JOIN dental_erp_inventory_units u ON u.id=i.unit_id AND u.owner_id=i.owner_id JOIN dental_erp_inventory_locations l ON l.id=b.location_id AND l.owner_id=b.owner_id WHERE b.owner_id=? ORDER BY i.name,b.expiration_date,b.id",[$ownerId]);
-    $reports=dentalErpProfitability($pdo,$ownerId,$reportFrom,$reportTo);
+    $reports=!empty($context['plan']['dental_procedure_costing']) ? dentalErpProfitability($pdo,$ownerId,$reportFrom,$reportTo) : ['procedures'=>[],'services'=>[],'doctors'=>[]];
     $balances=dentalErpRows($pdo,"SELECT a.account_code,a.name,a.account_type,COALESCE(SUM(CASE WHEN j.entry_date<? THEN e.debit-e.credit ELSE 0 END),0) opening_balance,COALESCE(SUM(CASE WHEN j.entry_date BETWEEN ? AND ? THEN e.debit ELSE 0 END),0) debit,COALESCE(SUM(CASE WHEN j.entry_date BETWEEN ? AND ? THEN e.credit ELSE 0 END),0) credit,COALESCE(SUM(CASE WHEN j.entry_date<=? THEN e.debit-e.credit ELSE 0 END),0) closing_balance FROM dental_erp_accounting_accounts a LEFT JOIN dental_erp_accounting_entries e ON e.account_id=a.id AND e.owner_id=a.owner_id LEFT JOIN dental_erp_accounting_journals j ON j.id=e.journal_id AND j.owner_id=e.owner_id WHERE a.owner_id=? GROUP BY a.id ORDER BY a.account_code",[$reportFrom,$reportFrom,$reportTo,$reportFrom,$reportTo,$reportTo,$ownerId]);
     jsonResponse(true,'Операційні дані завантажено.',[
-      'batches'=>$batches,'locations'=>dentalErpRows($pdo,'SELECT * FROM dental_erp_inventory_locations WHERE owner_id=? AND is_active=1 ORDER BY name',[$ownerId]),
+      'batches'=>$batches,'locations'=>dentalErpRows($pdo,"SELECT * FROM dental_erp_inventory_locations WHERE owner_id=? ORDER BY is_active DESC, (name='Основний склад') DESC, name",[$ownerId]),
       'reservations'=>dentalErpRows($pdo,"SELECT r.*,i.name item_name,b.batch_number FROM dental_erp_stock_reservations r JOIN dental_erp_inventory_batches b ON b.id=r.batch_id AND b.owner_id=r.owner_id JOIN dental_erp_inventory_items i ON i.id=b.item_id AND i.owner_id=b.owner_id WHERE r.owner_id=? ORDER BY r.created_at DESC",[$ownerId]),
       'appointments'=>dentalErpRows($pdo,"SELECT DISTINCT t.id,t.title,t.due_date,c.name patient_name FROM tasks t JOIN task_clients tc ON tc.task_id=t.id JOIN clients c ON c.id=tc.client_id WHERE c.created_by=? AND c.module='dentistry' AND t.is_client_appointment=1 AND t.status NOT IN ('cancelled','archived') ORDER BY t.due_date DESC LIMIT 500",[$ownerId]),
       'counts'=>dentalErpRows($pdo,'SELECT n.*,i.name item_name FROM dental_erp_inventory_counts n JOIN dental_erp_inventory_batches b ON b.id=n.batch_id AND b.owner_id=n.owner_id JOIN dental_erp_inventory_items i ON i.id=b.item_id AND i.owner_id=b.owner_id WHERE n.owner_id=? ORDER BY n.created_at DESC',[$ownerId]),
       'consumptions'=>dentalErpRows($pdo,"SELECT m.*,i.name item_name,COALESCE((SELECT SUM(r.quantity) FROM dental_erp_stock_movements r WHERE r.owner_id=m.owner_id AND r.source_type='material_return' AND r.source_id=m.id),0) returned FROM dental_erp_stock_movements m JOIN dental_erp_inventory_items i ON i.owner_id=m.owner_id AND i.id=m.item_id WHERE m.owner_id=? AND m.movement_type='consumption' ORDER BY m.created_at DESC",[$ownerId]),
-      'returns'=>dentalErpRows($pdo,'SELECT r.*,i.invoice_number FROM dental_erp_supplier_returns r JOIN dental_erp_supplier_invoices i ON i.id=r.supplier_invoice_id AND i.owner_id=r.owner_id WHERE r.owner_id=? ORDER BY r.created_at DESC',[$ownerId]),
-      'supplier_refunds'=>dentalErpRows($pdo,'SELECT * FROM dental_erp_supplier_refunds WHERE owner_id=? ORDER BY created_at DESC',[$ownerId]),
-      'invoice_items'=>dentalErpRows($pdo,'SELECT l.*,i.name item_name FROM dental_erp_supplier_invoice_items l JOIN dental_erp_inventory_items i ON i.id=l.inventory_item_id AND i.owner_id=l.owner_id WHERE l.owner_id=?',[$ownerId]),
-      'supplier_payments'=>dentalErpRows($pdo,'SELECT p.*,i.invoice_number,s.name supplier_name FROM dental_erp_supplier_payments p JOIN dental_erp_supplier_invoices i ON i.id=p.supplier_invoice_id AND i.owner_id=p.owner_id JOIN dental_erp_suppliers s ON s.id=i.supplier_id AND s.owner_id=i.owner_id WHERE p.owner_id=? ORDER BY p.payment_date DESC',[$ownerId]),
-      'expense_requests'=>dentalErpRows($pdo,'SELECT r.*,c.name category_name FROM dental_erp_expense_requests r JOIN dental_erp_expense_categories c ON c.id=r.category_id AND c.owner_id=r.owner_id WHERE r.owner_id=? ORDER BY r.expense_date DESC,r.created_at DESC',[$ownerId]),
-      'recurring_expenses'=>dentalErpRows($pdo,'SELECT * FROM dental_erp_recurring_expenses WHERE owner_id=? ORDER BY next_due',[$ownerId]),
-      'expense_documents'=>dentalErpRows($pdo,'SELECT id,expense_id,original_name,file_size FROM dental_erp_expense_documents WHERE owner_id=? ORDER BY created_at DESC',[$ownerId]),
-      'depreciation'=>dentalErpRows($pdo,'SELECT d.*,e.name equipment_name FROM dental_erp_depreciation d JOIN dental_erp_equipment e ON e.id=d.equipment_id AND e.owner_id=d.owner_id WHERE d.owner_id=? ORDER BY d.period_date DESC',[$ownerId]),
-      'payroll_adjustments'=>dentalErpRows($pdo,'SELECT * FROM dental_erp_payroll_adjustments WHERE owner_id=? ORDER BY created_at DESC',[$ownerId]),
-      'payroll_payments'=>dentalErpRows($pdo,'SELECT p.*,u.name user_name FROM dental_erp_payroll_payments p JOIN dental_erp_payroll_accruals a ON a.id=p.accrual_id AND a.owner_id=p.owner_id JOIN users u ON u.id=a.user_id WHERE p.owner_id=? ORDER BY p.payment_date DESC',[$ownerId]),
-      'settings'=>dentalErpRows($pdo,'SELECT auto_drafts,lead_days FROM dental_erp_procurement_settings WHERE owner_id=?',[$ownerId])[0]??['auto_drafts'=>0,'lead_days'=>7],
-      'profitability'=>$reports,'balances'=>$balances,
-      'audit'=>dentalErpRows($pdo,'SELECT a.*,u.name actor_name FROM dental_erp_audit a LEFT JOIN users u ON u.id=a.actor_id WHERE a.owner_id=? ORDER BY a.created_at DESC LIMIT 500',[$ownerId]),
+      'returns'=>$canProcure?dentalErpRows($pdo,'SELECT r.*,i.invoice_number FROM dental_erp_supplier_returns r JOIN dental_erp_supplier_invoices i ON i.id=r.supplier_invoice_id AND i.owner_id=r.owner_id WHERE r.owner_id=? ORDER BY r.created_at DESC',[$ownerId]):[],
+      'supplier_refunds'=>$canProcure?dentalErpRows($pdo,'SELECT * FROM dental_erp_supplier_refunds WHERE owner_id=? ORDER BY created_at DESC',[$ownerId]):[],
+      'invoice_items'=>$canProcure?dentalErpRows($pdo,'SELECT l.*,i.name item_name FROM dental_erp_supplier_invoice_items l JOIN dental_erp_inventory_items i ON i.id=l.inventory_item_id AND i.owner_id=l.owner_id WHERE l.owner_id=?',[$ownerId]):[],
+      'supplier_payments'=>$canProcure?dentalErpRows($pdo,'SELECT p.*,i.invoice_number,s.name supplier_name FROM dental_erp_supplier_payments p JOIN dental_erp_supplier_invoices i ON i.id=p.supplier_invoice_id AND i.owner_id=p.owner_id JOIN dental_erp_suppliers s ON s.id=i.supplier_id AND s.owner_id=i.owner_id WHERE p.owner_id=? ORDER BY p.payment_date DESC',[$ownerId]):[],
+      'expense_requests'=>$canAdvancedFinance?dentalErpRows($pdo,'SELECT r.*,c.name category_name FROM dental_erp_expense_requests r JOIN dental_erp_expense_categories c ON c.id=r.category_id AND c.owner_id=r.owner_id WHERE r.owner_id=? ORDER BY r.expense_date DESC,r.created_at DESC',[$ownerId]):[],
+      'recurring_expenses'=>$canAdvancedFinance?dentalErpRows($pdo,'SELECT * FROM dental_erp_recurring_expenses WHERE owner_id=? ORDER BY next_due',[$ownerId]):[],
+      'expense_documents'=>$canAdvancedFinance?dentalErpRows($pdo,'SELECT id,expense_id,original_name,file_size FROM dental_erp_expense_documents WHERE owner_id=? ORDER BY created_at DESC',[$ownerId]):[],
+      'depreciation'=>$canEquipment?dentalErpRows($pdo,'SELECT d.*,e.name equipment_name FROM dental_erp_depreciation d JOIN dental_erp_equipment e ON e.id=d.equipment_id AND e.owner_id=d.owner_id WHERE d.owner_id=? ORDER BY d.period_date DESC',[$ownerId]):[],
+      'payroll_adjustments'=>$canPayroll?dentalErpRows($pdo,'SELECT * FROM dental_erp_payroll_adjustments WHERE owner_id=? ORDER BY created_at DESC',[$ownerId]):[],
+      'payroll_payments'=>$canPayroll?dentalErpRows($pdo,'SELECT p.*,u.name user_name FROM dental_erp_payroll_payments p JOIN dental_erp_payroll_accruals a ON a.id=p.accrual_id AND a.owner_id=p.owner_id JOIN users u ON u.id=a.user_id WHERE p.owner_id=? ORDER BY p.payment_date DESC',[$ownerId]):[],
+      'settings'=>!empty($context['plan']['dental_procurement'])?(dentalErpRows($pdo,'SELECT auto_drafts,lead_days FROM dental_erp_procurement_settings WHERE owner_id=?',[$ownerId])[0]??['auto_drafts'=>0,'lead_days'=>7]):['auto_drafts'=>0,'lead_days'=>7],
+      'profitability'=>$canCost?$reports:['procedures'=>[],'services'=>[],'doctors'=>[]],'balances'=>$canManagementAccounting?$balances:[],
+      'audit'=>dentalErpRows($pdo,'SELECT a.*,u.name actor_name FROM dental_erp_audit a LEFT JOIN users u ON u.id=a.actor_id WHERE a.owner_id=? AND (?=1 OR a.entity_type IN (\'inventory_item\',\'inventory_batch\',\'stock_movement\',\'stock_reservation\',\'inventory_count\')) ORDER BY a.created_at DESC LIMIT 500',[$ownerId,$canAdvancedFinance?1:0]),
     ]);
 }
 
@@ -104,7 +119,7 @@ if ($method==='GET' && $action==='expense_document') {
     header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($doc['original_name'])); readfile($path); exit;
 }
 
-$operationActions=['save_location','stock_operation','reserve_stock','release_reservation','save_procurement_settings','generate_purchase_drafts','create_expense_request','approve_expense','reject_expense','generate_recurring_expenses','stop_recurring_expense','record_procedure_cost','post_depreciation','payroll_adjustment','reverse_journal','upload_expense_document','cancel_purchase_order','supplier_refund','pay_procedure_cost'];
+$operationActions=['save_location','set_location_active','receive_inventory','stock_operation','reserve_stock','release_reservation','save_procurement_settings','generate_purchase_drafts','create_expense_request','approve_expense','reject_expense','generate_recurring_expenses','stop_recurring_expense','record_procedure_cost','post_depreciation','payroll_adjustment','reverse_journal','upload_expense_document','cancel_purchase_order','supplier_refund','pay_procedure_cost'];
 if ($method==='POST' && in_array($action,$operationActions,true)) {
     $manage(); $key=(string)($data['idempotency_key']??'');
     if (!preg_match('/^[a-f0-9]{32}$/i',$key)) jsonResponse(false,'Відсутній ключ повторного запиту.',[],422);
@@ -130,6 +145,36 @@ if ($method==='POST' && in_array($action,$operationActions,true)) {
         if ($action==='save_location') {
             $name=trim((string)($data['name']??'')); if ($name==='') throw new DomainException('Вкажіть назву складу.');
             $pdo->prepare('INSERT INTO dental_erp_inventory_locations(id,owner_id,name) VALUES(?,?,?)')->execute([$opId,$ownerId,mb_substr($name,0,120)]);
+        }
+        if ($action==='set_location_active') {
+            $location=$owned('dental_erp_inventory_locations',(string)($data['location_id']??''));
+            $active=filter_var($data['active']??null,FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
+            if ($active===null) throw new DomainException('Некоректний статус складу.');
+            if (!$active && $location['name']==='Основний склад') throw new DomainException('Основний склад потрібен системі для обліку матеріалів і не може бути видалений.');
+            if (!$active) {
+                $stock=dentalErpRows($pdo,'SELECT COALESCE(SUM(available_quantity),0) quantity FROM dental_erp_inventory_batches WHERE owner_id=? AND location_id=?',[$ownerId,$location['id']])[0]['quantity']??0;
+                $reserved=dentalErpRows($pdo,"SELECT COALESCE(SUM(r.quantity),0) reserved FROM dental_erp_stock_reservations r JOIN dental_erp_inventory_batches b ON b.owner_id=r.owner_id AND b.id=r.batch_id WHERE r.owner_id=? AND b.location_id=? AND r.status='active'",[$ownerId,$location['id']])[0]['reserved']??0;
+                if ((float)$stock>0 || (float)$reserved>0) throw new DomainException('На складі є матеріали або резерви. Спочатку перемістіть залишок на інший склад і звільніть резерви.');
+            }
+            $pdo->prepare('UPDATE dental_erp_inventory_locations SET is_active=? WHERE id=? AND owner_id=?')->execute([$active?1:0,$location['id'],$ownerId]);
+            $result=['location_id'=>$location['id'],'active'=>$active];
+        }
+        if ($action==='receive_inventory') {
+            $item=$owned('dental_erp_inventory_items',(string)($data['item_id']??''));
+            $location=$owned('dental_erp_inventory_locations',(string)($data['location_id']??''));
+            if (!$item['is_active'] || !$location['is_active']) throw new DomainException('Оберіть активний матеріал і склад.');
+            $qty=dentalErpNumber($data['quantity']??'',true);
+            $unitCost=dentalErpNumber($data['unit_cost']??$item['purchase_unit_cost']);
+            $batchNumber=trim((string)($data['batch_number']??''));
+            $expiration=trim((string)($data['expiration_date']??''));
+            if ($reason==='') throw new DomainException('Вкажіть підставу надходження.');
+            if ($expiration!=='') $expiration=dentalErpDate($expiration);
+            $batchId=$id();
+            $pdo->prepare('INSERT INTO dental_erp_inventory_batches(id,owner_id,item_id,location_id,batch_number,expiration_date,received_quantity,available_quantity,purchase_unit_cost,is_blocked) VALUES(?,?,?,?,?,?,?,?,?,0)')->execute([$batchId,$ownerId,$item['id'],$location['id'],$batchNumber?:null,$expiration?:null,$qty,$qty,$unitCost]);
+            $pdo->prepare("INSERT INTO dental_erp_stock_movements(id,owner_id,item_id,batch_id,location_id,movement_type,quantity,unit_cost,source_type,source_id,note,actor_id) VALUES(?,?,?,?,?,'receipt',?,?, 'manual_receipt',?,?,?)")->execute([$id(),$ownerId,$item['id'],$batchId,$location['id'],$qty,$unitCost,$opId,mb_substr($reason,0,1000),$userId]);
+            $cents=(int)round((float)$qty*(float)$unitCost*100);
+            if ($cents>0) dentalErpPostJournal($pdo,$ownerId,$userId,'manual_inventory_receipt',$opId,date('Y-m-d'),$reason,[['account'=>'inventory','debit_cents'=>$cents],['account'=>'stock_adjustment','credit_cents'=>$cents]]);
+            $result=['batch_id'=>$batchId,'quantity'=>$qty];
         }
         if ($action==='stock_operation') {
             $batch=$owned('dental_erp_inventory_batches',(string)($data['batch_id']??'')); $kind=(string)($data['kind']??'');

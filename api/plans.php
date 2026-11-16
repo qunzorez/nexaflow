@@ -4,16 +4,60 @@ declare(strict_types=1);
 /** NexaFlow workspace plan limits and billing entitlements. */
 function planDefinitions(): array
 {
-    return [
+    $accounting = [
         'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'services' => false, 'services_per_client' => 2, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
         'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'amount' => '7.99', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'services' => true, 'services_per_client' => null, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
         'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => 1, 'project_leads' => 1, 'moderators' => 3],
         'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'amount' => '24.99', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => null, 'project_leads' => 5, 'moderators' => 5],
     ];
+    $dentalFeatures = [
+        'dental_medical_records' => true, 'dental_service_catalog' => true, 'dental_patient_invoices' => true,
+        'dental_documents' => false,
+        'dental_tooth_chart' => false, 'dental_treatment_plans' => false, 'dental_inventory' => false,
+        'dental_basic_reports' => false, 'dental_procurement' => false,
+        'dental_procedure_costing' => false, 'dental_doctor_payroll' => false, 'dental_financial_analytics' => false,
+        'dental_equipment' => false, 'dental_advanced_analytics' => false, 'dental_management_accounting' => false,
+        'dental_priority_support' => false, 'services' => true, 'calendar' => true,
+    ];
+    $dental = [
+        'dental_start' => ['name' => 'Dental Start', 'price' => 'Безкоштовно', 'amount' => '0.00', 'doctors' => 1, 'managers' => 1, 'participants' => 1, 'patients' => 10, 'clients' => 10, 'appointments_month' => 10],
+        'dental_growth' => ['name' => 'Dental Growth', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'doctors' => 2, 'managers' => 2, 'patients' => 100, 'clients' => 100, 'appointments_month' => 100],
+        'dental_team' => ['name' => 'Dental Team', 'price' => '$29.99 / місяць', 'amount' => '29.99', 'doctors' => 5, 'managers' => 5, 'patients' => 500, 'clients' => 500, 'appointments_month' => 1000],
+        'dental_business' => ['name' => 'Dental Business', 'price' => '$100 / місяць', 'amount' => '100.00', 'doctors' => 10, 'managers' => 10, 'patients' => 3000, 'clients' => 3000, 'appointments_month' => 3000],
+    ];
+    $growth = ['dental_tooth_chart', 'dental_treatment_plans', 'dental_inventory', 'dental_basic_reports', 'dental_documents'];
+    $team = ['dental_procurement', 'dental_procedure_costing', 'dental_doctor_payroll', 'dental_financial_analytics'];
+    $business = ['dental_equipment', 'dental_advanced_analytics', 'dental_management_accounting', 'dental_priority_support'];
+    foreach ($dental as $key => &$plan) {
+        $plan += $dentalFeatures;
+        if ($key === 'dental_start') $plan['dental_tooth_chart'] = true;
+        if ($key === 'dental_start') $plan['dental_treatment_plans'] = true;
+        if (in_array($key, ['dental_growth', 'dental_team', 'dental_business'], true)) foreach ($growth as $feature) $plan[$feature] = true;
+        if (in_array($key, ['dental_team', 'dental_business'], true)) foreach ($team as $feature) $plan[$feature] = true;
+        if ($key === 'dental_business') foreach ($business as $feature) $plan[$feature] = true;
+    }
+    unset($plan);
+    foreach ($accounting as &$plan) $plan['module'] = 'accounting';
+    unset($plan);
+    foreach ($dental as &$plan) $plan['module'] = 'dentistry';
+    unset($plan);
+    return $accounting + $dental;
+}
+
+function planModuleForKey(string $key): string
+{
+    return str_starts_with($key, 'dental_') ? 'dentistry' : 'accounting';
+}
+
+function dentalPlanFeatures(): array
+{
+    return ['dental_medical_records','dental_service_catalog','dental_patient_invoices','dental_documents','dental_tooth_chart','dental_treatment_plans','dental_inventory','dental_basic_reports','dental_procurement','dental_procedure_costing','dental_doctor_payroll','dental_financial_analytics','dental_equipment','dental_advanced_analytics','dental_management_accounting','dental_priority_support','services','calendar'];
 }
 
 function ensurePlanSchema(PDO $pdo): void
 {
+    $moduleColumnExists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'active_client_module'")->fetchColumn();
+    if (!(int)$moduleColumnExists) $pdo->exec("ALTER TABLE users ADD active_client_module VARCHAR(40) NOT NULL DEFAULT 'accounting'");
     $exists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'plan_key'")->fetchColumn();
     if (!(int)$exists) $pdo->exec("ALTER TABLE users ADD plan_key VARCHAR(24) NOT NULL DEFAULT 'start'");
     $supportRoleExists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_support_agent'")->fetchColumn();
@@ -37,6 +81,18 @@ function ensurePlanSchema(PDO $pdo): void
         UNIQUE KEY uq_plan_subscription_payment (liqpay_payment_id),
         KEY idx_plan_subscription_owner (owner_id, status, current_period_end)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $subscriptionColumns = array_column($pdo->query("SHOW COLUMNS FROM plan_subscriptions")->fetchAll(), 'Field');
+    if (!in_array('module_key', $subscriptionColumns, true)) {
+        $pdo->exec("ALTER TABLE plan_subscriptions ADD module_key VARCHAR(24) NOT NULL DEFAULT 'accounting'");
+        $pdo->exec("UPDATE plan_subscriptions SET module_key = 'dentistry' WHERE plan_key LIKE 'dental\\_%'");
+        $usersColumns = array_column($pdo->query('SHOW COLUMNS FROM users')->fetchAll(), 'Field');
+        if (in_array('active_client_module', $usersColumns, true)) {
+            // Convert the former independent dental selector to the free dental tier.
+            // Existing accounting subscriptions remain in history and retain their module.
+            $pdo->exec("UPDATE users u SET plan_key = 'dental_start' WHERE u.active_client_module = 'dentistry' AND u.plan_key IN ('start','growth','team','business') AND NOT EXISTS (SELECT 1 FROM plan_subscriptions s WHERE s.owner_id = u.id AND s.module_key = 'accounting' AND s.plan_key <> 'start' AND s.status IN ('active','cancelled') AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP))");
+            $pdo->exec("UPDATE plan_subscriptions SET module_key = 'accounting' WHERE plan_key IN ('start','growth','team','business')");
+        }
+    }
 }
 
 /** Return the teams this account has actually joined. A team is identified by its manager/owner account. */
@@ -87,26 +143,27 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
     if ($billingEnabled) {
       try {
-        $subscriptionQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1");
-        $subscriptionQuery->execute([$ownerId]);
+        $moduleKey = planModuleForKey($planKey);
+        $subscriptionQuery = $pdo->prepare("SELECT id, plan_key, module_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? AND module_key = ? ORDER BY created_at DESC LIMIT 1");
+        $subscriptionQuery->execute([$ownerId, $moduleKey]);
         $latestSubscription = $subscriptionQuery->fetch() ?: null;
         $pendingQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
         $pendingQuery->execute([$ownerId]);
         $pendingSubscription = $pendingQuery->fetch() ?: null;
-        $accessQuery = $pdo->prepare("SELECT id, plan_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? AND status IN ('active','cancelled') AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP) ORDER BY created_at DESC LIMIT 1");
-        $accessQuery->execute([$ownerId]);
+        $accessQuery = $pdo->prepare("SELECT id, plan_key, module_key, status, current_period_end, order_id FROM plan_subscriptions WHERE owner_id = ? AND module_key = ? AND status IN ('active','cancelled') AND (current_period_end IS NULL OR current_period_end > CURRENT_TIMESTAMP) ORDER BY created_at DESC LIMIT 1");
+        $accessQuery->execute([$ownerId, $moduleKey]);
         $accessSubscription = $accessQuery->fetch() ?: null;
         $subscription = $accessSubscription ?: $latestSubscription;
         if ($accessSubscription) {
             $planKey = (string)$accessSubscription['plan_key'];
         } else {
-            $expiredQuery = $pdo->prepare("SELECT id FROM plan_subscriptions WHERE owner_id = ? AND status IN ('active','cancelled') AND current_period_end <= CURRENT_TIMESTAMP ORDER BY created_at DESC LIMIT 1");
-            $expiredQuery->execute([$ownerId]);
+            $expiredQuery = $pdo->prepare("SELECT id FROM plan_subscriptions WHERE owner_id = ? AND module_key = ? AND status IN ('active','cancelled') AND current_period_end <= CURRENT_TIMESTAMP ORDER BY created_at DESC LIMIT 1");
+            $expiredQuery->execute([$ownerId, $moduleKey]);
             $expiredId = $expiredQuery->fetchColumn();
             if ($expiredId) {
                 $pdo->prepare("UPDATE plan_subscriptions SET status = 'expired' WHERE id = ? AND status IN ('active','cancelled')")->execute([$expiredId]);
-                $pdo->prepare("UPDATE users SET plan_key = 'start' WHERE id = ?")->execute([$ownerId]);
-                $planKey = 'start';
+                $planKey = $moduleKey === 'dentistry' ? 'dental_start' : 'start';
+                $pdo->prepare('UPDATE users SET plan_key = ?, active_client_module = ? WHERE id = ?')->execute([$planKey, $moduleKey, $ownerId]);
             }
         }
     } catch (Throwable $ignored) {
@@ -116,6 +173,9 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
     }
     if (!isset($plans[$planKey])) $planKey = 'start';
     $plan = $plans[$planKey];
+    $moduleKey = planModuleForKey($planKey);
+    $moduleColumn = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'active_client_module'")->fetchColumn();
+    if ($moduleColumn) $pdo->prepare('UPDATE users SET active_client_module = ? WHERE id = ? AND active_client_module <> ?')->execute([$moduleKey, $ownerId, $moduleKey]);
     $leadActorsQuery = $pdo->prepare("SELECT DISTINCT gm.user_id FROM project_groups pg JOIN project_group_members gm ON gm.group_id = pg.id WHERE pg.project_id IS NULL AND LOWER(pg.name) = LOWER('Керівник проєкту') AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(pg.permissions) THEN pg.permissions ELSE '{}' END, '$.owner_id')) = ?");
     $leadActorsQuery->execute([$ownerId]);
     $leadActorIds = array_map('strval', $leadActorsQuery->fetchAll(PDO::FETCH_COLUMN));
@@ -149,9 +209,28 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         'tasks_month' => $count("SELECT COUNT(DISTINCT t.id) FROM tasks t WHERE t.created_by IN ($marks) AND t.status <> 'archived' AND ((t.created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AND t.created_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)) OR EXISTS (SELECT 1 FROM task_history h WHERE h.task_id = t.id AND h.action = 'restored_from_archive' AND h.created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AND h.created_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)))"),
         'participants' => max(0, count($ids) - 1) + $pendingCount,
     ];
+    if ($moduleKey === 'dentistry') {
+        $patientCount = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE created_by = ? AND module = 'dentistry'");
+        $patientCount->execute([$ownerId]);
+        $counts['patients'] = (int)$patientCount->fetchColumn();
+        $counts['clients'] = $counts['patients'];
+        $monthStart = (new DateTimeImmutable('first day of this month 00:00:00', new DateTimeZone('Europe/Kyiv')))->format('Y-m-d H:i:s');
+        $nextMonth = (new DateTimeImmutable('first day of next month 00:00:00', new DateTimeZone('Europe/Kyiv')))->format('Y-m-d H:i:s');
+        try {
+            $appointments = $pdo->prepare("SELECT COUNT(DISTINCT t.id) FROM tasks t JOIN task_clients tc ON tc.task_id=t.id JOIN clients c ON c.id=tc.client_id LEFT JOIN dental_appointment_details ad ON ad.appointment_id=t.id WHERE c.created_by=? AND c.module='dentistry' AND t.is_client_appointment=1 AND t.status <> 'cancelled' AND COALESCE(ad.appointment_status,'scheduled') <> 'cancelled' AND t.due_date >= ? AND t.due_date < ?");
+            $appointments->execute([$ownerId, $monthStart, $nextMonth]);
+            $counts['appointments_month'] = (int)$appointments->fetchColumn();
+        } catch (Throwable $ignored) { $counts['appointments_month'] = 0; }
+        try {
+            $doctorCount = $pdo->prepare("SELECT COUNT(DISTINCT assigned.user_id) FROM (SELECT t.assignee_id user_id,t.id FROM tasks t WHERE t.is_client_appointment=1 AND t.assignee_id IS NOT NULL UNION SELECT ta.user_id,ta.task_id FROM task_assignees ta JOIN tasks t ON t.id=ta.task_id WHERE t.is_client_appointment=1) assigned JOIN task_clients tc ON tc.task_id=assigned.id JOIN clients c ON c.id=tc.client_id WHERE c.created_by=? AND c.module='dentistry'");
+            $doctorCount->execute([$ownerId]);
+            $counts['doctors'] = max(1, (int)$doctorCount->fetchColumn());
+        } catch (Throwable $ignored) { $counts['doctors'] = 0; }
+    }
     $managerCount = $pdo->prepare("SELECT COUNT(DISTINCT u.id) FROM users u WHERE u.role = 'manager' AND (EXISTS (SELECT 1 FROM user_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted') OR EXISTS (SELECT 1 FROM project_invitations i WHERE i.email = u.email AND i.invited_by = ? AND i.status = 'accepted'))");
     $managerCount->execute([$ownerId, $ownerId]);
     $counts['managers'] = (int)$managerCount->fetchColumn() + 1;
+    if ($moduleKey === 'dentistry') $counts['doctors'] = $counts['managers'];
     foreach (['project_leads' => 'Керівник проєкту', 'moderators' => 'Модератор'] as $metric => $groupName) {
         if ($metric === 'project_leads') {
             $counts[$metric] = planProjectLeadCount($pdo, ['owner_id' => $ownerId, 'member_ids' => $ids]);
@@ -167,18 +246,22 @@ function workspacePlan(PDO $pdo, string $userId, string $role): array
         $leadMembership->execute([$userId, $ownerId]);
         if ($leadMembership->fetchColumn()) $workspaceRole = 'project_lead';
     }
-    if (in_array($role, ['admin', 'owner'], true)) {
+    if (in_array($role, ['admin', 'owner'], true) && $moduleKey === 'accounting') {
         foreach (['projects', 'clients', 'tasks_month', 'participants', 'services_per_client'] as $metric) $plan[$metric] = null;
         foreach (['services', 'calendar', 'analytics', 'telegram'] as $feature) $plan[$feature] = true;
         foreach (['managers', 'project_leads', 'moderators'] as $metric) $plan[$metric] = null;
     }
-    return ['key' => $planKey, 'owner_id' => $ownerId, 'user_id' => $userId, 'role' => $role, 'workspace_role' => $workspaceRole, 'member_ids' => $ids, 'lead_actor_ids' => $leadActorIds, 'workspaces' => $workspaces, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
+    return ['key' => $planKey, 'module' => $moduleKey, 'owner_id' => $ownerId, 'user_id' => $userId, 'role' => $role, 'workspace_role' => $workspaceRole, 'member_ids' => $ids, 'lead_actor_ids' => $leadActorIds, 'workspaces' => $workspaces, 'plan' => $plan, 'counts' => $counts, 'plans' => $plans, 'subscription' => $subscription, 'pending_subscription' => $pendingSubscription, 'billing_enabled' => $billingEnabled];
 }
 
 function requirePlanFeature(array $context, string $feature): void
 {
     if (!empty($context['plan'][$feature])) return;
-    jsonResponse(false, 'Ця можливість недоступна у вашому поточному плані. Перегляньте ліміти в Налаштуваннях.', ['code' => 'plan_feature_locked', 'feature' => $feature, 'plan' => $context['key']], 403);
+    $requiredPlan = null;
+    foreach (($context['plans'] ?? planDefinitions()) as $candidate) {
+        if (($candidate['module'] ?? 'accounting') === ($context['module'] ?? 'accounting') && !empty($candidate[$feature])) { $requiredPlan = $candidate['name']; break; }
+    }
+    jsonResponse(false, 'Можливість недоступна у плані «' . ($context['plan']['name'] ?? '') . '».' . ($requiredPlan ? ' Її відкриває план «' . $requiredPlan . '».' : ' Перегляньте доступ до функцій у налаштуваннях.'), ['code' => 'plan_feature_locked', 'feature' => $feature, 'plan' => $context['key'], 'required_plan' => $requiredPlan], 403);
 }
 
 function telegramPlanAvailable(PDO $pdo, string $userId): bool
@@ -198,7 +281,7 @@ function telegramPlanAvailable(PDO $pdo, string $userId): bool
 function notifyPlanCapacityReached(array $context, string $metric, int $current, int $limit): void
 {
     global $pdo;
-    $labels = ['projects' => 'проєктів', 'clients' => 'клієнтів', 'tasks_month' => 'задач цього місяця', 'participants' => 'учасників', 'services_per_client' => 'окремих послуг на клієнта', 'managers' => 'менеджерів', 'project_leads' => 'керівників проєктів', 'moderators' => 'модераторів'];
+    $labels = ['projects' => 'проєктів', 'clients' => 'клієнтів', 'patients' => 'пацієнтів', 'appointments_month' => 'прийомів цього місяця', 'doctors' => 'лікарів', 'tasks_month' => 'задач цього місяця', 'participants' => 'учасників', 'services_per_client' => 'окремих послуг на клієнта', 'managers' => 'менеджерів', 'project_leads' => 'керівників проєктів', 'moderators' => 'модераторів'];
     $title = 'Досягнуто ліміту плану';
     $message = 'У плані «' . $context['plan']['name'] . '» вичерпано ліміт ' . ($labels[$metric] ?? $metric) . ' (' . $current . ' з ' . $limit . '). Перегляньте доступні плани в Налаштуваннях.';
     try {
@@ -365,13 +448,66 @@ function requirePlanCapacity(array $context, string $metric, int $add = 1): void
     jsonResponse(false, 'Досягнуто ліміту плану «' . $fresh['plan']['name'] . '». Перегляньте доступні плани в Налаштуваннях.', ['code' => 'plan_limit_reached', 'metric' => $metric, 'limit' => (int)$limit, 'current' => $current, 'plan' => $fresh['key']], 403);
 }
 
+function requireDentalAppointmentCapacity(PDO $pdo, array $context, string $scheduledAt, int $add = 1): void
+{
+    if (($context['module'] ?? '') !== 'dentistry') return;
+    $limit = $context['plan']['appointments_month'] ?? null;
+    if ($limit === null) return;
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', str_replace('T', ' ', substr($scheduledAt, 0, 19)), new DateTimeZone('Europe/Kyiv'));
+    if (!$date) jsonResponse(false, 'Вкажіть коректну дату прийому.', [], 422);
+    $monthStart = $date->modify('first day of this month')->setTime(0, 0)->format('Y-m-d H:i:s');
+    $monthEnd = $date->modify('first day of next month')->setTime(0, 0)->format('Y-m-d H:i:s');
+    $metric = 'appointments_month:' . $date->format('Y-m');
+    acquirePlanCapacityLock($context, $metric);
+    $query = $pdo->prepare("SELECT COUNT(DISTINCT t.id) FROM tasks t JOIN task_clients tc ON tc.task_id=t.id JOIN clients c ON c.id=tc.client_id LEFT JOIN dental_appointment_details ad ON ad.appointment_id=t.id WHERE c.created_by=? AND c.module='dentistry' AND t.is_client_appointment=1 AND t.status <> 'cancelled' AND COALESCE(ad.appointment_status,'scheduled') <> 'cancelled' AND t.due_date >= ? AND t.due_date < ?");
+    $query->execute([(string)$context['owner_id'], $monthStart, $monthEnd]);
+    $current = (int)$query->fetchColumn();
+    if ($current + $add <= (int)$limit) return;
+    notifyPlanCapacityReached($context, 'appointments_month', max($current, (int)$limit), (int)$limit);
+    jsonResponse(false, 'Вичерпано ліміт прийомів на ' . $date->format('m.Y') . ' у плані «' . $context['plan']['name'] . '».', ['code' => 'plan_limit_reached', 'metric' => 'appointments_month', 'month' => $date->format('Y-m'), 'limit' => (int)$limit, 'current' => $current, 'plan' => $context['key']], 403);
+}
+
+function requireDentalDoctors(PDO $pdo, array $context, array $doctorIds): void
+{
+    $doctorIds = array_values(array_unique(array_filter(array_map('strval', $doctorIds))));
+    if (!$doctorIds || ($context['module'] ?? '') !== 'dentistry') return;
+    $workspaceMembers = array_fill_keys(array_map('strval', $context['member_ids'] ?? [$context['owner_id']]), true);
+    $doctorMarks = implode(',', array_fill(0, count($doctorIds), '?'));
+    $eligibleQuery = $pdo->prepare("SELECT id FROM users WHERE id IN ({$doctorMarks}) AND role IN ('manager','owner')");
+    $eligibleQuery->execute($doctorIds);
+    $eligible = array_fill_keys(array_map('strval', $eligibleQuery->fetchAll(PDO::FETCH_COLUMN)), true);
+    foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
+        $policy = groupPolicy($group['permissions'] ?? null);
+        if (($policy['owner_id'] ?? '') !== (string)$context['owner_id'] || mb_strtolower(trim((string)$group['name']), 'UTF-8') !== 'лікар') continue;
+        $groupMembers = $pdo->prepare('SELECT user_id FROM project_group_members WHERE group_id = ?');
+        $groupMembers->execute([(string)$group['id']]);
+        foreach ($groupMembers->fetchAll(PDO::FETCH_COLUMN) as $memberId) $eligible[(string)$memberId] = true;
+    }
+    foreach ($doctorIds as $doctorId) {
+        if (!isset($workspaceMembers[$doctorId]) || !isset($eligible[$doctorId])) jsonResponse(false, 'Відповідальним можна обрати лише лікаря з команди цього простору.', ['code' => 'appointment_doctor_role_invalid'], 422);
+    }
+}
+
 function planSettingsPayload(array $context): array
 {
-    $labels = ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники', 'managers' => 'Менеджери', 'project_leads' => 'Керівники проєктів', 'moderators' => 'Модератори'];
+    $isDental = ($context['module'] ?? 'accounting') === 'dentistry';
+    $labels = $isDental ? ['doctors' => 'Лікарі', 'participants' => 'Виконавці', 'patients' => 'Пацієнти', 'appointments_month' => 'Записи цього місяця'] : ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники', 'managers' => 'Менеджери', 'project_leads' => 'Керівники проєктів', 'moderators' => 'Модератори'];
     $limits = [];
-    foreach ($labels as $key => $label) $limits[] = ['key' => $key, 'label' => $label, 'limit' => $context['plan'][$key], 'used' => $context['counts'][$key]];
+    foreach ($labels as $key => $label) $limits[] = ['key' => $key, 'label' => $label, 'limit' => $context['plan'][$key] ?? null, 'used' => $context['counts'][$key] ?? 0];
     $subscription = $context['subscription'] ?? null;
     $pending = $context['pending_subscription'] ?? null;
-    $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
-    return ['key' => $context['key'], 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => ['services' => (bool)$context['plan']['services'], 'calendar' => (bool)$context['plan']['calendar'], 'analytics' => (bool)$context['plan']['analytics'], 'telegram' => (bool)$context['plan']['telegram'], 'support' => (bool)$context['plan']['support']], 'available_plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => ['projects' => $plan['projects'], 'tasks_month' => $plan['tasks_month'], 'clients' => $plan['clients'], 'participants' => $plan['participants'], 'services_per_client' => $plan['services_per_client'] ?? null, 'managers' => $plan['managers'], 'project_leads' => $plan['project_leads'], 'moderators' => $plan['moderators']], 'features' => ['services' => $plan['services'], 'calendar' => $plan['calendar'], 'analytics' => $plan['analytics'], 'telegram' => $plan['telegram'], 'support' => $plan['support']]], $context['plans'], array_keys($context['plans']))];
+    $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'module' => $pending['module_key'] ?? planModuleForKey((string)$pending['plan_key']), 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
+    $availablePlans = [];
+    foreach ($context['plans'] as $key => $plan) {
+        $planIsDental = ($plan['module'] ?? 'accounting') === 'dentistry';
+        $planLabels = $planIsDental ? ['doctors' => 'Лікарі', 'participants' => 'Виконавці', 'patients' => 'Пацієнти', 'appointments_month' => 'Записи цього місяця'] : ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники', 'managers' => 'Менеджери', 'project_leads' => 'Керівники проєктів', 'moderators' => 'Модератори'];
+        $planLimits = [];
+        foreach ($planLabels as $metric => $label) $planLimits[$metric] = $plan[$metric] ?? null;
+        $planFeatures = [];
+        foreach ($planIsDental ? dentalPlanFeatures() : ['services','calendar','analytics','telegram','support'] as $feature) $planFeatures[$feature] = (bool)($plan[$feature] ?? false);
+        $availablePlans[] = ['key' => $key, 'module' => $plan['module'] ?? 'accounting', 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => $planLimits, 'features' => $planFeatures];
+    }
+    $features = [];
+    foreach ($isDental ? dentalPlanFeatures() : ['services','calendar','analytics','telegram','support'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
+    return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
 }

@@ -13,9 +13,7 @@ $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $context = workspacePlan($pdo, $userId, (string)$user['role']);
 $ownerId = (string)$context['owner_id'];
-$moduleQuery = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ? LIMIT 1');
-$moduleQuery->execute([$ownerId]);
-if ((string)$moduleQuery->fetchColumn() !== 'dentistry') jsonResponse(false, 'ERP доступна лише для стоматологічного простору.', [], 403);
+if (($context['module'] ?? '') !== 'dentistry') jsonResponse(false, 'ERP доступна лише для стоматологічного простору.', [], 403);
 
 $careSchema = file_get_contents(__DIR__ . '/../database/dentistry_care.sql');
 if ($careSchema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічної картки.', [], 500);
@@ -47,6 +45,22 @@ $canViewFinance = $canManage;
 $method = (string)($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $data = $method === 'POST' ? (str_contains((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') ? $_POST : body()) : [];
 $action = trim((string)($_GET['action'] ?? $data['action'] ?? 'overview'));
+$dentalFeatureByAction = [
+    'save_payroll_rule' => 'dental_doctor_payroll', 'calculate_payroll' => 'dental_doctor_payroll', 'payroll_payment' => 'dental_doctor_payroll',
+    'save_equipment' => 'dental_equipment', 'delete_equipment' => 'dental_equipment', 'save_equipment_maintenance' => 'dental_equipment', 'save_instrument_set' => 'dental_equipment', 'delete_instrument_set' => 'dental_equipment', 'complete_sterilization_cycle' => 'dental_equipment',
+    'close_accounting_period' => 'dental_management_accounting', 'save_supplier' => 'dental_procurement',
+    'create_purchase_order' => 'dental_procurement', 'approve_purchase_order' => 'dental_procurement', 'mark_purchase_ordered' => 'dental_procurement', 'receive_purchase_order' => 'dental_procurement',
+    'create_supplier_invoice' => 'dental_procurement', 'pay_supplier_invoice' => 'dental_procurement',
+    'save_expense' => 'dental_financial_analytics', 'mark_expense_paid' => 'dental_financial_analytics', 'cancel_expense' => 'dental_financial_analytics',
+    'save_service_material_template' => 'dental_inventory', 'deactivate_service_material_template' => 'dental_inventory',
+    'save_category' => 'dental_inventory', 'save_unit' => 'dental_inventory', 'save_inventory_item' => 'dental_inventory',
+];
+if (in_array($action, ['overview', 'alerts'], true)) requirePlanFeature($context, 'dental_inventory');
+if ($action === 'set_active') {
+    $activeFeature = match ((string)($data['kind'] ?? '')) { 'supplier' => 'dental_procurement', 'payroll_rule' => 'dental_doctor_payroll', default => 'dental_inventory' };
+    requirePlanFeature($context, $activeFeature);
+}
+elseif (isset($dentalFeatureByAction[$action])) requirePlanFeature($context, $dentalFeatureByAction[$action]);
 $reportFrom = trim((string)($_GET['from'] ?? date('Y-m-01')));
 $reportTo = trim((string)($_GET['to'] ?? date('Y-m-d')));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportFrom) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportTo) || $reportTo < $reportFrom) jsonResponse(false, 'Перевірте дати звітного періоду.', [], 422);
@@ -143,17 +157,22 @@ if ($method === 'GET' && $action === 'overview') {
     $financial['operating_profit'] = $financial['gross_margin']-$financial['expenses']-$financial['payroll']-$financial['depreciation'];
     $recommendations = [];
     foreach ($itemRows as $stockItem) if ((int)$stockItem['is_active'] && (float)$stockItem['available_stock'] < (float)$stockItem['minimum_stock']) $recommendations[] = ['item_id' => $stockItem['id'], 'name' => $stockItem['name'], 'available' => $stockItem['available_stock'], 'minimum' => $stockItem['minimum_stock'], 'optimal' => $stockItem['optimal_stock'], 'suggested_quantity' => max(0, (float)$stockItem['optimal_stock'] - (float)$stockItem['available_stock']), 'unit_symbol' => $stockItem['unit_symbol'], 'supplier_id' => $stockItem['default_supplier_id'], 'supplier_name' => $stockItem['supplier_name']];
+    $canProcure = !empty($context['plan']['dental_procurement']);
+    $canPayroll = !empty($context['plan']['dental_doctor_payroll']);
+    $canEquipment = !empty($context['plan']['dental_equipment']);
+    $canFinance = $canViewFinance && !empty($context['plan']['dental_financial_analytics']);
+    if (!$canProcure) foreach ($itemRows as &$itemRow) { $itemRow['default_supplier_id'] = null; $itemRow['supplier_name'] = null; } unset($itemRow);
     jsonResponse(true, 'Дані стоматологічної ERP завантажено.', [
         'categories' => $categories->fetchAll(), 'units' => $units->fetchAll(),
-        'suppliers' => $suppliers->fetchAll(), 'items' => $itemRows, 'purchase_orders' => $orderRows,
-        'supplier_invoices' => $canViewFinance ? $supplierInvoices->fetchAll() : [], 'expense_categories' => $expenseCategories->fetchAll(), 'expenses' => $canViewFinance ? $expenses->fetchAll() : [],
+        'suppliers' => $canProcure ? $suppliers->fetchAll() : [], 'items' => $itemRows, 'purchase_orders' => $canProcure ? $orderRows : [],
+        'supplier_invoices' => $canProcure ? $supplierInvoices->fetchAll() : [], 'expense_categories' => $canFinance ? $expenseCategories->fetchAll() : [], 'expenses' => $canFinance ? $expenses->fetchAll() : [],
         'services' => $services, 'service_material_templates' => $templates,
-        'movements' => $movements->fetchAll(), 'equipment' => $equipment->fetchAll(), 'maintenance' => $maintenance->fetchAll(), 'instrument_sets' => $instrumentSets->fetchAll(), 'sterilization_cycles' => $sterilizationCycles->fetchAll(),
-        'team' => $canViewFinance ? $users : [], 'payroll_rules' => $canViewFinance ? $payrollRules->fetchAll() : [], 'payroll_periods' => $canViewFinance ? $payrollPeriods->fetchAll() : [], 'payroll_accruals' => $canViewFinance ? $payrollAccruals->fetchAll() : [],
-        'accounting_accounts' => $canViewFinance ? $pdo->query("SELECT id, account_code, name, account_type FROM dental_erp_accounting_accounts WHERE owner_id = " . $pdo->quote($ownerId) . " AND is_active = 1 ORDER BY account_code")->fetchAll() : [],
-        'accounting_journals' => $canViewFinance ? $journalResult : [], 'accounting_periods' => $canViewFinance ? $accountingPeriods->fetchAll() : [], 'financial' => $canViewFinance ? $financial : null, 'purchase_recommendations' => dentalErpRecommendations($pdo, $ownerId),
+        'movements' => $movements->fetchAll(), 'equipment' => $canEquipment ? $equipment->fetchAll() : [], 'maintenance' => $canEquipment ? $maintenance->fetchAll() : [], 'instrument_sets' => $canEquipment ? $instrumentSets->fetchAll() : [], 'sterilization_cycles' => $canEquipment ? $sterilizationCycles->fetchAll() : [],
+        'team' => $canPayroll ? $users : [], 'payroll_rules' => $canPayroll ? $payrollRules->fetchAll() : [], 'payroll_periods' => $canPayroll ? $payrollPeriods->fetchAll() : [], 'payroll_accruals' => $canPayroll ? $payrollAccruals->fetchAll() : [],
+        'accounting_accounts' => $canFinance ? $pdo->query("SELECT id, account_code, name, account_type FROM dental_erp_accounting_accounts WHERE owner_id = " . $pdo->quote($ownerId) . " AND is_active = 1 ORDER BY account_code")->fetchAll() : [],
+        'accounting_journals' => $canFinance ? $journalResult : [], 'accounting_periods' => $canFinance ? $accountingPeriods->fetchAll() : [], 'financial' => $canFinance ? $financial : ($canViewFinance && !empty($context['plan']['dental_basic_reports']) ? ['revenue' => $financial['revenue'], 'collected' => $financial['collected'], 'receivables' => $financial['receivables']] : null), 'purchase_recommendations' => $canProcure ? dentalErpRecommendations($pdo, $ownerId) : [],
         'financial_period' => ['from' => $reportFrom, 'to' => $reportTo],
-        'permissions' => ['manage' => $canManage, 'view_finance' => $canViewFinance],
+        'permissions' => ['manage' => $canManage, 'view_finance' => $canFinance, 'features' => array_intersect_key($context['plan'], array_flip(dentalPlanFeatures()))],
     ]);
 }
 
@@ -269,6 +288,17 @@ if ($action === 'save_equipment') {
     jsonResponse(true, 'Обладнання збережено.');
 }
 
+if ($action === 'delete_equipment') {
+    $equipmentId=trim((string)($data['id']??''));
+    $q=$pdo->prepare('SELECT id,name FROM dental_erp_equipment WHERE id=? AND owner_id=?'); $q->execute([$equipmentId,$ownerId]); $row=$q->fetch();
+    if (!$row) jsonResponse(false,'Обладнання не знайдено.',[],404);
+    $history=$pdo->prepare('SELECT (SELECT COUNT(*) FROM dental_erp_equipment_maintenance WHERE owner_id=? AND equipment_id=?) + (SELECT COUNT(*) FROM dental_erp_depreciation WHERE owner_id=? AND equipment_id=?)'); $history->execute([$ownerId,$equipmentId,$ownerId,$equipmentId]);
+    if ((int)$history->fetchColumn()>0) jsonResponse(false,'Є історія сервісу або амортизації. Позначте обладнання як списане, щоб зберегти облік.',[],409);
+    $pdo->prepare('DELETE FROM dental_erp_equipment WHERE id=? AND owner_id=?')->execute([$equipmentId,$ownerId]);
+    $audit('equipment',$equipmentId,'deleted',['name'=>$row['name']]);
+    jsonResponse(true,'Обладнання видалено.');
+}
+
 if ($action === 'save_equipment_maintenance') {
     $equipmentId = trim((string)($data['equipment_id'] ?? '')); $equipment = $pdo->prepare('SELECT id, name FROM dental_erp_equipment WHERE id = ? AND owner_id = ?'); $equipment->execute([$equipmentId, $ownerId]); $equipmentRow = $equipment->fetch();
     if (!$equipmentRow) jsonResponse(false, 'Обладнання не знайдено.', [], 422);
@@ -308,6 +338,17 @@ if ($action === 'save_instrument_set') {
         $audit('instrument_set', $setId, 'saved', ['name' => $name, 'status' => $status]);
     } catch (PDOException $error) { jsonResponse(false, 'Код набору вже використовується або не вдалося зберегти набір.', [], 409); }
     jsonResponse(true, 'Набір інструментів збережено.');
+}
+
+if ($action === 'delete_instrument_set') {
+    $setId=trim((string)($data['id']??''));
+    $q=$pdo->prepare('SELECT id,name FROM dental_erp_instrument_sets WHERE id=? AND owner_id=?'); $q->execute([$setId,$ownerId]); $row=$q->fetch();
+    if (!$row) jsonResponse(false,'Набір інструментів не знайдено.',[],404);
+    $cycles=$pdo->prepare('SELECT COUNT(*) FROM dental_erp_sterilization_cycles WHERE owner_id=? AND instrument_set_id=?'); $cycles->execute([$ownerId,$setId]);
+    if ((int)$cycles->fetchColumn()>0) jsonResponse(false,'Є журнал стерилізації. Виведіть набір з обігу, щоб зберегти історію.',[],409);
+    $pdo->prepare('DELETE FROM dental_erp_instrument_sets WHERE id=? AND owner_id=?')->execute([$setId,$ownerId]);
+    $audit('instrument_set',$setId,'deleted',['name'=>$row['name']]);
+    jsonResponse(true,'Набір інструментів видалено.');
 }
 
 if ($action === 'complete_sterilization_cycle') {
@@ -617,6 +658,31 @@ if ($action === 'mark_expense_paid') {
     jsonResponse(true, 'Витрату позначено оплаченою.');
 }
 
+if ($action === 'cancel_expense') {
+    $expenseId = trim((string)($data['expense_id'] ?? ''));
+    $pdo->beginTransaction();
+    try {
+        $expenseQuery = $pdo->prepare('SELECT id,description,payment_status FROM dental_erp_expenses WHERE id=? AND owner_id=? FOR UPDATE');
+        $expenseQuery->execute([$expenseId,$ownerId]); $expense = $expenseQuery->fetch();
+        if (!$expense || $expense['payment_status'] === 'cancelled') throw new DomainException('Витрату не знайдено або її вже скасовано.');
+        $journals = $pdo->prepare("SELECT id,entry_date FROM dental_erp_accounting_journals WHERE owner_id=? AND source_id=? AND source_type IN ('expense','expense_payment') AND status='posted' FOR UPDATE");
+        $journals->execute([$ownerId,$expenseId]);
+        foreach ($journals->fetchAll() as $journal) {
+            $lines=[]; $accountLookup=array_flip(dentalErpLedgerAccounts($pdo,$ownerId));
+            foreach (dentalErpRows($pdo,'SELECT account_id,debit,credit FROM dental_erp_accounting_entries WHERE owner_id=? AND journal_id=?',[$ownerId,$journal['id']]) as $line) {
+                if (!isset($accountLookup[$line['account_id']])) throw new DomainException('Не вдалося сторнувати рахунок витрати. Зверніться до власника клініки.');
+                $lines[]=['account'=>$accountLookup[$line['account_id']],'debit_cents'=>(int)round((float)$line['credit']*100),'credit_cents'=>(int)round((float)$line['debit']*100)];
+            }
+            if ($lines) dentalErpPostJournal($pdo,$ownerId,$userId,'expense_reversal',$id(),date('Y-m-d'),'Скасування витрати: '.$expense['description'],$lines);
+        }
+        $pdo->prepare("UPDATE dental_erp_expenses SET payment_status='cancelled' WHERE id=? AND owner_id=?")->execute([$expenseId,$ownerId]);
+        $audit('expense',$expenseId,'cancelled',['reason'=>$text('reason',1000) ?? 'Скасовано менеджером']);
+        $pdo->commit();
+    } catch (DomainException $error) { if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false,$error->getMessage(),[],422); }
+    catch (Throwable $error) { error_log('Dentistry ERP '.$action.': '.$error->getMessage()); if ($pdo->inTransaction()) $pdo->rollBack(); jsonResponse(false,'Не вдалося скасувати витрату. Перевірте відкритість облікового періоду.',[],500); }
+    jsonResponse(true,'Витрату скасовано зі збереженням історії обліку.');
+}
+
 if ($action === 'save_service_material_template') {
     $serviceId = trim((string)($data['service_id'] ?? '')); $itemId = trim((string)($data['inventory_item_id'] ?? ''));
     $service = $pdo->prepare("SELECT id FROM service_catalog WHERE id = ? AND created_by = ? AND module = 'dentistry' AND active = 1"); $service->execute([$serviceId, $ownerId]);
@@ -682,11 +748,12 @@ if ($action === 'pay_supplier_invoice') {
 if ($action === 'set_active') {
     $kind = (string)($data['kind'] ?? ''); $entityId = trim((string)($data['id'] ?? ''));
     $active = filter_var($data['active'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-    $tables = ['supplier' => 'dental_erp_suppliers', 'item' => 'dental_erp_inventory_items'];
+    $tables = ['supplier' => 'dental_erp_suppliers', 'item' => 'dental_erp_inventory_items', 'payroll_rule' => 'dental_erp_payroll_rules'];
     if (!isset($tables[$kind]) || !preg_match('/^[a-f0-9]{32}$/i', $entityId) || $active === null) jsonResponse(false, 'Некоректний запит.', [], 422);
     $query = $pdo->prepare("UPDATE {$tables[$kind]} SET is_active = ? WHERE id = ? AND owner_id = ?"); $query->execute([$active ? 1 : 0, $entityId, $ownerId]);
     if (!$query->rowCount()) { $exists = $pdo->prepare("SELECT id FROM {$tables[$kind]} WHERE id = ? AND owner_id = ?"); $exists->execute([$entityId, $ownerId]); if (!$exists->fetchColumn()) jsonResponse(false, 'Запис не знайдено у цьому просторі.', [], 404); }
-    jsonResponse(true, $active ? 'Запис активовано.' : 'Запис приховано без видалення історії.');
+    $audit($kind, $entityId, $active ? 'restored' : 'archived');
+    jsonResponse(true, $active ? 'Запис повернуто до активного списку.' : 'Запис прибрано з активного списку; історію збережено.');
 }
 
 jsonResponse(false, 'Невідома дія.', [], 404);

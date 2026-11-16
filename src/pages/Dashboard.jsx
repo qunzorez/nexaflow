@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import DentistryInventoryAlerts from "../components/DentistryInventoryAlerts.jsx";
+import DentistryManagerDashboard from "./DentistryManagerDashboard.jsx";
+import DentistryExecutorDashboard from "./DentistryExecutorDashboard.jsx";
 import { api, post } from "../services/api.js";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import ReminderModal from "../modules/tasks/ReminderModal.jsx";
@@ -177,6 +179,8 @@ export default function Dashboard() {
     : projectProgressFilter === "in_progress"
       ? Number(b.in_progress || 0) - Number(a.in_progress || 0)
       : 0);
+  if (activeClientModule === "dentistry" && canManage) return <DentistryManagerDashboard dashboard={data} calendarAvailable={!dentistryCalendarUnavailable} />;
+  if (activeClientModule === "dentistry") return <DentistryExecutorDashboard dashboard={data} calendarAvailable={!dentistryCalendarUnavailable} />;
   async function saveReminder(reminderAt) {
     const result = await post("/api/tasks.php", {
       action: "set_reminder",
@@ -205,7 +209,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="dashboard-actions">
-            {activeClientModule === "dentistry" && <Link aria-disabled={dentistryCalendarUnavailable} title={dentistryCalendarUnavailable ? "Календар недоступний у вашому тарифі" : undefined} className={`primary-action dashboard-appointment-action${dentistryCalendarUnavailable ? " plan-limit-disabled" : ""}`} onClick={event => dentistryCalendarUnavailable && event.preventDefault()} to="/appointments">
+            {activeClientModule === "dentistry" && !dentistryCalendarUnavailable && <Link className="primary-action dashboard-appointment-action" to="/appointments">
               <Icon name="plus" /> Новий запис
             </Link>}
             <Link aria-disabled={taskLimitReached} title={taskLimitReached ? planLimitHint(data.user.subscription, "tasks_month") : undefined} className={`primary-action${taskLimitReached ? " plan-limit-disabled" : ""}`} onClick={event => taskLimitReached && event.preventDefault()} to="/tasks?create=1">

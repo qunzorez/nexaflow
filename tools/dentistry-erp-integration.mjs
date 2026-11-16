@@ -29,7 +29,7 @@ try {
     $pdo->exec('SET FOREIGN_KEY_CHECKS=1'); $c['database']=$db; file_put_contents($argv[2].'/api/config.local.php','<?php return '.var_export($c,true).';');
     $pdo->exec('USE \`'.$db.'\`');
     $s=$pdo->prepare('INSERT INTO users(id,name,email,password_hash,role,active_client_module,plan_key) VALUES(?,?,?,?,?,?,?)');
-    foreach([['a','ERP manager','manager','dentistry'],['b','Other manager','manager','dentistry'],['c','Accounting manager','manager','accounting'],['d','Regular user','user','dentistry']] as $u) $s->execute([str_repeat($u[0],32),$u[1],$u[0].'@erp-check.invalid','unused',$u[2],$u[3],'business']);
+    foreach([['a','ERP manager','manager','dentistry'],['b','Other manager','manager','dentistry'],['c','Accounting manager','manager','accounting'],['d','Regular user','user','dentistry']] as $u) $s->execute([str_repeat($u[0],32),$u[1],$u[0].'@erp-check.invalid','unused',$u[2],$u[3],$u[3]==='dentistry'?'dental_business':'business']);
     $pdo->prepare("INSERT INTO clients(id,name,legal_form,tax_system,created_by,module,module_data) VALUES(?,'Patient','','',?,'dentistry','{}')")->execute([str_repeat('e',32),str_repeat('a',32)]);
     $pdo->prepare("INSERT INTO tasks(id,title,created_by,status,due_date,duration_minutes,is_client_appointment) VALUES(?,'ERP appointment',?,'todo',DATE_ADD(CURRENT_DATE,INTERVAL 2 DAY),60,1)")->execute([str_repeat('f',32),str_repeat('a',32)]);
     $pdo->prepare('INSERT INTO task_clients(task_id,client_id) VALUES(?,?)')->execute([str_repeat('f',32),str_repeat('e',32)]);`, [testDb, temp]);

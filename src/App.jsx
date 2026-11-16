@@ -40,12 +40,12 @@ export default function App() {
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/patients/:id" element={<DentistryModuleRoute><DentistryPatientPage /></DentistryModuleRoute>} />
-      <Route path="/dentistry-erp" element={<DentistryModuleRoute><DentistryERPPage /></DentistryModuleRoute>} />
-      <Route path="/dentistry/inventory" element={<DentistryModuleRoute><DentistryERPPage key="inventory" module="inventory" /></DentistryModuleRoute>} />
-      <Route path="/dentistry/purchases" element={<DentistryModuleRoute><DentistryERPPage key="procurement" module="procurement" /></DentistryModuleRoute>} />
-      <Route path="/dentistry/accounting" element={<DentistryModuleRoute><DentistryERPPage key="accounting" module="accounting" /></DentistryModuleRoute>} />
-      <Route path="/dentistry/payroll" element={<DentistryModuleRoute><DentistryERPPage key="payroll" module="payroll" /></DentistryModuleRoute>} />
-      <Route path="/dentistry/equipment" element={<DentistryModuleRoute><DentistryERPPage key="equipment" module="equipment" /></DentistryModuleRoute>} />
+      <Route path="/dentistry-erp" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_inventory"><DentistryERPPage /></PlanFeatureRoute></DentistryModuleRoute>} />
+      <Route path="/dentistry/inventory" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_inventory"><DentistryERPPage key="inventory" module="inventory" /></PlanFeatureRoute></DentistryModuleRoute>} />
+      <Route path="/dentistry/purchases" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_procurement"><DentistryERPPage key="procurement" module="procurement" /></PlanFeatureRoute></DentistryModuleRoute>} />
+      <Route path="/dentistry/accounting" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_management_accounting"><DentistryERPPage key="accounting" module="accounting" /></PlanFeatureRoute></DentistryModuleRoute>} />
+      <Route path="/dentistry/payroll" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_doctor_payroll"><DentistryERPPage key="payroll" module="payroll" /></PlanFeatureRoute></DentistryModuleRoute>} />
+      <Route path="/dentistry/equipment" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_equipment"><DentistryERPPage key="equipment" module="equipment" /></PlanFeatureRoute></DentistryModuleRoute>} />
       <Route path="/calendar" element={<PlanFeatureRoute feature="calendar"><Calendar /></PlanFeatureRoute>} />
       <Route path="/appointments" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><Appointments /></DentistryModuleRoute></PlanFeatureRoute>} />
       <Route path="/appointments/:id" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><AppointmentDetailPage /></DentistryModuleRoute></PlanFeatureRoute>} />

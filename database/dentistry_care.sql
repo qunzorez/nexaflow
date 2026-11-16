@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS dental_documents (
   patient_id CHAR(32) NOT NULL,
   record_id CHAR(32) NULL,
   original_name VARCHAR(255) NOT NULL,
+  description VARCHAR(1000) NULL,
   stored_name VARCHAR(80) NOT NULL UNIQUE,
   mime_type VARCHAR(80) NOT NULL,
   file_size INT UNSIGNED NOT NULL,

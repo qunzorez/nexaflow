@@ -13,10 +13,9 @@ $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $context = workspacePlan($pdo, $userId, (string)$user['role']);
 $ownerId = (string)$context['owner_id'];
+$inventoryEnabled = !empty($context['plan']['dental_inventory']);
 $canManageFinance = in_array((string)($context['workspace_role'] ?? ''), ['manager', 'admin', 'owner'], true) || in_array((string)$user['role'], ['admin', 'owner'], true);
-$moduleQuery = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ? LIMIT 1');
-$moduleQuery->execute([$ownerId]);
-if ((string)$moduleQuery->fetchColumn() !== 'dentistry') jsonResponse(false, 'Дані доступні лише для стоматологічного модуля.', [], 403);
+if (($context['module'] ?? '') !== 'dentistry') jsonResponse(false, 'Дані доступні лише для стоматологічного модуля.', [], 403);
 $taskColumns = array_column($pdo->query("SHOW COLUMNS FROM tasks")->fetchAll(), 'Field');
 if (!in_array('is_client_appointment', $taskColumns, true)) {
     $pdo->exec("ALTER TABLE tasks ADD is_client_appointment TINYINT(1) NOT NULL DEFAULT 0");
@@ -30,6 +29,13 @@ $pdo->exec("UPDATE dental_appointment_details d JOIN tasks t ON t.id = d.appoint
 $isMultipart = str_contains(strtolower((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'multipart/form-data');
 $data = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? ($isMultipart ? $_POST : body()) : [];
 $action = trim((string)($_GET['action'] ?? $data['action'] ?? 'patient'));
+if (in_array($action, ['create_treatment_plan', 'update_treatment_plan', 'perform_treatment_plans'], true)) requirePlanFeature($context, 'dental_treatment_plans');
+if (in_array($action, ['upload_document', 'delete_document', 'download_document', 'preview_document'], true)) requirePlanFeature($context, 'dental_documents');
+if (in_array($action, ['save_medical_record', 'perform_service'], true)) {
+    $toothValues = $data['tooth_numbers'] ?? $data['teeth'] ?? [];
+    if (is_string($toothValues)) { $decodedTeeth = json_decode($toothValues, true); if (is_array($decodedTeeth)) $toothValues = $decodedTeeth; }
+    if (!empty($toothValues)) requirePlanFeature($context, 'dental_tooth_chart');
+}
 
 function dentalId(): string { return bin2hex(random_bytes(16)); }
 function dentalMoney(int $cents): string { return number_format($cents / 100, 2, '.', ''); }
@@ -175,32 +181,30 @@ function dentalRecalculateInvoice(PDO $pdo, string $invoiceId): void
 $schema = file_get_contents(__DIR__ . '/../database/dentistry_care.sql');
 if ($schema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічних даних.', [], 500);
 foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $schema) ?: [])) as $statement) $pdo->exec($statement);
-$erpSchema = file_get_contents(__DIR__ . '/../database/dentistry_erp.sql');
-if ($erpSchema === false) jsonResponse(false, 'Не вдалося завантажити схему стоматологічної ERP.', [], 500);
-require_once __DIR__ . '/dentistry-erp-schema.php';
-dentalErpApplySchema($pdo, $erpSchema);
-$erpOperationsSchema = file_get_contents(__DIR__ . '/../database/dentistry_erp_operations.sql');
-if ($erpOperationsSchema === false) jsonResponse(false, 'Не вдалося завантажити складські операції.', [], 500);
-foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $erpOperationsSchema) ?: [])) as $statement) $pdo->exec($statement);
-$pdo->prepare('INSERT IGNORE INTO dental_erp_inventory_locations (id, owner_id, name) VALUES (?, ?, ?)')->execute([md5($ownerId . '|dental-location|main'), $ownerId, 'Основний склад']);
+$patientLedgerSchema = file_get_contents(__DIR__ . '/../database/dentistry_patient_ledger.sql');
+if ($patientLedgerSchema === false) jsonResponse(false, 'Не вдалося завантажити схему рахунків пацієнтів.', [], 500);
+foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $patientLedgerSchema) ?: [])) as $statement) $pdo->exec($statement);
 require_once __DIR__ . '/dentistry-erp-ledger.php';
+$documentColumns = array_column($pdo->query('SHOW COLUMNS FROM dental_documents')->fetchAll(), 'Field');
+if (!in_array('description', $documentColumns, true)) $pdo->exec('ALTER TABLE dental_documents ADD description VARCHAR(1000) NULL AFTER original_name');
 $planItemColumns = array_column($pdo->query('SHOW COLUMNS FROM dental_treatment_plan_items')->fetchAll(), 'Field');
 if (!in_array('completed_quantity', $planItemColumns, true)) {
     $pdo->exec('ALTER TABLE dental_treatment_plan_items ADD completed_quantity SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER quantity');
     $pdo->exec("UPDATE dental_treatment_plan_items i JOIN (SELECT treatment_plan_item_id, SUM(quantity) AS completed FROM dental_performed_services WHERE treatment_plan_item_id IS NOT NULL GROUP BY treatment_plan_item_id) s ON s.treatment_plan_item_id = i.id SET i.completed_quantity = LEAST(i.quantity, s.completed), i.status = CASE WHEN s.completed >= i.quantity THEN 'completed' ELSE 'in_progress' END");
 }
 
-if ($action === 'download_document') {
+if (in_array($action, ['download_document', 'preview_document'], true)) {
     $documentId = trim((string)($_GET['id'] ?? ''));
     $documentQuery = $pdo->prepare('SELECT id, patient_id, original_name, stored_name, mime_type FROM dental_documents WHERE id = ? LIMIT 1');
     $documentQuery->execute([$documentId]); $document = $documentQuery->fetch();
     if (!$document) jsonResponse(false, 'Документ не знайдено.', [], 404);
     dentalPatient($pdo, $context, $user, (string)$document['patient_id']);
+    if ($action === 'preview_document' && !in_array((string)$document['mime_type'], ['image/jpeg', 'image/png', 'image/webp'], true)) jsonResponse(false, 'Попередній перегляд доступний лише для зображень.', [], 415);
     $documentPath = dirname(__DIR__, 2) . '/storage/nexaflow/dentistry/' . basename((string)$document['stored_name']);
     if (!is_file($documentPath)) jsonResponse(false, 'Файл документа відсутній у сховищі.', [], 404);
     header('Content-Type: ' . $document['mime_type']);
     header('Content-Length: ' . (string)filesize($documentPath));
-    header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode((string)$document['original_name']));
+    header('Content-Disposition: ' . ($action === 'preview_document' ? 'inline' : 'attachment') . '; filename*=UTF-8\'\'' . rawurlencode((string)$document['original_name']));
     header('X-Content-Type-Options: nosniff');
     readfile($documentPath); exit;
 }
@@ -232,8 +236,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     unset($invoice);
     $payments = $pdo->prepare('SELECT p.*, COALESCE((SELECT SUM(CASE WHEN p2.payment_type = \'refund\' THEN -a.amount ELSE a.amount END) FROM dental_payment_allocations a JOIN dental_payments p2 ON p2.id = a.payment_id WHERE a.payment_id = p.id), 0) AS allocated_amount FROM dental_payments p WHERE p.patient_id = ? ORDER BY p.payment_date DESC');
     $payments->execute([$patientId]);
-    $documents = $pdo->prepare('SELECT id, patient_id, record_id, original_name, mime_type, file_size, uploaded_by, created_at FROM dental_documents WHERE patient_id = ? ORDER BY created_at DESC');
-    $documents->execute([$patientId]);
+    $documents = [];
+    if (!empty($context['plan']['dental_documents'])) {
+        $documentsQuery = $pdo->prepare('SELECT id, patient_id, record_id, original_name, description, mime_type, file_size, uploaded_by, created_at FROM dental_documents WHERE patient_id = ? ORDER BY created_at DESC');
+        $documentsQuery->execute([$patientId]);
+        $documents = $documentsQuery->fetchAll();
+    }
     $visitQuery = $pdo->prepare('SELECT t.id, t.title, t.status, d.appointment_status, t.due_date, t.duration_minutes, d.cabinet_id, d.reason, d.comment, GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR \', \') AS doctor_name FROM tasks t JOIN task_clients tc ON tc.task_id = t.id LEFT JOIN task_assignees ta ON ta.task_id = t.id LEFT JOIN users u ON u.id = ta.user_id LEFT JOIN dental_appointment_details d ON d.appointment_id = t.id WHERE tc.client_id = ? AND t.is_client_appointment = 1 GROUP BY t.id ORDER BY t.due_date DESC');
     $visitQuery->execute([$patientId]);
     $invoiceTotal = 0; $paidTotal = 0; $debtTotal = 0;
@@ -251,7 +259,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         'performed_services' => $performed->fetchAll(),
         'invoices' => $canManageFinance ? $invoiceRows : [],
         'payments' => $canManageFinance ? $payments->fetchAll() : [],
-        'documents' => $documents->fetchAll(),
+        'documents' => $documents,
         'financial_access' => $canManageFinance,
         'summary' => $canManageFinance ? ['invoiced' => dentalMoney($invoiceTotal), 'paid' => dentalMoney($paidTotal), 'debt' => dentalMoney($debtTotal), 'advance' => dentalMoney(max(0, $advances))] : null,
     ]);
@@ -276,14 +284,27 @@ if ($action === 'upload_document') {
     $documentId = dentalId(); $storedName = $documentId . '.' . $allowedMimes[$mime];
     if (!move_uploaded_file((string)$file['tmp_name'], $folder . '/' . $storedName)) jsonResponse(false, 'Не вдалося зберегти документ.', [], 500);
     $originalName = mb_substr(basename((string)($file['name'] ?? 'Документ')), 0, 255);
+    $description = mb_substr(trim((string)($data['description'] ?? '')), 0, 1000);
     try {
-        $pdo->prepare('INSERT INTO dental_documents (id, patient_id, record_id, original_name, stored_name, mime_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-            ->execute([$documentId, $patientId, $recordId ?: null, $originalName, $storedName, $mime, (int)$file['size'], $userId]);
+        $pdo->prepare('INSERT INTO dental_documents (id, patient_id, record_id, original_name, description, stored_name, mime_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$documentId, $patientId, $recordId ?: null, $originalName, $description ?: null, $storedName, $mime, (int)$file['size'], $userId]);
     } catch (Throwable $error) {
         @unlink($folder . '/' . $storedName);
         jsonResponse(false, 'Не вдалося зберегти дані документа.', [], 500);
     }
     jsonResponse(true, 'Документ завантажено.', ['id' => $documentId]);
+}
+
+if ($action === 'delete_document') {
+    $documentId = trim((string)($data['document_id'] ?? ''));
+    $documentQuery = $pdo->prepare('SELECT id, stored_name FROM dental_documents WHERE id = ? AND patient_id = ? LIMIT 1');
+    $documentQuery->execute([$documentId, $patientId]);
+    $document = $documentQuery->fetch();
+    if (!$document) jsonResponse(false, 'Документ не знайдено.', [], 404);
+    $pdo->prepare('DELETE FROM dental_documents WHERE id = ? AND patient_id = ?')->execute([$documentId, $patientId]);
+    $documentPath = dirname(__DIR__, 2) . '/storage/nexaflow/dentistry/' . basename((string)$document['stored_name']);
+    if (is_file($documentPath)) @unlink($documentPath);
+    jsonResponse(true, 'Документ видалено.');
 }
 
 if ($action === 'save_appointment_details') {
@@ -350,9 +371,19 @@ if ($action === 'create_treatment_plan') {
         $preparedItems = [];
         foreach ($items as $item) {
             if (!is_array($item)) continue;
-            $catalog = dentalCatalogService($pdo, $ownerId, (string)($item['service_id'] ?? ''));
+            $packageId = trim((string)($item['package_id'] ?? ''));
+            if ($packageId !== '') {
+                if (!preg_match('/^[a-f0-9]{32}$/i', $packageId)) throw new RuntimeException('Некоректний пакет послуг.');
+                $packageQuery = $pdo->prepare("SELECT id, name, client_price FROM service_packages WHERE id = ? AND created_by = ? AND module = 'dentistry' AND active = 1 LIMIT 1");
+                $packageQuery->execute([$packageId, $ownerId]);
+                $package = $packageQuery->fetch();
+                if (!$package) throw new RuntimeException('Пакет не знайдено в активному стоматологічному каталозі.');
+                $catalog = ['id' => null, 'name' => (string)$package['name'], 'client_price' => $package['client_price']];
+            } else {
+                $catalog = dentalCatalogService($pdo, $ownerId, (string)($item['service_id'] ?? ''));
+            }
             $quantity = min(100, max(1, (int)($item['quantity'] ?? 1)));
-            $tooth = isset($item['tooth_number']) && (int)$item['tooth_number'] > 0 ? (int)$item['tooth_number'] : null;
+            $tooth = $packageId === '' && isset($item['tooth_number']) && (int)$item['tooth_number'] > 0 ? (int)$item['tooth_number'] : null;
             if ($tooth !== null && !in_array($tooth, $allowedTeeth, true)) throw new RuntimeException('Некоректний номер зуба.');
             $unitCents = dentalCents($catalog['client_price']);
             $lineCents = $unitCents * $quantity; $estimatedCents += $lineCents;
@@ -395,8 +426,9 @@ if ($action === 'update_treatment_plan') {
 if ($action === 'perform_treatment_plans') {
     $appointmentId = trim((string)($data['appointment_id'] ?? ''));
     $planIds = array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($data['treatment_plan_ids'] ?? [])))));
-    $materialUsage = $data['material_usage'] ?? [];
-    if (!is_array($materialUsage)) jsonResponse(false, 'Некоректні дані фактичного використання матеріалів.', [], 422);
+    $materialUsageProvided = $inventoryEnabled && array_key_exists('material_usage', $data);
+    $materialUsage = $materialUsageProvided ? ($data['material_usage'] ?? []) : [];
+    if ($materialUsageProvided && !is_array($materialUsage)) jsonResponse(false, 'Некоректні дані фактичного використання матеріалів.', [], 422);
     if (!$planIds) jsonResponse(false, 'Оберіть один або кілька планів лікування.', [], 422);
     foreach ($planIds as $planId) if (!preg_match('/^[a-f0-9]{32}$/i', $planId)) jsonResponse(false, 'Некоректний список планів лікування.', [], 422);
     $appointment = dentalAppointment($pdo, $appointmentId, $patientId, true);
@@ -429,7 +461,7 @@ if ($action === 'perform_treatment_plans') {
             $lineCents = $unitCents * $quantity;
             $performedId = dentalId();
             $insertPerformed->execute([$performedId, $patientId, $appointmentId, $doctorId, $item['service_id'], $item['service_name'], $item['id'], $item['tooth_number'], $quantity, dentalMoney($unitCents), dentalMoney($lineCents), $performedAt, $userId]);
-        $materialCost = dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)($item['service_id'] ?? ''), (string)$item['id'], $performedId, $materialUsage);
+        $materialCost = $materialUsageProvided ? dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)($item['service_id'] ?? ''), (string)$item['id'], $performedId, $materialUsage) : 0.0;
         if ($materialCost > 0) {
             $costCents = (int)round($materialCost * 100);
             if ($costCents > 0) dentalErpPostJournal($pdo, $ownerId, $userId, 'procedure_materials', $performedId, $performedAt, 'Списання матеріалів · ' . $item['service_name'], [
@@ -488,8 +520,9 @@ if ($action === 'perform_service') {
     $tooth = isset($data['tooth_number']) && (int)$data['tooth_number'] > 0 ? (int)$data['tooth_number'] : null;
     if ($tooth !== null && !in_array($tooth, $allowedTeeth, true)) jsonResponse(false, 'Некоректний номер зуба.', [], 422);
     $planItemId = trim((string)($data['treatment_plan_item_id'] ?? ''));
-    $materialUsage = $data['material_usage'] ?? [];
-    if (!is_array($materialUsage)) jsonResponse(false, 'Некоректні дані фактичного використання матеріалів.', [], 422);
+    $materialUsageProvided = $inventoryEnabled && array_key_exists('material_usage', $data);
+    $materialUsage = $materialUsageProvided ? ($data['material_usage'] ?? []) : [];
+    if ($materialUsageProvided && !is_array($materialUsage)) jsonResponse(false, 'Некоректні дані фактичного використання матеріалів.', [], 422);
     $unitCents = dentalCents($catalog['client_price']); $totalCents = $unitCents * $quantity;
     $performedId = dentalId();
     $pdo->beginTransaction();
@@ -511,7 +544,7 @@ if ($action === 'perform_service') {
         $doctorId = (string)($appointment['assignee_id'] ?: $userId);
         $pdo->prepare('INSERT INTO dental_performed_services (id, patient_id, appointment_id, doctor_id, service_id, service_name, treatment_plan_item_id, tooth_number, quantity, unit_price, total_price, performed_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([$performedId, $patientId, $appointmentId, $doctorId, $catalog['id'], $catalog['name'], $planItemId ?: null, $tooth, $quantity, dentalMoney($unitCents), dentalMoney($totalCents), $dateTime($data['performed_at'] ?? $appointment['due_date']), $userId]);
-        $materialCost = dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)$catalog['id'], $planItemId, $performedId, $materialUsage);
+        $materialCost = $materialUsageProvided ? dentalConsumeServiceMaterials($pdo, $ownerId, $userId, (string)$catalog['id'], $planItemId, $performedId, $materialUsage) : 0.0;
         $costCents = (int)round($materialCost*100);
         if ($costCents > 0) dentalErpPostJournal($pdo,$ownerId,$userId,'procedure_materials',$performedId,date('Y-m-d'),'Списання матеріалів · '.$catalog['name'],[
             ['account'=>'material_expense','debit_cents'=>$costCents],['account'=>'inventory','credit_cents'=>$costCents],

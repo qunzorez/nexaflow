@@ -17,7 +17,7 @@
 .client-form-grid { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 14px; margin-top: 20px; }
 .client-form-grid-wide { grid-column: 1 / -1; }
 .client-form label { display: block; color: #6f7f76; font-size: 11px; font-weight: 700; }
-.client-form input:not([type="checkbox"]), .client-form select { display: block; width: 100%; margin-top: 7px; border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; color: var(--ink); font-size: 12px; background: #fff; }
+.client-form input:not([type="checkbox"]), .client-form select { display: block; width: 100%; margin-top: 0; border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; color: var(--ink); font-size: 12px; background: #fff; }
 .client-form textarea { display: block; width: 100%; margin-top: 7px; border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; color: var(--ink); font: inherit; font-size: 12px; background: #fff; resize: vertical; }
 .client-toggles { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 22px; }
 .client-toggle { min-width: 145px; display: grid!important; grid-template-columns: 18px 1fr; gap: 2px 7px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdfb; cursor: pointer; transition: border-color .2s, background .2s; }

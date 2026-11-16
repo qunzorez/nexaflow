@@ -43,15 +43,22 @@ export default function ClientCreatePage() {
     const isAdmin = ["admin", "owner"].includes(user.role);
     if (isAdmin && !workspaceOwnerId) return;
     const clientsUrl = isAdmin ? `/api/clients.php?workspace_owner_id=${encodeURIComponent(workspaceOwnerId)}` : "/api/clients.php";
-    const activeModule = user.active_client_module || "accounting";
-    const servicesUrl = isAdmin ? `/api/services.php?module=${encodeURIComponent(activeModule)}&scope=all&owner_id=${encodeURIComponent(workspaceOwnerId)}` : `/api/services.php?module=${encodeURIComponent(activeModule)}`;
-    Promise.all([api(clientsUrl), api(servicesUrl), api("/api/tasks.php")]).then(([clientsResult, packagesResult, tasksResult]) => {
-      if (clientsResult.ok) { setAvailableUsers(clientsResult.available_users || []); setTeamUsers(clientsResult.team_users || []); setAvailableUsersByClient(clientsResult.available_users_by_client || {}); }
+    Promise.all([api(clientsUrl), api("/api/tasks.php")]).then(async ([clientsResult, tasksResult]) => {
+      if (!clientsResult.ok) return;
+      const activeModule = clientsResult.active_client_module || user.active_client_module || "accounting";
+      setAvailableUsers(clientsResult.available_users || []);
+      setTeamUsers(clientsResult.team_users || []);
+      setAvailableUsersByClient(clientsResult.available_users_by_client || {});
+      setUser((current) => current ? { ...current, active_client_module: activeModule } : current);
+      setForm((current) => current.module === activeModule ? current : { ...current, module: activeModule });
+      window.localStorage.setItem("nexaflow.client.module", activeModule);
       if (tasksResult.ok) setCalendarTasks(tasksResult.tasks || []);
-    if (packagesResult.ok) {
-      setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
-      setStandaloneServices((packagesResult.standalone_services || []).filter((item) => item.active !== false));
-    }
+      const servicesUrl = isAdmin ? `/api/services.php?module=${encodeURIComponent(activeModule)}&scope=all&owner_id=${encodeURIComponent(workspaceOwnerId)}` : `/api/services.php?module=${encodeURIComponent(activeModule)}`;
+      const packagesResult = await api(servicesUrl);
+      if (packagesResult.ok) {
+        setServicePackages((packagesResult.packages || []).filter((item) => item.active !== false));
+        setStandaloneServices((packagesResult.standalone_services || []).filter((item) => item.active !== false));
+      }
     });
   }, [user?.id, user?.role, workspaceOwnerId]);
 

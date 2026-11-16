@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import { api } from '../services/api.js';
@@ -13,12 +13,25 @@ const modules = [
   { icon: 'chart', title: 'Аналітика', text: 'Показуйте завантаженість і прогрес без ручного зведення даних.' },
 ];
 
-const plans = [
-  { name: 'Старт', icon: 'home', price: 'Безкоштовно', note: 'Для знайомства з NexaFlow', features: ['Менеджер і до 2 учасників', 'Доступ до проєктів, задач і клієнтів', '1 проєкт', 'До 50 задач на місяць', 'До 3 клієнтів', 'До 2 послуг на кожного клієнта'], unavailable: ['Календар', 'Аналітика для менеджера', 'Telegram-сповіщення', 'Пакети послуг', 'Онлайн-підтримка'] },
-  { name: 'Зростання', icon: 'chart', price: '$7.99', note: 'Для невеликої команди з амбіціями', features: ['1 менеджер і до 5 учасників', 'До 5 проєктів', 'До 100 задач на місяць', 'До 30 клієнтів', 'Послуги та пакети'], unavailable: ['Календар', 'Аналітика для менеджера', 'Онлайн-підтримка'] },
-  { name: 'Команда', icon: 'users', price: '$14.99', note: 'Для команд, які ростуть', featured: true, features: ['1 менеджер і до 10 учасників', '1 керівник проєкту', 'До 3 модераторів', 'Аналітика для менеджера', 'Календар', 'До 50 проєктів', 'До 300 задач на місяць', 'До 100 клієнтів', 'Створення власних послуг і пакетів', 'Онлайн-підтримка в чаті'] },
-  { name: 'Бізнес', icon: 'subscription', price: '$24.99', note: 'Для команд і компаній, що масштабуються', features: ['До 50 учасників загалом', 'До 5 керівників проєктів', 'До 5 модераторів', 'Аналітика та календар', 'До 100 проєктів', 'До 1 000 задач на місяць', 'До 500 клієнтів', 'Створення послуг і пакетів', 'Доступ до інших модулів NexaFlow', 'Пріоритетна онлайн-підтримка в чаті'] },
-];
+const featureLabels = {
+  calendar: 'Календар', analytics: 'Аналітика', services: 'Послуги й пакети', telegram: 'Telegram-сповіщення', support: 'Онлайн-підтримка',
+  dental_medical_records: 'Медичні картки', dental_service_catalog: 'Каталог послуг', dental_patient_invoices: 'Рахунки й оплати',
+  dental_documents: 'Документи пацієнтів',
+  dental_tooth_chart: 'Зубна формула', dental_treatment_plans: 'Плани лікування', dental_inventory: 'Складський облік',
+  dental_basic_reports: 'Базові звіти', dental_procurement: 'Закупівлі', dental_procedure_costing: 'Собівартість процедур',
+  dental_doctor_payroll: 'Зарплати лікарів', dental_financial_analytics: 'Фінансова аналітика', dental_equipment: 'Облік обладнання',
+  dental_advanced_analytics: 'Розширена аналітика', dental_management_accounting: 'Управлінська бухгалтерія', dental_priority_support: 'Пріоритетна підтримка',
+};
+const planIcons = { start: 'home', growth: 'chart', team: 'users', business: 'subscription', dental_start: 'home', dental_growth: 'chart', dental_team: 'users', dental_business: 'subscription' };
+const planNotes = { start: 'Для знайомства з NexaFlow', growth: 'Для невеликої команди з амбіціями', team: 'Для команд, які ростуть', business: 'Для команд і компаній, що масштабуються', dental_start: 'Базовий набір для приватного кабінету', dental_growth: 'Для клініки, що розвивається', dental_team: 'Для багатопрофільної клініки', dental_business: 'Для великої стоматологічної мережі' };
+const accountingFeatures = ['calendar', 'analytics', 'services', 'telegram', 'support'];
+const dentalFeatures = [...Object.keys(featureLabels).filter(key => key.startsWith('dental_')), 'calendar'];
+const accountingCardCopy = {
+  start: { icon: 'home', note: 'Для знайомства з NexaFlow', features: ['Менеджер і до 2 учасників', 'Доступ до проєктів, задач і клієнтів', '1 проєкт', 'До 50 задач на місяць', 'До 3 клієнтів', 'До 2 послуг на кожного клієнта'], unavailable: ['Календар', 'Аналітика для менеджера', 'Telegram-сповіщення', 'Пакети послуг', 'Онлайн-підтримка'] },
+  growth: { icon: 'chart', note: 'Для невеликої команди з амбіціями', features: ['1 менеджер і до 5 учасників', 'До 5 проєктів', 'До 100 задач на місяць', 'До 30 клієнтів', 'Послуги та пакети'], unavailable: ['Календар', 'Аналітика для менеджера', 'Онлайн-підтримка'] },
+  team: { icon: 'users', note: 'Для команд, які ростуть', featured: true, features: ['1 менеджер і до 10 учасників', '1 керівник проєкту', 'До 3 модераторів', 'Аналітика для менеджера', 'Календар', 'До 50 проєктів', 'До 300 задач на місяць', 'До 100 клієнтів', 'Створення власних послуг і пакетів', 'Онлайн-підтримка в чаті'] },
+  business: { icon: 'subscription', note: 'Для команд і компаній, що масштабуються', features: ['До 50 учасників загалом', 'До 5 керівників проєктів', 'До 5 модераторів', 'Аналітика та календар', 'До 100 проєктів', 'До 1 000 задач на місяць', 'До 500 клієнтів', 'Створення послуг і пакетів', 'Доступ до інших модулів NexaFlow', 'Пріоритетна онлайн-підтримка в чаті'] },
+};
 
 const landingSections = [
   ['Початок', '.landing-hero'], ['Можливості', '#modules'], ['Як це працює', '#workflow'],
@@ -28,7 +41,32 @@ const landingSections = [
 
 export default function Landing() {
   const [signedIn, setSignedIn] = useState(false);
-  useEffect(() => { api('/api/me.php').then(result => setSignedIn(Boolean(result.ok && result.user))); }, []);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [billingEnabled, setBillingEnabled] = useState(false);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [selectedPlanModule, setSelectedPlanModule] = useState('accounting');
+  const navigate = useNavigate();
+  useEffect(() => {
+    let active = true;
+    Promise.all([api('/api/me.php'), api('/api/public-plans.php')]).then(([userResult, planResult]) => {
+      if (!active) return;
+      const user = userResult.ok ? userResult.user : null;
+      setCurrentUser(user);
+      setSignedIn(Boolean(user));
+      if (user?.subscription?.module) setSelectedPlanModule(user.subscription.module);
+      if (planResult.ok) {
+        setPlans(planResult.plans || []);
+        setBillingEnabled(Boolean(planResult.billing_enabled));
+      }
+    }).finally(() => { if (active) setPlansLoading(false); });
+    return () => { active = false; };
+  }, []);
+  const canChoosePlan = !signedIn || ['admin', 'owner', 'manager'].includes(currentUser?.subscription?.workspace_role || currentUser?.workspace_role || currentUser?.role);
+  function selectPlan(planKey) {
+    navigate(signedIn ? `/settings?plan=${encodeURIComponent(planKey)}` : `/register?plan=${encodeURIComponent(planKey)}`);
+  }
+  const visiblePlans = plans.filter(plan => (plan.module || 'accounting') === selectedPlanModule);
   const scrollToSection = (event, id) => {
     event.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -73,7 +111,7 @@ export default function Landing() {
 
     <section className="landing-section workflow-section" id="workflow"><div className="workflow-visual"><div className="workflow-ring ring-one" /><div className="workflow-ring ring-two" /><div className="workflow-card"><div className="workflow-icon">✦</div><span>Ваш процес</span><strong>від заявки<br />до результату</strong><div className="workflow-line"><i /><i /><i /><i /></div><small>Клієнт · Проєкт · Команда · Звіт</small><div className="workflow-status status-client"><i>✓</i> Клієнта додано</div><div className="workflow-status status-project"><i>↗</i> Проєкт активний</div><div className="workflow-status status-done"><i>✓</i> Результат готовий</div></div></div><div className="workflow-copy"><div className="landing-kicker">ПРОСТО ПОЧАТИ · ЛЕГКО РОЗВИВАТИ</div><h2>Ваш процес.<br /><em>Одна система.</em></h2><p>NexaFlow допомагає перетворити щоденну рутину на зрозумілий процес: від першого клієнта до завершеного проєкту.</p><div className="workflow-step"><b>01</b><div><strong>Зберіть робочий простір</strong><span>Додайте команду, клієнтів і потрібні модулі.</span></div></div><div className="workflow-step"><b>02</b><div><strong>Працюйте в одному ритмі</strong><span>Розподіляйте задачі, відстежуйте дедлайни та прогрес.</span></div></div><div className="workflow-step"><b>03</b><div><strong>Розвивайтеся на даних</strong><span>Бачте завантаження команди й наступні кроки.</span></div></div></div></section>
 
-    <section className="landing-section pricing-section" id="pricing"><div className="pricing-heading"><div className="landing-kicker">ПРОЗОРІ ТАРИФИ · БЕЗ СЮРПРИЗІВ</div><h2>Оберіть свій <em>наступний крок.</em></h2><p>{signedIn ? "Керуйте тарифом свого робочого простору в налаштуваннях." : "Створіть акаунт менеджера, щоб оформити тариф для робочого простору."}</p></div><div className="pricing-grid">{plans.map(plan => <article className={`price-card${plan.featured ? ' featured' : ''}`} key={plan.name}>{plan.featured && <div className="popular-badge">НАЙПОПУЛЯРНІШИЙ</div>}<div className="price-card-top"><span>{plan.name}</span><i><Icon name={plan.icon} /></i></div><p>{plan.note}</p><div className="price"><strong>{plan.price}</strong>{plan.price !== 'Безкоштовно' && <small>/ місяць</small>}</div><Link to={signedIn ? "/settings" : plan.price === 'Безкоштовно' ? '/register' : `/register?plan=${plan.name === 'Зростання' ? 'growth' : plan.name === 'Команда' ? 'team' : 'business'}`} className={plan.featured ? 'landing-button' : 'price-button'}>{signedIn ? 'Переглянути план' : plan.price === 'Безкоштовно' ? 'Почати безкоштовно' : 'Обрати план'} <Icon name="forward" /></Link><ul>{plan.features.map(feature => <li key={feature}><span>✓</span>{feature}</li>)}</ul>{plan.unavailable && <><div className="plan-limit-label">Недоступно у цьому плані</div><ul className="plan-unavailable">{plan.unavailable.map(feature => <li key={feature}><span>×</span>{feature}</li>)}</ul></>}</article>)}</div></section>
+    <section className="landing-section pricing-section" id="pricing"><div className="pricing-heading"><div className="landing-kicker">ТАРИФИ РОБОЧОГО ПРОСТОРУ</div><h2>Оберіть свій <em>наступний крок.</em></h2><p>{signedIn ? 'Перегляньте можливості планів і підключіть потрібний робочому простору.' : 'Оберіть напрям і тариф для нового робочого простору.'}</p><div className="landing-plan-switch" role="group" aria-label="Напрям тарифного плану"><button type="button" className={selectedPlanModule === 'accounting' ? 'active' : ''} onClick={() => setSelectedPlanModule('accounting')}>Бухгалтерія</button><button type="button" className={selectedPlanModule === 'dentistry' ? 'active' : ''} onClick={() => setSelectedPlanModule('dentistry')}>Стоматологія</button></div></div>{plansLoading ? <div className="landing-plans-state">Завантажуємо тарифи…</div> : !visiblePlans.length ? <div className="landing-plans-state">Не вдалося завантажити тарифи. Оновіть сторінку.</div> : <div className={`pricing-grid${selectedPlanModule === 'dentistry' ? ' dental-pricing-grid' : ''}`}>{visiblePlans.map((plan, index) => { const isDental = plan.module === 'dentistry'; const copy = accountingCardCopy[plan.key]; const metrics = [['doctors', 'лікарів'], ['patients', 'пацієнтів'], ['appointments_month', 'записів / міс.'], ...(plan.limits?.participants != null ? [['participants', 'виконавців']] : [])]; const activeFeatures = dentalFeatures.filter(feature => plan.features?.[feature]); const price = plan.price.replace(/\s*\/\s*місяць$/i, ''); if (!isDental) return <article className={`price-card${copy?.featured ? ' featured' : ''}`} key={plan.key} style={{ '--delay': `${index * 100}ms` }}><div className="price-card-top"><span>{plan.name}</span><i><Icon name={copy?.icon || planIcons[plan.key] || 'subscription'} /></i></div><p>{copy?.note}</p><div className="price"><strong>{price}</strong>{plan.amount > 0 && <small>/ місяць</small>}</div><button type="button" className={copy?.featured ? 'landing-button landing-plan-choose' : 'price-button landing-plan-choose'} disabled={!canChoosePlan} onClick={() => selectPlan(plan.key)}>{signedIn ? 'Переглянути план' : Number(plan.amount) === 0 ? 'Почати безкоштовно' : 'Обрати план'} <Icon name="forward" /></button><ul>{copy?.features.map(feature => <li key={feature}><span>✓</span>{feature}</li>)}</ul>{copy?.unavailable && <><div className="plan-limit-label">Недоступно у цьому плані</div><ul className="plan-unavailable">{copy.unavailable.map(feature => <li key={feature}><span>×</span>{feature}</li>)}</ul></>}</article>; const isCurrentPlan = currentUser?.subscription?.key === plan.key; return <article className={`price-card${index === 2 ? ' featured' : ''}${isCurrentPlan ? ' is-current' : ''}`} key={plan.key} style={{ '--delay': `${index * 100}ms` }}><div className="price-card-top"><span>{plan.name}</span><i><Icon name={planIcons[plan.key] || 'subscription'} /></i></div><p>{planNotes[plan.key] || 'План для стоматологічної практики'}</p><div className="price"><strong>{price}</strong>{plan.amount > 0 && <small>/ місяць</small>}</div><div className="landing-plan-metrics dental">{metrics.map(([key, label]) => <span key={key}><strong>{plan.limits?.[key] ?? '∞'}</strong><small>{label}</small></span>)}</div><button type="button" className={index === 2 ? 'landing-button landing-plan-choose' : 'price-button landing-plan-choose'} disabled={!canChoosePlan || isCurrentPlan} onClick={() => selectPlan(plan.key)}>{isCurrentPlan ? 'Ваш поточний план' : !canChoosePlan ? 'Обрати може менеджер' : plan.amount > 0 && billingEnabled ? 'Обрати план' : plan.amount > 0 ? 'Підключити план' : 'Почати безкоштовно'} <Icon name="forward" /></button><ul className={`dental-plan-feature-grid${activeFeatures.length > 5 ? ' has-many' : ''}`}>{activeFeatures.map(feature => <li key={feature}><span>✓</span>{featureLabels[feature] || feature}</li>)}</ul>{dentalFeatures.some(feature => !plan.features?.[feature]) && <><div className="plan-limit-label">Недоступно у цьому плані</div><ul className={`plan-unavailable dental-plan-feature-grid${dentalFeatures.filter(feature => !plan.features?.[feature]).length > 5 ? ' has-many' : ''}`}>{dentalFeatures.filter(feature => !plan.features?.[feature]).map(feature => <li key={feature}><span>×</span>{featureLabels[feature] || feature}</li>)}</ul></>}</article>; })}</div>}{!billingEnabled && <p className="landing-billing-note">Онлайн-оплата поки не підключена — платні можливості активуються без списання коштів.</p>}</section>
 
     <section className="landing-section security-section" id="security"><div className="section-intro"><div><div className="landing-kicker">БЕЗПЕКА · КОНТРОЛЬ ДОСТУПУ</div><h2>Дані команди<br /><em>під контролем.</em></h2></div><p>Доступ до робочого простору визначають ролі, права та налаштування вашої команди.</p></div><div className="security-grid"><article className="security-card"><span><Icon name="security" /></span><div><h3>Ролі й дозволи</h3><p>Менеджери керують простором, а учасники бачать лише доступні їм проєкти, задачі та клієнтів.</p></div><b>01</b></article><article className="security-card"><span><Icon name="users" /></span><div><h3>Окремі простори</h3><p>Дані різних команд розділені. Учасник працює в межах тих просторів, до яких його запросили.</p></div><b>02</b></article><article className="security-card"><span><Icon name="check" /></span><div><h3>Захищений обліковий запис</h3><p>Підтвердження email і парольний вхід допомагають контролювати доступ до облікового запису.</p></div><b>03</b></article></div><p className="security-note">Права доступу можуть залежати від ролі користувача, простору та вибраного тарифу.</p></section>
 

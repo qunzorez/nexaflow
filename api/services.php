@@ -48,6 +48,7 @@ if ($addedPackagePrices) {
 }
 
 $canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manager', 'project_lead'], true);
+$canViewWorkspaceCatalog = in_array($planContext['workspace_role'] ?? '', ['user', 'project_lead'], true);
 $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $data = $method === 'POST' ? body() : [];
@@ -61,8 +62,10 @@ $moduleLabel = static fn(string $module): string => [
 ][$module] ?? 'Бухгалтерія';
 
 if ($method === 'GET') {
-    if (!$canManage) jsonResponse(false, 'Сторінка послуг доступна лише керівникам простору.', [], 403);
-    if (!$isAdmin) requirePlanFeature($planContext, 'services');
+    if (!$canManage && !$canViewWorkspaceCatalog) jsonResponse(false, 'Каталог послуг недоступний у цьому просторі.', [], 403);
+    // Workspace members need the read-only catalog for client cards and dental
+    // treatment plans. Keep the subscription gate on management pages/actions.
+    if (!$isAdmin && !in_array($planContext['workspace_role'] ?? '', ['user', 'project_lead'], true)) requirePlanFeature($planContext, 'services');
     $globalScope = $isAdmin && ($_GET['scope'] ?? '') === 'all';
     if ($globalScope) {
         $moduleFilter = (string)($_GET['module'] ?? 'all');
