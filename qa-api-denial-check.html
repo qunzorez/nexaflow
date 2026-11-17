@@ -1,0 +1,58 @@
+<!doctype html><meta charset="utf-8"><title>Local QA API denial checks</title>
+<h1>Local QA API denial checks</h1>
+<p>Requests below are deliberately unauthorized/over-limit probes. They must return 403 before storing or sending anything.</p>
+<button id="client">Probe client limit (Start owner)</button>
+<button id="team">Probe manager-only action (accountant)</button>
+<pre id="out">Ready</pre>
+<script>
+async function probe(path, payload) {
+  const out = document.querySelector('#out'); out.textContent = 'Sending local denial check…';
+  try { const res = await fetch(path, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); const body = await res.json(); out.textContent = `HTTP ${res.status}\n${JSON.stringify(body, null, 2)}`; }
+  catch (e) { out.textContent = String(e); }
+}
+document.querySelector('#client').onclick = () => probe('/api/clients.php', {action:'create', name:'QA SHOULD NOT PERSIST — Start over-limit probe', legal_form:'ТОВ', tax_system:'Загальна система', module:'accounting'});
+document.querySelector('#team').onclick = () => probe('/api/team.php', {action:'create_group', name:'QA SHOULD NOT PERSIST — unauthorized probe', permissions:{read:true}});
+</script>
+<button id="service">Probe Start service-per-client limit (owner)</button>
+<script>
+document.querySelector('#service').onclick = async () => {
+  const out = document.querySelector('#out'); out.textContent = 'Loading the synthetic Start client…';
+  try {
+    const listing = await (await fetch('/api/clients.php', {credentials:'same-origin'})).json();
+    const client = (listing.clients || []).find(c => c.name === 'QA Start — тестове ТОВ Альфа');
+    if (!client) throw new Error('Synthetic Start TOV not found in authenticated client list.');
+    const payload = {action:'update', id:client.id, name:client.name, legal_form:client.legal_form, tax_system:client.tax_system, has_vat:client.has_vat, has_excise:client.has_excise, has_employees:client.has_employees, employee_count:client.employee_count, special_taxes:client.special_taxes, module:client.module, module_data:client.module_data, services:[...(client.services || []), {name:'QA SHOULD NOT PERSIST — extra Start service probe', price:1, responsible_amount:0, period:'Місяць'}]};
+    const response = await fetch('/api/clients.php', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    out.textContent = `HTTP ${response.status}\n${await response.text()}`;
+  } catch (error) { out.textContent = String(error); }
+};
+</script>
+<button id="inspect">Read authenticated client API (no write)</button>
+<script>
+document.querySelector('#inspect').onclick = async () => { const r = await fetch('/api/clients.php', {credentials:'same-origin'}); const t = await r.text(); document.querySelector('#out').textContent = `GET HTTP ${r.status}\n${t.slice(0,5000)}`; };
+</script>
+
+<button id="inspectclient">Show current synthetic client data</button>
+<script>
+document.querySelector('#inspectclient').onclick = async () => { const r = await fetch('/api/clients.php', {credentials:'same-origin'}); const j = await r.json(); const c = (j.clients || []).find(x => x.name === 'QA Start — тестове ТОВ Альфа'); document.querySelector('#out').textContent = `GET HTTP ${r.status}\n${JSON.stringify(c, null, 2)}`; };
+</script>
+
+<button id="unassigned">Read unassigned Team accounting client (GET only)</button>
+<script>
+document.querySelector('#unassigned').onclick = async () => { const r = await fetch('/api/accounting.php?client_id=4f9b1d6fa5ee821ce3d46254a5da07ce', {credentials:'same-origin'}); document.querySelector('#out').textContent = `GET HTTP ${r.status}\n${(await r.text()).slice(0,3000)}`; };
+</script>
+<button id="task51">Probe Start task 51 limit (owner)</button>
+<script>
+document.querySelector('#task51').onclick = async () => { const r = await fetch('/api/tasks.php', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'create',title:'QA SHOULD NOT PERSIST — Start task 51 probe',status:'todo',priority:'normal'})}); document.querySelector('#out').textContent = `POST HTTP ${r.status}\n${await r.text()}`; };
+</script>
+<button id="participant">Probe Start participant 3 capacity (owner)</button>
+<script>
+document.querySelector('#participant').onclick = async () => { const r = await fetch('/api/team.php', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'create_project',name:'QA SHOULD NOT PERSIST — Start participant probe',invite_emails:['qa.should-not-persist@nexaflow.test'],invite_role:'member'})}); document.querySelector('#out').textContent = `POST HTTP ${r.status}\n${await r.text()}`; };
+</script>
+<button id="project2">Probe Start project limit (owner)</button>
+<script>
+document.querySelector('#project2').onclick = async () => { const r = await fetch('/api/team.php', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'create_project',name:'QA SHOULD NOT PERSIST — Start project 2 probe',visibility:'team',status:'active'})}); document.querySelector('#out').textContent = `POST HTTP ${r.status}\n${await r.text()}`; };
+</script>
+<button id="accountingManagerOnly">Probe accountant checklist_add denial (Business)</button><script>document.querySelector("#accountingManagerOnly").onclick = async () => { const r = await fetch("/api/accounting.php", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"checklist_add",client_id:"be9e32879367def1fcbac96ab78d4b1c",period_key:"2026-11",title:"QA SHOULD NOT PERSIST — accountant manager-only probe"})}); document.querySelector("#out").textContent = `POST HTTP ${r.status}\n${await r.text()}`; };</script>
+<button id="crossWorkspaceStart">Read Start accounting client while in Business (GET only)</button><script>document.querySelector("#crossWorkspaceStart").onclick = async () => { const r = await fetch("/api/accounting.php?client_id=a63108e337b26a3bde0de1e9fc53bf9c", {credentials:"same-origin"}); document.querySelector("#out").textContent = `GET HTTP ${r.status}\n${(await r.text()).slice(0,1000)}`; };</script>
+<button id="accountingReassign">Probe accountant reassign denial (Business)</button><script>document.querySelector("#accountingReassign").onclick = async () => { const r = await fetch("/api/accounting.php", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"reassign",id:"fe0f2b4a1e3028f155d1c23adda507e2",assignee_id:"qa-unauthorized-probe"})}); document.querySelector("#out").textContent = `POST HTTP ${r.status}\n${await r.text()}`; };</script>
