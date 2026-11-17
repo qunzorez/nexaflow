@@ -2,8 +2,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #e6eee8;
+  border-radius: 10px;
+  background: #fff;
+  color: #557267;
+  font-size: 13px;
   line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 2px #183b2910;
+  transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
 }
 
 .table-more::before {
@@ -12,3 +22,9 @@
   line-height: 1;
   transform: translateY(-1px);
 }
+.task-row-actions { display: flex; justify-content: center; align-items: center; gap: 7px; white-space: nowrap; }
+.table-more.table-edit:hover { color: #117a5b; background: #eaf6ef; border-color: #cce8d7; transform: translateY(-1px); box-shadow: 0 4px 10px #1689681c; }
+.table-more.table-delete { color: #a94e46; background: #fffdfd; border-color: #f0e3e1; }
+.table-more.table-delete:hover { background: #fff0ee; border-color: #f1d2ce; color: #97362f; transform: translateY(-1px); box-shadow: 0 4px 10px #a8493b18; }
+.table-more:focus-visible { outline: 3px solid #7ec8aa80; outline-offset: 2px; }
+.task-row-actions .nf-icon { font-size: 13px; }

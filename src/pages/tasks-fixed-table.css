@@ -26,8 +26,8 @@
 }
 .tasks-redesign .task-table th:nth-child(8),
 .tasks-redesign .task-table td:nth-child(8) {
-  width: 5%;
-  min-width: 42px;
+  width: 8%;
+  min-width: 82px;
 }
 .tasks-redesign .task-status-cell,
 .tasks-redesign .task-actions-cell {

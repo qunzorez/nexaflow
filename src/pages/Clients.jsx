@@ -178,7 +178,7 @@ function officialDateForService(name = "", period = "Місяць") {
   else if (period === "Щодня") result.setDate(result.getDate() + 1);
   else if (period === "Щогодини") result.setHours(result.getHours() + 1, 0, 0, 0);
   else result.setMonth(result.getMonth() + 1, 20);
-  return result.toISOString().slice(0, 10);
+  return `${result.getFullYear()}-${String(result.getMonth() + 1).padStart(2, "0")}-${String(result.getDate()).padStart(2, "0")}`;
 }
 const servicePriceDefaultsKey = (userId) => `nexaflow.accounting.servicePriceDefaults:${userId || "anonymous"}`;
 const readServicePriceDefaults = (userId) => {
@@ -230,7 +230,7 @@ export function serviceTaskPayload(client, service, clientId) {
     return /^[a-f0-9]{32}$/i.test(id) ? id : "";
   };
   const normalizedClientId = normalizeId(clientId);
-  const rawDueDate = String(service.official_due_date || "").trim();
+  const rawDueDate = String(service.official_due_date || officialDateForService(service.name, service.period) || "").trim();
   const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDueDate)
     ? rawDueDate
     : (/^(\d{2})\.(\d{2})\.(\d{4})$/.test(rawDueDate)
@@ -240,7 +240,7 @@ export function serviceTaskPayload(client, service, clientId) {
   if (service.reminders_enabled !== false && dueDate) {
     const reminderDate = new Date(`${dueDate}T12:00:00`);
     reminderDate.setDate(reminderDate.getDate() - Number(service.internal_days_before ?? 5));
-    const date = reminderDate.toISOString().slice(0, 10);
+    const date = `${reminderDate.getFullYear()}-${String(reminderDate.getMonth() + 1).padStart(2, "0")}-${String(reminderDate.getDate()).padStart(2, "0")}`;
     reminderAt = `${date}T09:00`;
   }
   const taxes = (client.special_taxes || []).join(", ") || "немає";
@@ -606,7 +606,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
     }
     if (packageItem.module && packageItem.module !== form.module) set("module", packageItem.module);
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
-    const nextServices = [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_ids: [...globalAccountantIds], accountant_id: globalAccountantIds[0] || "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
+    const nextServices = [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: officialDateForService(packageItem.name, "Місяць"), accountant_ids: [...globalAccountantIds], accountant_id: globalAccountantIds[0] || "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
     set("services", nextServices);
     if (clientId) persistSelectedService(nextServices, 0, "package");
     setSelectedPackageId("");
@@ -854,7 +854,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                 {form.module === "accounting" && <small className="client-tax-hint">Для цього режиму дедлайни декларацій з’являться в календарі. Додайте ПДВ, акциз, працівників і специфічні податки нижче, щоб бачити пов’язані строки.</small>}
               </label>}
             </div>
-            {form.module === "accounting" && <fieldset className="client-accountants-fieldset"><legend>Відповідальні бухгалтери</legend><p className="client-field-hint">Обрані бухгалтери автоматично додаються до всіх бухгалтерських послуг і пакетів та призначаються виконавцями задач.</p><AccountantMultiSelect value={globalAccountantIds} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={setGlobalAccountants} /><small>{globalAccountantIds.length ? `Обрано: ${globalAccountantIds.length}` : "Можна обрати одного або кількох бухгалтерів."}</small></fieldset>}
+            {form.module === "accounting" && <fieldset className="client-accountants-fieldset"><legend>Відповідальні бухгалтери</legend><p className="client-field-hint">Обрані бухгалтери автоматично призначаються на майбутні податкові зобов’язання й календарні події цього клієнта.</p><AccountantMultiSelect value={globalAccountantIds} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={setGlobalAccountants} /><small>{globalAccountantIds.length ? `Обрано: ${globalAccountantIds.length}` : "Можна обрати одного або кількох бухгалтерів."}</small></fieldset>}
             {form.module === "accounting" && <><div className="client-toggles">
               <Toggle
                 label="ПДВ"

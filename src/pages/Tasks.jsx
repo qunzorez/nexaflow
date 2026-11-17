@@ -164,6 +164,13 @@ export default function Tasks() {
     () => params.get("status") || (params.get("priority") === "urgent" ? "urgent" : null) || window.localStorage.getItem("nexaflow.tasks.filter") || "all",
   );
   const [search, setSearch] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const [newTasksOnly, setNewTasksOnly] = useState(false);
+  const [deadlineFilter, setDeadlineFilter] = useState("");
+  const [sortBy, setSortBy] = useState("priority");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -201,7 +208,7 @@ export default function Tasks() {
   }, [data, params]);
   useEffect(() => {
     setPage(1);
-  }, [filter, search]);
+  }, [filter, search, clientFilter, clientSearch, newTasksOnly, deadlineFilter]);
   useEffect(() => {
     window.localStorage.setItem("nexaflow.tasks.filter", filter);
   }, [filter]);
@@ -290,11 +297,22 @@ export default function Tasks() {
       return;
     changeStatus(task, "archived");
   }
+  async function deleteTask(task) {
+    if (!window.confirm("Видалити задачу назавжди? Її історію та пов’язані записи буде видалено.")) return;
+    const result = await post("/api/tasks.php", { action: "delete", id: task.id });
+    if (!result.ok) return setError(result.message || "Не вдалося видалити задачу.");
+    setNotice(result.message);
+    load();
+  }
   if (!data) return <div className="loading-screen">Завантаження задач…</div>;
   const canArchive = (task) =>
     ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role) ||
     task.created_by === data.user?.id;
+  const canDeleteInWorkspace = ["admin", "owner", "manager", "project_lead"].includes(data.user?.workspace_role || data.user?.role);
   const normalizedSearch = search.trim().toLowerCase();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const weekAhead = new Date(today); weekAhead.setDate(weekAhead.getDate() + 7);
+  const recentCutoff = new Date(); recentCutoff.setDate(recentCutoff.getDate() - 7);
   const tasksForCurrentModule = data.active_client_module === "dentistry"
     ? data.tasks.filter(task => Number(task.is_client_appointment) !== 1)
     : data.tasks;
@@ -308,6 +326,9 @@ export default function Tasks() {
             : filter === "urgent"
               ? task.priority === "urgent" && !nonOverdueStatuses.has(task.status)
             : task.status === filter;
+      const taskClientIds = (task.client_ids || []).map(String);
+      const dueDate = task.due_date ? new Date(`${String(task.due_date).slice(0, 10)}T00:00:00`) : null;
+      const createdDate = task.created_at ? new Date(String(task.created_at).replace(" ", "T")) : null;
       const linkedDentalClient = data.active_client_module === "dentistry"
         ? (data.clients || []).find(client => (task.client_ids || []).some(clientId => String(clientId) === String(client.id)))
         : null;
@@ -318,10 +339,25 @@ export default function Tasks() {
         `${task.title} ${task.client_names || task.client_name || ""} ${task.project_name || ""} ${task.assignee_name || ""} ${dentalSearchText}`.toLowerCase();
       return (
         matchesFilter &&
+        (!clientFilter || taskClientIds.includes(clientFilter)) &&
+        (!newTasksOnly || (createdDate && createdDate >= recentCutoff)) &&
+        (!deadlineFilter || (dueDate && (deadlineFilter === "overdue" ? dueDate < today : deadlineFilter === "week" ? dueDate >= today && dueDate <= weekAhead : deadlineFilter === "none" ? false : true))) &&
+        (deadlineFilter !== "none" || !task.due_date) &&
         (!normalizedSearch || haystack.includes(normalizedSearch))
       );
     })
-    .sort(taskSort);
+    .sort((a, b) => {
+      const values = {
+        title: [a.title, b.title], project: [a.project_name, b.project_name],
+        client: [a.client_names || a.client_name, b.client_names || b.client_name],
+        assignee: [a.assignee_name, b.assignee_name], priority: [priorityRank[a.priority] ?? 9, priorityRank[b.priority] ?? 9],
+        deadline: [a.due_date || "9999", b.due_date || "9999"], status: [statusOptions[a.status]?.label || a.status, statusOptions[b.status]?.label || b.status],
+      };
+      const [left, right] = values[sortBy] || values.priority;
+      const compared = typeof left === "number" ? left - right : String(left || "").localeCompare(String(right || ""), "uk");
+      return (sortDirection === "asc" ? compared : -compared) || taskSort(a, b);
+    });
+  const sortableHeaders = [["title", "Задача"], ["project", "Проєкт"], ["client", "Клієнти"], ["assignee", "Виконавці"], ["priority", "Пріоритет"], ["deadline", "Дедлайн"], ["status", "Статус"]];
   const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageTasks = filteredTasks
@@ -390,18 +426,20 @@ export default function Tasks() {
               <option value="cancelled">Скасовані</option>
               <option value="archived">Архів</option>
             </select>
+            <div className="task-client-filter">
+              <button type="button" className="task-client-trigger" onClick={() => setClientDropdownOpen(open => !open)}>{clientFilter ? (data.clients || []).find(client => String(client.id) === clientFilter)?.name : "Усі клієнти"}<span>⌄</span></button>
+              {clientDropdownOpen && <div className="task-client-options"><input autoFocus value={clientSearch} onChange={event => setClientSearch(event.target.value)} placeholder="Пошук клієнта…" aria-label="Пошук клієнта" /><button type="button" onClick={() => { setClientFilter(""); setClientDropdownOpen(false); }}>Усі клієнти</button>{(data.clients || []).filter(client => client.name.toLocaleLowerCase("uk").includes(clientSearch.trim().toLocaleLowerCase("uk"))).map(client => <button type="button" key={client.id} onClick={() => { setClientFilter(String(client.id)); setClientDropdownOpen(false); }}>{client.name}</button>)}{!(data.clients || []).some(client => client.name.toLocaleLowerCase("uk").includes(clientSearch.trim().toLocaleLowerCase("uk"))) && <span>Клієнтів не знайдено</span>}</div>}
+            </div>
+            <select className="task-filter" value={deadlineFilter} onChange={(event) => setDeadlineFilter(event.target.value)} aria-label="Фільтр за дедлайном">
+              <option value="">Усі дедлайни</option><option value="week">Дедлайн за 7 днів</option><option value="overdue">Прострочені дедлайни</option><option value="none">Без дедлайну</option>
+            </select>
+            <label className="task-new-filter"><input type="checkbox" checked={newTasksOnly} onChange={event => setNewTasksOnly(event.target.checked)} /> Нові за 7 днів</label>
           </div>
           <div className="task-table-wrap">
             <table className="task-table">
               <thead>
                 <tr>
-                  <th>Задача</th>
-                  <th>Проєкт</th>
-                  <th>Клієнти</th>
-                  <th>Виконавці</th>
-                  <th>Пріоритет</th>
-                  <th>Дедлайн</th>
-                  <th>Статус</th>
+                  {sortableHeaders.map(([key, label]) => <th key={key}><button type="button" className="task-sort-button" onClick={() => { if (sortBy === key) setSortDirection(value => value === "asc" ? "desc" : "asc"); else { setSortBy(key); setSortDirection("asc"); } }}>{label}<span>{sortBy === key ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}</span></button></th>)}
                   <th aria-label="Дії" />
                 </tr>
               </thead>
@@ -473,17 +511,21 @@ export default function Tasks() {
                       <StatusMenu task={task} onChange={changeStatus} />
                     </td>
                     <td className="task-actions-cell">
-                      <button
-                        className="table-more"
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          editTask(task);
-                        }}
-                        aria-label="Редагувати"
-                      >
-                        <Icon name="edit" />
-                      </button>
+                      <div className="task-row-actions">
+                        <button
+                          className="table-more table-edit"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            editTask(task);
+                          }}
+                          aria-label="Редагувати задачу"
+                          title="Редагувати"
+                        >
+                          <Icon name="edit" />
+                        </button>
+                        {canDeleteInWorkspace && Number(task.is_client_appointment) !== 1 && <button className="table-more table-delete" type="button" onClick={(event) => { event.stopPropagation(); deleteTask(task); }} aria-label="Видалити задачу" title="Видалити назавжди"><Icon name="trash" /></button>}
+                      </div>
                     </td>
                   </tr>
                 ))}

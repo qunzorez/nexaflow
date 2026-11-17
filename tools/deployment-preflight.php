@@ -29,6 +29,13 @@ if (!is_array($webProfile) || ($webProfile['base_url'] ?? '') !== 'https://nexaf
     exit(4);
 }
 
+$taxCalendarPath = dirname(__DIR__) . '/api/data/vchasno-tax-events-2026.json';
+$taxCalendar = json_decode((string)@file_get_contents($taxCalendarPath), true);
+if (!is_array($taxCalendar) || !is_array($taxCalendar['groups'] ?? null) || empty($taxCalendar['source'])) {
+    fwrite(STDERR, "The release is missing a valid Vchasno tax calendar catalog.\n");
+    exit(11);
+}
+
 $runtimeSchemas = [
     'dentistry_care.sql',
     'dentistry_patient_ledger.sql',

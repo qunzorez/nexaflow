@@ -118,8 +118,8 @@ if ($method === 'GET') {
         }
         unset($client);
     }
-    // Match accounting groups in PHP: older production tables can use different
-    // collations for group names and user IDs, making the joined SQL query fail.
+    // Responsible accountants can be any member of the workspace team,
+    // including its manager. Keep assignment options scoped to that workspace.
     $availableUsers = [];
     $managerTeamIds = array_fill_keys($workspaceIds, true);
     $manageableTeamIds = $managerTeamIds;
@@ -128,58 +128,24 @@ if ($method === 'GET') {
         $invitedUsers->execute([$userId, $userId]);
         $manageableTeamIds = array_fill_keys(array_map('strval', $invitedUsers->fetchAll(PDO::FETCH_COLUMN)), true);
     }
-    if ($isAdmin && $canManage) {
-        $availableUsers = $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('admin','owner','manager','user') ORDER BY name, email")->fetchAll();
-    } elseif ($canManage) {
-        $accountingGroupIds = [];
-        foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
-            if (!in_array($user['role'], ['admin', 'owner'], true) && (groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $planContext['owner_id']) continue;
-            $name = (string)$group['name'];
-            $nameHex = strtoupper(bin2hex($name));
-            if (preg_match('/(?:бухгалт|бугалт|account)/iu', $name)
-                || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0
-                || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) {
-                $accountingGroupIds[(string)$group['id']] = true;
-            }
-        }
-        if ($accountingGroupIds) {
-            $placeholders = implode(',', array_fill(0, count($accountingGroupIds), '?'));
-            $membershipQuery = $pdo->prepare("SELECT user_id FROM project_group_members WHERE group_id IN ($placeholders)");
-            $membershipQuery->execute(array_keys($accountingGroupIds));
-            foreach ($membershipQuery->fetchAll() as $membership) {
-                $person = $serviceUsers[(string)$membership['user_id']] ?? null;
-                $isAllowedManagerMember = $person && (!in_array($planContext['workspace_role'], ['manager', 'project_lead'], true) || isset($manageableTeamIds[(string)$person['id']]));
-                if ($person && in_array($person['role'], ['admin', 'owner', 'manager', 'user'], true) && $isAllowedManagerMember) {
-                    $availableUsers[(string)$person['id']] = $person;
-                }
-            }
-            $availableUsers = array_values($availableUsers);
-            usort($availableUsers, static function (array $left, array $right): int {
-                return strcmp($left['name'], $right['name']) ?: strcmp($left['email'], $right['email']);
-            });
-        }
-    }
+    $accountantTeamIds = $workspaceIds;
     if ($isAdmin && trim((string)($_GET['workspace_owner_id'] ?? '')) !== '') {
         $selectedOwnerId = trim((string)$_GET['workspace_owner_id']);
         $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
         $ownerCheck->execute([$selectedOwnerId]);
         if (!$ownerCheck->fetchColumn()) jsonResponse(false, 'Простір не знайдено.', [], 404);
-        $accountingGroupIds = [];
-        foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
-            if ((groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $selectedOwnerId) continue;
-            $groupName = (string)$group['name']; $nameHex = strtoupper(bin2hex($groupName));
-            if (preg_match('/(?:бухгалт|бугалт|account)/iu', $groupName) || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0 || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) $accountingGroupIds[(string)$group['id']] = true;
-        }
-        $accountantIds = [];
-        if ($accountingGroupIds) {
-            $groupMarks = implode(',', array_fill(0, count($accountingGroupIds), '?'));
-            $accountantQuery = $pdo->prepare("SELECT DISTINCT user_id FROM project_group_members WHERE group_id IN ({$groupMarks})");
-            $accountantQuery->execute(array_keys($accountingGroupIds));
-            $accountantIds = array_fill_keys(array_map('strval', $accountantQuery->fetchAll(PDO::FETCH_COLUMN)), true);
-        }
-        $availableUsers = array_values(array_filter($serviceUsers, static fn(array $person): bool => isset($accountantIds[(string)$person['id']]) && in_array($person['role'], ['admin','owner','manager','user'], true)));
+        $selectedOwnerRoleQuery = $pdo->prepare('SELECT role FROM users WHERE id = ? LIMIT 1');
+        $selectedOwnerRoleQuery->execute([$selectedOwnerId]);
+        $selectedOwnerContext = workspacePlan($pdo, $selectedOwnerId, (string)($selectedOwnerRoleQuery->fetchColumn() ?: 'manager'));
+        $accountantTeamIds = array_map('strval', $selectedOwnerContext['member_ids'] ?? [$selectedOwnerId]);
+        $manageableTeamIds = array_fill_keys($accountantTeamIds, true);
+    } elseif ($isAdmin) {
+        $accountantTeamIds = array_keys($serviceUsers);
+    }
+    if ($canManage) {
+        $accountantTeamLookup = array_fill_keys(array_map('strval', $accountantTeamIds), true);
+        $availableUsers = array_values(array_filter($serviceUsers, static fn(array $person): bool => isset($accountantTeamLookup[(string)$person['id']]) && in_array($person['role'], ['admin','owner','manager','user'], true)));
         usort($availableUsers, static fn(array $a, array $b): int => strcmp($a['name'], $b['name']) ?: strcmp($a['email'], $b['email']));
-        $manageableTeamIds = $accountantIds;
     }
     $availableByClient = [];
     if ($canManage && $clients) {
@@ -366,28 +332,7 @@ if ($packageIds) {
 }
 $requestedAccountantIds = array_values(array_unique(array_filter(array_merge($globalAccountantIds, ...array_map(static fn(array $service): array => array_merge([(string)($service['accountant_id'] ?? '')], (array)($service['accountant_ids'] ?? [])), $services)))));
 if ($requestedAccountantIds) {
-    $accountingGroupIds = [];
-    foreach ($pdo->query('SELECT id, name, permissions FROM project_groups WHERE project_id IS NULL')->fetchAll() as $group) {
-        if (!in_array($user['role'], ['admin', 'owner'], true) && (groupPolicy($group['permissions'] ?? null)['owner_id'] ?? '') !== $planContext['owner_id']) continue;
-        $groupName = (string)$group['name'];
-        $nameHex = strtoupper(bin2hex($groupName));
-        if (preg_match('/(?:бухгалт|бугалт|account)/iu', $groupName)
-            || strpos($nameHex, 'C390C291C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0
-            || strpos($nameHex, 'C390C2B1C391C283C391C285C390C2B3C390C2B0C390C2BB') === 0) {
-            $accountingGroupIds[(string)$group['id']] = true;
-        }
-    }
-    $allowedAccountantIds = [];
-    if ($accountingGroupIds) {
-        $groupMarks = implode(',', array_fill(0, count($accountingGroupIds), '?'));
-        $membershipQuery = $pdo->prepare("SELECT DISTINCT user_id FROM project_group_members WHERE group_id IN ($groupMarks)");
-        $membershipQuery->execute(array_keys($accountingGroupIds));
-        $allowedAccountantIds = array_fill_keys(array_map('strval', $membershipQuery->fetchAll(PDO::FETCH_COLUMN)), true);
-    }
-    if ($planContext['workspace_role'] === 'manager' && $allowedAccountantIds) {
-        $managerTeamIds = array_fill_keys(array_map('strval', $planContext['member_ids']), true);
-        $allowedAccountantIds = array_filter($allowedAccountantIds, static fn($_, $id): bool => isset($managerTeamIds[(string)$id]), ARRAY_FILTER_USE_BOTH);
-    }
+    $allowedAccountantIds = array_fill_keys(array_map('strval', $planContext['member_ids'] ?? [$userId]), true);
     foreach ($requestedAccountantIds as $accountantId) {
         // Keep legacy assignments after a claim/team change, but never allow
         // a new assignment to a person outside the current team.
@@ -418,9 +363,10 @@ if ($action === 'update' && $serviceLimit !== null && $addedStandalone > 0) {
 }
 if (empty($planContext['plan']['services']) && $serviceLimit === null && $addedStandalone > 0) requirePlanFeature($planContext, 'services');
 if ($action === 'update' && $id !== '') {
-    $existingClientQuery = $pdo->prepare('SELECT id FROM clients WHERE id = ? LIMIT 1');
+    $existingClientQuery = $pdo->prepare('SELECT id, legal_form, tax_system, has_vat, has_excise, has_employees, employee_count, special_taxes, module_data, module FROM clients WHERE id = ? LIMIT 1');
     $existingClientQuery->execute([$id]);
-    if (!$existingClientQuery->fetchColumn()) jsonResponse(false, 'Клієнта не знайдено.', [], 404);
+    $previousProfile = $existingClientQuery->fetch();
+    if (!$previousProfile) jsonResponse(false, 'Клієнта не знайдено.', [], 404);
     $ownerId = null;
     if ($isAdmin && !empty($data['workspace_owner_id'])) {
         $ownerCheck = $pdo->prepare("SELECT id FROM users WHERE id = ? AND role IN ('manager','admin','owner') LIMIT 1");
@@ -435,6 +381,16 @@ if ($action === 'update' && $id !== '') {
     if ($ownerId !== null) $updateValues[] = $ownerId;
     $updateValues[] = $id;
     $pdo->prepare($updateSql)->execute($updateValues);
+    if (($previousProfile['module'] ?? '') === 'accounting' && $module === 'accounting') {
+        $oldData = json_decode((string)($previousProfile['module_data'] ?? '{}'), true) ?: [];
+        $newData = json_decode((string)$moduleData, true) ?: [];
+        $oldProfile = ['legal_form'=>$previousProfile['legal_form'], 'tax_system'=>$previousProfile['tax_system'], 'has_vat'=>(bool)$previousProfile['has_vat'], 'has_excise'=>(bool)$previousProfile['has_excise'], 'has_employees'=>(bool)$previousProfile['has_employees'], 'employee_count'=>$previousProfile['employee_count'], 'special_taxes'=>json_decode((string)($previousProfile['special_taxes'] ?? '[]'), true) ?: [], 'tax_income_over_40m'=>(bool)($oldData['tax_income_over_40m'] ?? false), 'tax_group'=>$oldData['tax_group'] ?? null, 'tax_profile_extra'=>$oldData['tax_profile_extra'] ?? []];
+        $newProfile = ['legal_form'=>$legalForm, 'tax_system'=>$taxSystem, 'has_vat'=>(bool)$hasVat, 'has_excise'=>(bool)$hasExcise, 'has_employees'=>(bool)$hasEmployees, 'employee_count'=>$employeeCount, 'special_taxes'=>$specialTaxes, 'tax_income_over_40m'=>(bool)($newData['tax_income_over_40m'] ?? false), 'tax_group'=>$newData['tax_group'] ?? null, 'tax_profile_extra'=>$newData['tax_profile_extra'] ?? []];
+        if ($oldProfile !== $newProfile) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS accounting_profile_history (id CHAR(32) PRIMARY KEY, owner_id CHAR(32) NOT NULL, client_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, old_values JSON NOT NULL, new_values JSON NOT NULL, reason VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, KEY idx_accounting_profile_history (client_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            $pdo->prepare('INSERT INTO accounting_profile_history (id,owner_id,client_id,user_id,old_values,new_values,reason) VALUES (?,?,?,?,?,?,?)')->execute([bin2hex(random_bytes(16)), (string)$planContext['owner_id'], $id, $userId, json_encode($oldProfile, JSON_UNESCAPED_UNICODE), json_encode($newProfile, JSON_UNESCAPED_UNICODE), mb_substr(trim((string)($data['profile_change_reason'] ?? $newData['profile_change_reason'] ?? '')), 0, 1000) ?: null]);
+        }
+    }
     if ($module === 'accounting' && $requestedAccountantIds) {
         $assignMember = $pdo->prepare('INSERT IGNORE INTO client_members (client_id, user_id, assigned_by) VALUES (?, ?, ?)');
         foreach ($requestedAccountantIds as $accountantId) $assignMember->execute([$id, $accountantId, $userId]);

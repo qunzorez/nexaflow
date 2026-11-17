@@ -257,6 +257,7 @@ export default function ClientEditPage() {
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
         {user && ["admin", "owner"].includes(user.role) && <label className="admin-client-workspace-select">Простір-власник клієнта<select value={workspaceOwnerId} onChange={event => setWorkspaceOwnerId(event.target.value)} required>{adminWorkspaces.map(owner => <option key={owner.id} value={owner.id}>{owner.name} · {owner.email}</option>)}</select></label>}
+        {form.module === "accounting" && <div className="accounting-client-link"><a href={`/accounting?client=${encodeURIComponent(id)}`}>Чекліст документів і історія податкового профілю →</a></div>}
         <ClientFormModal form={form} setForm={setForm} editing={form} availableUsers={availableUsers} teamUsers={teamUsers} availableUsersByClient={availableUsersByClient} servicePackages={servicePackages} standaloneServices={standaloneServices} calendarTasks={calendarTasks} clientId={id} currentUserId={user?.id || ""} subscription={user?.subscription} onSave={save} onSaveAppointment={saveAppointment} onAddService={addService} onClose={() => navigate("/clients")} pageMode />
       </div>
     </Layout>

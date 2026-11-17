@@ -1,0 +1,4621 @@
+{
+  "source": "https://zvit.vchasno.ua/wp-admin/admin-ajax.php?action=tax_events",
+  "retrieved_at": "2026-11-17",
+  "year": 2026,
+  "groups": [
+    {
+      "group": 1,
+      "events": [
+        {
+          "id": 2,
+          "name": "Єдиний соціальний внесок",
+          "type": "taxes",
+          "description": "за квартал",
+          "periods": [
+            {
+              "id": 556,
+              "group": 1,
+              "amount": "5280 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-19",
+              "taxEventId": 2
+            },
+            {
+              "id": 697,
+              "group": 1,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 835,
+              "group": 1,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 836,
+              "group": 1,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-19",
+              "taxEventId": 2
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Звіт по доходу",
+          "type": "report",
+          "description": "Річна декларація",
+          "periods": [
+            {
+              "id": 560,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 3
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "name": "Розрахунок 4ДФ",
+          "type": "report",
+          "description": "За виплати ФОП",
+          "periods": [
+            {
+              "id": 561,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 4
+            },
+            {
+              "id": 701,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 4
+            },
+            {
+              "id": 833,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 4
+            },
+            {
+              "id": 834,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 4
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "Зміна групи",
+          "type": "group",
+          "description": "Подання заяви",
+          "periods": [
+            {
+              "id": 564,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-16",
+              "taxEventId": 5
+            },
+            {
+              "id": 702,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 831,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 832,
+              "group": 1,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-15",
+              "taxEventId": 5
+            }
+          ]
+        },
+        {
+          "id": 50,
+          "name": "Єдиний податок",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 557,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 562,
+              "group": 1,
+              "amount": "332,80 грн ",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 565,
+              "group": 1,
+              "amount": "332,80 грн ",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 694,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 695,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 696,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 50
+            },
+            {
+              "id": 819,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 820,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 821,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 50
+            },
+            {
+              "id": 822,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 823,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 50
+            },
+            {
+              "id": 824,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 50
+            }
+          ]
+        },
+        {
+          "id": 55,
+          "name": "Військовий збір",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 558,
+              "group": 1,
+              "amount": "864,70 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 563,
+              "group": 1,
+              "amount": "864,70 грн",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 566,
+              "group": 1,
+              "amount": "864,70 грн",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 698,
+              "group": 1,
+              "amount": "864,70 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 699,
+              "group": 1,
+              "amount": "864,70 грн",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 700,
+              "group": 1,
+              "amount": "864,70 грн",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 55
+            },
+            {
+              "id": 825,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 826,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 827,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 55
+            },
+            {
+              "id": 828,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 829,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 830,
+              "group": 1,
+              "amount": "332,80 грн",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 55
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "group": 2,
+      "events": [
+        {
+          "id": 2,
+          "name": "Єдиний соціальний внесок",
+          "type": "taxes",
+          "description": "за квартал",
+          "periods": [
+            {
+              "id": 567,
+              "group": 2,
+              "amount": "5280 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-19",
+              "taxEventId": 2
+            },
+            {
+              "id": 707,
+              "group": 2,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 838,
+              "group": 2,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 837,
+              "group": 2,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-19",
+              "taxEventId": 2
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Звіт по доходу",
+          "type": "report",
+          "description": "Річна декларація",
+          "periods": [
+            {
+              "id": 575,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 3
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "Зміна групи",
+          "type": "group",
+          "description": "Подання заяви",
+          "periods": [
+            {
+              "id": 583,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-16",
+              "taxEventId": 5
+            },
+            {
+              "id": 703,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 839,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 840,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-15",
+              "taxEventId": 5
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "ПДФО + ВЗ",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 570,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 579,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 586,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 713,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 712,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 711,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 6
+            },
+            {
+              "id": 841,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 842,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 843,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 6
+            },
+            {
+              "id": 844,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 845,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 846,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 6
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "ЄСВ за працівника",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 571,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 580,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 587,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 716,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 715,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 714,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 7
+            },
+            {
+              "id": 847,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 848,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 849,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 7
+            },
+            {
+              "id": 850,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 851,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 852,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 7
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "Сплата акцизу",
+          "type": "taxes",
+          "description": "Сплата роздрібного акцизу",
+          "periods": [
+            {
+              "id": 574,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 582,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 590,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 721,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 722,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 8
+            },
+            {
+              "id": 723,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 853,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 854,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 855,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 856,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 857,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 858,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 8
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "МПЗ",
+          "type": "taxes",
+          "description": "Податок для с/г виробників",
+          "periods": [
+            {
+              "id": 576,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-03-12",
+              "taxEventId": 9
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "name": "Звітність акциз",
+          "type": "report",
+          "description": "Роздрібний акциз",
+          "periods": [
+            {
+              "id": 573,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 588,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 589,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 717,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 718,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 719,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 10
+            },
+            {
+              "id": 859,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 860,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 861,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 10
+            },
+            {
+              "id": 862,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 863,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 864,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 10
+            }
+          ]
+        },
+        {
+          "id": 49,
+          "name": "Об'єднаний звіт 4ДФ",
+          "type": "report",
+          "description": "За найманих працівників",
+          "periods": [
+            {
+              "id": 609,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 49
+            },
+            {
+              "id": 720,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 49
+            },
+            {
+              "id": 865,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 49
+            },
+            {
+              "id": 866,
+              "group": 2,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 49
+            }
+          ]
+        },
+        {
+          "id": 52,
+          "name": "Єдиний податок",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 568,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 577,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 584,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 706,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 705,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 704,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 52
+            },
+            {
+              "id": 867,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 868,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 869,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 52
+            },
+            {
+              "id": 870,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 871,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 52
+            },
+            {
+              "id": 872,
+              "group": 2,
+              "amount": "1729,40 грн",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 52
+            }
+          ]
+        },
+        {
+          "id": 55,
+          "name": "Військовий збір",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 569,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 578,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 585,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 708,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 709,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 710,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 55
+            },
+            {
+              "id": 873,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 874,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 875,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 55
+            },
+            {
+              "id": 876,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 877,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 55
+            },
+            {
+              "id": 878,
+              "group": 2,
+              "amount": "864,70 грн",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 55
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "group": 3,
+      "events": [
+        {
+          "id": 1,
+          "name": "Єдиний податок",
+          "type": "taxes",
+          "description": "доходу за квартал",
+          "periods": [
+            {
+              "id": 598,
+              "group": 3,
+              "amount": "5%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-19",
+              "taxEventId": 1
+            },
+            {
+              "id": 725,
+              "group": 3,
+              "amount": "5%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 1
+            },
+            {
+              "id": 879,
+              "group": 3,
+              "amount": "5%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-19",
+              "taxEventId": 1
+            },
+            {
+              "id": 881,
+              "group": 3,
+              "amount": "5%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-19",
+              "taxEventId": 1
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Єдиний соціальний внесок",
+          "type": "taxes",
+          "description": "за квартал",
+          "periods": [
+            {
+              "id": 591,
+              "group": 3,
+              "amount": "5280 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-19",
+              "taxEventId": 2
+            },
+            {
+              "id": 727,
+              "group": 3,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 883,
+              "group": 3,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 884,
+              "group": 3,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-19",
+              "taxEventId": 2
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "Зміна групи",
+          "type": "group",
+          "description": "Подання заяви",
+          "periods": [
+            {
+              "id": 604,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-16",
+              "taxEventId": 5
+            },
+            {
+              "id": 729,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 885,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 886,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-15",
+              "taxEventId": 5
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "ПДФО + ВЗ",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 592,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 600,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 605,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 732,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 731,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 730,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 6
+            },
+            {
+              "id": 887,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 888,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 889,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 6
+            },
+            {
+              "id": 890,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 891,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 892,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 6
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "ЄСВ за працівника",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 593,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 601,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 606,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 733,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 734,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 898,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 897,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 896,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 7
+            },
+            {
+              "id": 895,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 894,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 893,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 7
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "Сплата акцизу",
+          "type": "taxes",
+          "description": "Сплата роздрібного акцизу",
+          "periods": [
+            {
+              "id": 596,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 603,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 608,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 741,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 740,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 8
+            },
+            {
+              "id": 739,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 899,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 900,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 901,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 902,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 903,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 904,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 8
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "МПЗ",
+          "type": "taxes",
+          "description": "Податок для с/г виробників",
+          "periods": [
+            {
+              "id": 610,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-19",
+              "taxEventId": 9
+            },
+            {
+              "id": 735,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-21",
+              "taxEventId": 9
+            },
+            {
+              "id": 905,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 9
+            },
+            {
+              "id": 906,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-19",
+              "taxEventId": 9
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "name": "Звітність акциз",
+          "type": "report",
+          "description": "Роздрібний акциз",
+          "periods": [
+            {
+              "id": 594,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 602,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 607,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 736,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 737,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 738,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 10
+            },
+            {
+              "id": 907,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 908,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 909,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 10
+            },
+            {
+              "id": 910,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 911,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 912,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 10
+            }
+          ]
+        },
+        {
+          "id": 49,
+          "name": "Об'єднаний звіт 4ДФ",
+          "type": "report",
+          "description": "За найманих працівників",
+          "periods": [
+            {
+              "id": 611,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 49
+            },
+            {
+              "id": 728,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 49
+            },
+            {
+              "id": 913,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 49
+            },
+            {
+              "id": 915,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 49
+            }
+          ]
+        },
+        {
+          "id": 56,
+          "name": "Військовий збір",
+          "type": "taxes",
+          "description": "доходу за квартал",
+          "periods": [
+            {
+              "id": 599,
+              "group": 3,
+              "amount": "1%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-19",
+              "taxEventId": 56
+            },
+            {
+              "id": 726,
+              "group": 3,
+              "amount": "1%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 56
+            },
+            {
+              "id": 880,
+              "group": 3,
+              "amount": "1%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-19",
+              "taxEventId": 56
+            },
+            {
+              "id": 882,
+              "group": 3,
+              "amount": "1%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-19",
+              "taxEventId": 56
+            }
+          ]
+        },
+        {
+          "id": 57,
+          "name": "Звіт по доходу",
+          "type": "report",
+          "description": "Квартальна декларація",
+          "periods": [
+            {
+              "id": 597,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-09",
+              "taxEventId": 57
+            },
+            {
+              "id": 724,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 57
+            },
+            {
+              "id": 914,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 57
+            },
+            {
+              "id": 916,
+              "group": 3,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 57
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "group": 4,
+      "events": [
+        {
+          "id": 2,
+          "name": "Єдиний соціальний внесок",
+          "type": "taxes",
+          "description": "за квартал",
+          "periods": [
+            {
+              "id": 612,
+              "group": 4,
+              "amount": "5280 грн",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-19",
+              "taxEventId": 2
+            },
+            {
+              "id": 746,
+              "group": 4,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 917,
+              "group": 4,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 918,
+              "group": 4,
+              "amount": "5707,02 грн",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-19",
+              "taxEventId": 2
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "Зміна групи",
+          "type": "group",
+          "description": "Подання заяви",
+          "periods": [
+            {
+              "id": 615,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-16",
+              "taxEventId": 5
+            },
+            {
+              "id": 774,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 919,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 920,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-15",
+              "taxEventId": 5
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "ПДФО + ВЗ",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 622,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 619,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 616,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 747,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 748,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 749,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 6
+            },
+            {
+              "id": 926,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 925,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 924,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 6
+            },
+            {
+              "id": 923,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 922,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 921,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 6
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "ЄСВ за працівника",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 623,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 620,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 617,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 752,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 751,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 750,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 7
+            },
+            {
+              "id": 927,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 928,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 929,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 7
+            },
+            {
+              "id": 930,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 931,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 932,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 7
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "Сплата акцизу",
+          "type": "taxes",
+          "description": "Сплата роздрібного акцизу",
+          "periods": [
+            {
+              "id": 625,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 626,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 627,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 763,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 762,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 8
+            },
+            {
+              "id": 761,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 933,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 934,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 935,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 936,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 937,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 938,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 8
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "МПЗ",
+          "type": "taxes",
+          "description": "Податок для с/г виробників",
+          "periods": [
+            {
+              "id": 629,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-19",
+              "taxEventId": 9
+            },
+            {
+              "id": 756,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-21",
+              "taxEventId": 9
+            },
+            {
+              "id": 939,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 9
+            },
+            {
+              "id": 940,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-19",
+              "taxEventId": 9
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "name": "Звітність акциз",
+          "type": "report",
+          "description": "Роздрібний акциз",
+          "periods": [
+            {
+              "id": 624,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 621,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 618,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 753,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 754,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 755,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 10
+            },
+            {
+              "id": 941,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 942,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 943,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 10
+            },
+            {
+              "id": 944,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 945,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 946,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 10
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "name": "Сплата ПДВ",
+          "type": "taxes",
+          "description": "Сплата ПДВ",
+          "periods": [
+            {
+              "id": 630,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 11
+            },
+            {
+              "id": 631,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 11
+            },
+            {
+              "id": 632,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 11
+            },
+            {
+              "id": 758,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 759,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 11
+            },
+            {
+              "id": 760,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 947,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 11
+            },
+            {
+              "id": 948,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 11
+            },
+            {
+              "id": 949,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 950,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 11
+            },
+            {
+              "id": 951,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 952,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 11
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "name": "Реєстрація ПН / РК з 1 по 15 число",
+          "type": "report",
+          "description": "Реєстрація ПН / РК",
+          "periods": [
+            {
+              "id": 633,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 634,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 635,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 769,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-06",
+              "taxEventId": 12
+            },
+            {
+              "id": 768,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 767,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 953,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-06",
+              "taxEventId": 12
+            },
+            {
+              "id": 954,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2027-08-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 955,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2027-09-06",
+              "taxEventId": 12
+            },
+            {
+              "id": 956,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2027-10-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 957,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2027-11-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 958,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2027-12-06",
+              "taxEventId": 12
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "name": "Реєстрація ПН / РК з 16 по 31 число",
+          "type": "report",
+          "description": "Реєстрація ПН / РК",
+          "periods": [
+            {
+              "id": 636,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-19",
+              "taxEventId": 13
+            },
+            {
+              "id": 637,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 638,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 770,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 13
+            },
+            {
+              "id": 771,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 772,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 959,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2027-07-19",
+              "taxEventId": 13
+            },
+            {
+              "id": 960,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2027-08-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 961,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2027-09-20",
+              "taxEventId": 13
+            },
+            {
+              "id": 962,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2027-10-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 963,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2027-11-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 964,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2027-12-20",
+              "taxEventId": 13
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "name": "Декларація ПДВ",
+          "type": "report",
+          "description": "Звітність по ПДВ",
+          "periods": [
+            {
+              "id": 641,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 640,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 639,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 764,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 765,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 766,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 14
+            },
+            {
+              "id": 965,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 966,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 967,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 14
+            },
+            {
+              "id": 968,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 969,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 970,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 14
+            }
+          ]
+        },
+        {
+          "id": 49,
+          "name": "Об'єднаний звіт 4ДФ",
+          "type": "report",
+          "description": "За найманих працівників",
+          "periods": [
+            {
+              "id": 628,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 49
+            },
+            {
+              "id": 745,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 49
+            },
+            {
+              "id": 971,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 49
+            },
+            {
+              "id": 973,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 49
+            }
+          ]
+        },
+        {
+          "id": 54,
+          "name": "Єдиний податок",
+          "type": "taxes",
+          "description": "доходу за квартал",
+          "periods": [
+            {
+              "id": 613,
+              "group": 4,
+              "amount": "3%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-19",
+              "taxEventId": 54
+            },
+            {
+              "id": 742,
+              "group": 4,
+              "amount": "3%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 54
+            },
+            {
+              "id": 975,
+              "group": 4,
+              "amount": "3%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-19",
+              "taxEventId": 54
+            },
+            {
+              "id": 977,
+              "group": 4,
+              "amount": "3%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-19",
+              "taxEventId": 54
+            }
+          ]
+        },
+        {
+          "id": 56,
+          "name": "Військовий збір",
+          "type": "taxes",
+          "description": "доходу за квартал",
+          "periods": [
+            {
+              "id": 614,
+              "group": 4,
+              "amount": "1%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-19",
+              "taxEventId": 56
+            },
+            {
+              "id": 743,
+              "group": 4,
+              "amount": "1%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 56
+            },
+            {
+              "id": 976,
+              "group": 4,
+              "amount": "1%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-19",
+              "taxEventId": 56
+            },
+            {
+              "id": 978,
+              "group": 4,
+              "amount": "1%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-19",
+              "taxEventId": 56
+            }
+          ]
+        },
+        {
+          "id": 57,
+          "name": "Звіт по доходу",
+          "type": "report",
+          "description": "Квартальна декларація",
+          "periods": [
+            {
+              "id": 642,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-09",
+              "taxEventId": 57
+            },
+            {
+              "id": 744,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 57
+            },
+            {
+              "id": 972,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 57
+            },
+            {
+              "id": 974,
+              "group": 4,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 57
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "group": 5,
+      "events": [
+        {
+          "id": 2,
+          "name": "Єдиний соціальний внесок",
+          "type": "taxes",
+          "description": "за квартал",
+          "periods": [
+            {
+              "id": 645,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-12",
+              "taxEventId": 2
+            },
+            {
+              "id": 981,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 982,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 2
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Звіт по доходу",
+          "type": "report",
+          "description": "Річна декларація",
+          "periods": [
+            {
+              "id": 646,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-01",
+              "taxEventId": 3
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "Зміна групи",
+          "type": "group",
+          "description": "Подання заяви",
+          "periods": [
+            {
+              "id": 791,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-16",
+              "taxEventId": 5
+            },
+            {
+              "id": 792,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 1017,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 1018,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-15",
+              "taxEventId": 5
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "ПДФО + ВЗ",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 647,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 648,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 649,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 777,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 776,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 775,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 6
+            },
+            {
+              "id": 991,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 992,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 993,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 6
+            },
+            {
+              "id": 994,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 995,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 996,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 6
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "ЄСВ за працівника",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 652,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 651,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 650,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 778,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 779,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 780,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 7
+            },
+            {
+              "id": 1002,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 1001,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 1000,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 7
+            },
+            {
+              "id": 999,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 998,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 997,
+              "group": 5,
+              "amount": "22%",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 7
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "Сплата акцизу",
+          "type": "taxes",
+          "description": "Сплата роздрібного акцизу",
+          "periods": [
+            {
+              "id": 790,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 789,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 788,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 787,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 786,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 8
+            },
+            {
+              "id": 785,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 1003,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 1004,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 1005,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 1006,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 1007,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 1008,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 8
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "МПЗ",
+          "type": "taxes",
+          "description": "Податок для с/г виробників",
+          "periods": [
+            {
+              "id": 653,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 9
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "name": "Звітність акциз",
+          "type": "report",
+          "description": "Роздрібний акциз",
+          "periods": [
+            {
+              "id": 654,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 655,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 656,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 782,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 783,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 784,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 10
+            },
+            {
+              "id": 1009,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1010,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1011,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 10
+            },
+            {
+              "id": 1012,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1013,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1014,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 10
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "name": "Сплата ПДФО",
+          "type": "taxes",
+          "description": "Сплата податку на дохід",
+          "periods": [
+            {
+              "id": 643,
+              "group": 5,
+              "amount": "18%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-12",
+              "taxEventId": 15
+            },
+            {
+              "id": 979,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 15
+            },
+            {
+              "id": 983,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 15
+            }
+          ]
+        },
+        {
+          "id": 49,
+          "name": "Об'єднаний звіт 4ДФ",
+          "type": "report",
+          "description": "За найманих працівників",
+          "periods": [
+            {
+              "id": 658,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 49
+            },
+            {
+              "id": 781,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 49
+            },
+            {
+              "id": 1015,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 49
+            },
+            {
+              "id": 1016,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 49
+            }
+          ]
+        },
+        {
+          "id": 58,
+          "name": "Військовий збір",
+          "type": "taxes",
+          "description": "доходу за квартал",
+          "periods": [
+            {
+              "id": 644,
+              "group": 5,
+              "amount": "1,5%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-12",
+              "taxEventId": 58
+            },
+            {
+              "id": 980,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 58
+            },
+            {
+              "id": 984,
+              "group": 5,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 58
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "group": 6,
+      "events": [
+        {
+          "id": 2,
+          "name": "Єдиний соціальний внесок",
+          "type": "taxes",
+          "description": "за квартал",
+          "periods": [
+            {
+              "id": 661,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-12",
+              "taxEventId": 2
+            },
+            {
+              "id": 990,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 2
+            },
+            {
+              "id": 985,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 2
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Звіт по доходу",
+          "type": "report",
+          "description": "Річна декларація",
+          "periods": [
+            {
+              "id": 672,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-01",
+              "taxEventId": 3
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "Зміна групи",
+          "type": "group",
+          "description": "Подання заяви",
+          "periods": [
+            {
+              "id": 690,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-16",
+              "taxEventId": 5
+            },
+            {
+              "id": 805,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 1019,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-15",
+              "taxEventId": 5
+            },
+            {
+              "id": 1020,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-15",
+              "taxEventId": 5
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "ПДФО + ВЗ",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 662,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 663,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 664,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 795,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 794,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 793,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 6
+            },
+            {
+              "id": 1021,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 1022,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 1023,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 6
+            },
+            {
+              "id": 1024,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 1025,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 6
+            },
+            {
+              "id": 1026,
+              "group": 6,
+              "amount": "18% та 5%",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 6
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "ЄСВ за працівника",
+          "type": "taxes",
+          "description": "",
+          "periods": [
+            {
+              "id": 667,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 666,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 665,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 796,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 797,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 798,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 7
+            },
+            {
+              "id": 1032,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 1031,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 1030,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 7
+            },
+            {
+              "id": 1029,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 1028,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 7
+            },
+            {
+              "id": 1027,
+              "group": 6,
+              "amount": "22%",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 7
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "Сплата акцизу",
+          "type": "taxes",
+          "description": "Сплата роздрібного акцизу",
+          "periods": [
+            {
+              "id": 679,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 678,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 677,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 808,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 807,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 8
+            },
+            {
+              "id": 806,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 1033,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 1034,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 8
+            },
+            {
+              "id": 1035,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 1036,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 8
+            },
+            {
+              "id": 1037,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 8
+            },
+            {
+              "id": 1038,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 8
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "МПЗ",
+          "type": "taxes",
+          "description": "Податок для с/г виробників",
+          "periods": [
+            {
+              "id": 671,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 9
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "name": "Звітність акциз",
+          "type": "report",
+          "description": "Роздрібний акциз",
+          "periods": [
+            {
+              "id": 674,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 675,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 676,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 801,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 800,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 799,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 10
+            },
+            {
+              "id": 1044,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1043,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1042,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 10
+            },
+            {
+              "id": 1041,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1040,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 10
+            },
+            {
+              "id": 1039,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 10
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "name": "Сплата ПДВ",
+          "type": "taxes",
+          "description": "Сплата ПДВ",
+          "periods": [
+            {
+              "id": 668,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-02-02",
+              "taxEventId": 11
+            },
+            {
+              "id": 669,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-03-02",
+              "taxEventId": 11
+            },
+            {
+              "id": 670,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-31",
+              "taxEventId": 11
+            },
+            {
+              "id": 809,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 810,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-06-01",
+              "taxEventId": 11
+            },
+            {
+              "id": 811,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 1045,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-31",
+              "taxEventId": 11
+            },
+            {
+              "id": 1046,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-31",
+              "taxEventId": 11
+            },
+            {
+              "id": 1047,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 1048,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-02",
+              "taxEventId": 11
+            },
+            {
+              "id": 1049,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-30",
+              "taxEventId": 11
+            },
+            {
+              "id": 1050,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-31",
+              "taxEventId": 11
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "name": "Реєстрація ПН / РК з 1 по 15 число",
+          "type": "report",
+          "description": "Реєстрація ПН / РК",
+          "periods": [
+            {
+              "id": 680,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 681,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 682,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 814,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-06",
+              "taxEventId": 12
+            },
+            {
+              "id": 813,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 812,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 1051,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-06",
+              "taxEventId": 12
+            },
+            {
+              "id": 1052,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 1053,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-07",
+              "taxEventId": 12
+            },
+            {
+              "id": 1054,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 1055,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-05",
+              "taxEventId": 12
+            },
+            {
+              "id": 1056,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-07",
+              "taxEventId": 12
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "name": "Реєстрація ПН / РК з 16 по 31 число",
+          "type": "report",
+          "description": "Реєстрація ПН / РК",
+          "periods": [
+            {
+              "id": 685,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-19",
+              "taxEventId": 13
+            },
+            {
+              "id": 684,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 683,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 815,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 13
+            },
+            {
+              "id": 816,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 817,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 1062,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 13
+            },
+            {
+              "id": 1061,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 1060,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 1059,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-19",
+              "taxEventId": 13
+            },
+            {
+              "id": 1058,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-18",
+              "taxEventId": 13
+            },
+            {
+              "id": 1057,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-18",
+              "taxEventId": 13
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "name": "Декларація ПДВ",
+          "type": "report",
+          "description": "Звітність по ПДВ",
+          "periods": [
+            {
+              "id": 686,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 688,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-02-01",
+              "dateEnd": "2026-02-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 689,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-03-01",
+              "dateEnd": "2026-03-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 802,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-04-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 803,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-05-01",
+              "dateEnd": "2026-05-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 804,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-06-01",
+              "dateEnd": "2026-06-19",
+              "taxEventId": 14
+            },
+            {
+              "id": 1063,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 1064,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-08-01",
+              "dateEnd": "2026-08-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 1065,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-09-01",
+              "dateEnd": "2026-09-18",
+              "taxEventId": 14
+            },
+            {
+              "id": 1066,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 1067,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-11-01",
+              "dateEnd": "2026-11-20",
+              "taxEventId": 14
+            },
+            {
+              "id": 1068,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-12-01",
+              "dateEnd": "2026-12-21",
+              "taxEventId": 14
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "name": "Сплата ПДФО",
+          "type": "taxes",
+          "description": "Сплата податку на дохід",
+          "periods": [
+            {
+              "id": 659,
+              "group": 6,
+              "amount": "18%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-12",
+              "taxEventId": 15
+            },
+            {
+              "id": 989,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 15
+            },
+            {
+              "id": 986,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 15
+            }
+          ]
+        },
+        {
+          "id": 49,
+          "name": "Об'єднаний звіт 4ДФ",
+          "type": "report",
+          "description": "За найманих працівників",
+          "periods": [
+            {
+              "id": 673,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-01-20",
+              "taxEventId": 49
+            },
+            {
+              "id": 818,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-04-01",
+              "dateEnd": "2026-05-11",
+              "taxEventId": 49
+            },
+            {
+              "id": 1069,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-08-10",
+              "taxEventId": 49
+            },
+            {
+              "id": 1070,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-11-09",
+              "taxEventId": 49
+            }
+          ]
+        },
+        {
+          "id": 58,
+          "name": "Військовий збір",
+          "type": "taxes",
+          "description": "доходу за квартал",
+          "periods": [
+            {
+              "id": 660,
+              "group": 6,
+              "amount": "1,5%",
+              "dateStart": "2026-01-01",
+              "dateEnd": "2026-05-12",
+              "taxEventId": 58
+            },
+            {
+              "id": 988,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-07-01",
+              "dateEnd": "2026-07-20",
+              "taxEventId": 58
+            },
+            {
+              "id": 987,
+              "group": 6,
+              "amount": "",
+              "dateStart": "2026-10-01",
+              "dateEnd": "2026-10-20",
+              "taxEventId": 58
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

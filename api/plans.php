@@ -5,10 +5,10 @@ declare(strict_types=1);
 function planDefinitions(): array
 {
     $accounting = [
-        'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'services' => false, 'services_per_client' => 2, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'amount' => '7.99', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'services' => true, 'services_per_client' => null, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => 1, 'project_leads' => 1, 'moderators' => 3],
-        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'amount' => '24.99', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => null, 'project_leads' => 5, 'moderators' => 5],
+        'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'accounting' => false, 'services' => false, 'services_per_client' => 2, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'amount' => '7.99', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => 1, 'project_leads' => 1, 'moderators' => 3],
+        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'amount' => '24.99', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => null, 'project_leads' => 5, 'moderators' => 5],
     ];
     $dentalFeatures = [
         'dental_medical_records' => true, 'dental_service_catalog' => true, 'dental_patient_invoices' => true,
@@ -56,6 +56,8 @@ function dentalPlanFeatures(): array
 
 function ensurePlanSchema(PDO $pdo): void
 {
+    $selectedWorkspaceColumn = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'selected_workspace_id'")->fetchColumn();
+    if (!(int)$selectedWorkspaceColumn) $pdo->exec("ALTER TABLE users ADD selected_workspace_id CHAR(32) NULL");
     $moduleColumnExists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'active_client_module'")->fetchColumn();
     if (!(int)$moduleColumnExists) $pdo->exec("ALTER TABLE users ADD active_client_module VARCHAR(40) NOT NULL DEFAULT 'accounting'");
     $exists = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'plan_key'")->fetchColumn();
@@ -120,10 +122,20 @@ function activeWorkspaceId(PDO $pdo, string $userId, string $role): string
 {
     $workspaces = availableWorkspaces($pdo, $userId, $role);
     $allowed = array_column($workspaces, 'id');
-    $requested = (string)($_SESSION['active_workspace_id'] ?? '');
-    if ($requested !== '' && in_array($requested, $allowed, true)) return $requested;
+    $selectedQuery = $pdo->prepare('SELECT selected_workspace_id FROM users WHERE id = ? LIMIT 1');
+    $selectedQuery->execute([$userId]);
+    $stored = (string)($selectedQuery->fetchColumn() ?: '');
+    $requested = $stored !== '' ? $stored : (string)($_SESSION['active_workspace_id'] ?? '');
+    if ($requested !== '' && in_array($requested, $allowed, true)) {
+        if ($requested !== $stored) {
+            $pdo->prepare('UPDATE users SET selected_workspace_id = ? WHERE id = ?')->execute([$requested, $userId]);
+        }
+        $_SESSION['active_workspace_id'] = $requested;
+        return $requested;
+    }
     // Keep the previous default for members while managers start in their own workspace.
     $default = (string)($workspaces[0]['id'] ?? $userId);
+    $pdo->prepare('UPDATE users SET selected_workspace_id = ? WHERE id = ?')->execute([$default, $userId]);
     $_SESSION['active_workspace_id'] = $default;
     return $default;
 }
@@ -504,10 +516,10 @@ function planSettingsPayload(array $context): array
         $planLimits = [];
         foreach ($planLabels as $metric => $label) $planLimits[$metric] = $plan[$metric] ?? null;
         $planFeatures = [];
-        foreach ($planIsDental ? dentalPlanFeatures() : ['services','calendar','analytics','telegram','support'] as $feature) $planFeatures[$feature] = (bool)($plan[$feature] ?? false);
+        foreach ($planIsDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support'] as $feature) $planFeatures[$feature] = (bool)($plan[$feature] ?? false);
         $availablePlans[] = ['key' => $key, 'module' => $plan['module'] ?? 'accounting', 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => $planLimits, 'features' => $planFeatures];
     }
     $features = [];
-    foreach ($isDental ? dentalPlanFeatures() : ['services','calendar','analytics','telegram','support'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
+    foreach ($isDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
     return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
 }

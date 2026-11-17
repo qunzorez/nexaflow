@@ -8,7 +8,7 @@ import {
   faBoxArchive, faPenToSquare, faWandMagicSparkles, faShieldHalved,
   faGem, faAddressBook, faHourglassHalf, faRotate, faPaperclip,
   faEye, faEyeSlash, faBold, faItalic, faListUl, faSpinner, faCircleQuestion,
-  faBriefcase,
+  faBriefcase, faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import './icons.css';
 
@@ -25,6 +25,7 @@ const icons = {
   edit: faPenToSquare, sparkle: faWandMagicSparkles, security: faShieldHalved,
   subscription: faGem, contact: faAddressBook, hourglass: faHourglassHalf,
   briefcase: faBriefcase,
+  trash: faTrash,
   refresh: faRotate, attachment: faPaperclip, eye: faEye, eyeSlash: faEyeSlash,
   bold: faBold, italic: faItalic, list: faListUl, loading: faSpinner,
   question: faCircleQuestion, 'circle-question': faCircleQuestion,

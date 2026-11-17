@@ -5,6 +5,7 @@ require_once __DIR__ . '/plans.php';
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db();
+ensurePlanSchema($pdo);
 $q = $pdo->prepare('SELECT id, role FROM users WHERE id = ? LIMIT 1');
 $q->execute([$_SESSION['user_id']]);
 $user = $q->fetch();
@@ -15,6 +16,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $target = trim((string)($data['workspace_id'] ?? ''));
     if (!in_array($target, array_column($workspaces, 'id'), true)) jsonResponse(false, 'Цей робочий простір вам недоступний.', [], 403);
     $_SESSION['active_workspace_id'] = $target;
+    $pdo->prepare('UPDATE users SET selected_workspace_id = ? WHERE id = ?')->execute([$target, $user['id']]);
 }
 $active = activeWorkspaceId($pdo, (string)$user['id'], (string)$user['role']);
 $context = workspacePlan($pdo, (string)$user['id'], (string)$user['role']);

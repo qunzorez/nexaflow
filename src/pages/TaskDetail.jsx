@@ -141,6 +141,13 @@ export default function TaskDetail() {
     setNotice("Задачу переміщено до архіву.");
     load();
   }
+  async function deleteTask() {
+    if (!window.confirm("Видалити задачу назавжди? Її історію та пов’язані записи буде видалено.")) return;
+    setError("");
+    const result = await post("/api/tasks.php", { action: "delete", id });
+    if (!result.ok) return setError(result.message || "Не вдалося видалити задачу.");
+    navigate("/tasks", { replace: true, state: { notice: result.message } });
+  }
   async function logTime(event) {
     event.preventDefault();
     setError("");
@@ -229,6 +236,7 @@ export default function TaskDetail() {
             <button className="primary-action" type="button" onClick={edit}>
               Редагувати задачу
             </button>
+            {canManage && !isAppointment && <button className="outline-btn task-delete-action" type="button" onClick={deleteTask}><Icon name="trash" /> Видалити</button>}
           </div>
         </section>
         <div className="task-detail-grid">
