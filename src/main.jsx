@@ -8,5 +8,6 @@ import './dashboard-tasks.css';
 import './header-create.css';
 import './dashboard-time.css';
 import './toasts.css';
+import './responsive-fixes.css';
 
 createRoot(document.getElementById('root')).render(<BrowserRouter><App /></BrowserRouter>);

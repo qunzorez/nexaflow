@@ -1,0 +1,206 @@
+/* Keep the landing hero's grid children from forcing a desktop-width layout. */
+@media (max-width: 750px) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landing-hero > *,
+  .hero-copy,
+  .hero-visual {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hero-copy {
+    max-width: 100%;
+  }
+
+  .hero-copy h1 {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .hero-visual {
+    overflow: hidden;
+  }
+
+  .dashboard-window {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .window-body aside {
+    flex: 0 0 68px;
+    width: 68px;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .mock-content {
+    min-width: 0;
+    padding: 14px 12px;
+  }
+
+  .mock-heading {
+    gap: 6px;
+  }
+
+  .mock-heading h3 {
+    min-width: 0;
+    font-size: clamp(12px, 4vw, 16px);
+  }
+
+  .mock-action {
+    flex: none;
+    padding: 7px;
+    font-size: 7px;
+  }
+
+  .mock-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .mock-stats > div {
+    min-width: 0;
+    padding: 6px;
+  }
+
+  .mock-stats strong {
+    font-size: 18px;
+  }
+
+  .mock-panel {
+    padding: 10px 8px;
+  }
+
+  /* Reserve space for the fixed section control beside the plan cards. */
+  .landing-page .pricing-section {
+    padding-right: 40px;
+  }
+}
+
+/* The two-column plan grid is taller than a tablet viewport. Let the section
+   grow naturally so anchor navigation does not center the cards over its title. */
+@media (min-width: 751px) and (max-width: 1050px) {
+  .pricing-section {
+    height: auto;
+    min-height: calc(100svh - 78px);
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .pricing-section .pricing-grid {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+}
+
+/* Preserve usable page width on tablet while keeping the full sidebar. */
+@media (min-width: 701px) and (max-width: 850px) {
+  .project-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-filters .project-search,
+  .project-filters .filter-reset {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Keep decorative artwork and the shared header from creating page overflow. */
+.dashboard-page {
+  min-width: 0;
+}
+
+.dashboard-page::before {
+  right: 0;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    min-width: 0;
+    gap: 10px;
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .breadcrumb {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .top-actions {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .header-create-actions {
+    display: none;
+  }
+
+  .profile-menu-wrap,
+  .user-chip-copy {
+    min-width: 0;
+  }
+
+  .user-chip-copy {
+    max-width: 120px;
+  }
+
+  .user-chip-copy strong,
+  .user-chip-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .top-actions {
+    gap: 6px;
+  }
+
+  .user-chip {
+    min-width: 0;
+    gap: 5px;
+    padding-left: 8px;
+  }
+
+  .user-chip-copy {
+    max-width: 74px;
+  }
+}
+
+@media (min-width: 621px) and (max-width: 900px) {
+  .accounting-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .accounting-header .primary-action {
+    white-space: nowrap;
+  }
+
+  .accounting-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.menu-btn { display: none; }
+@media (max-width: 700px) {
+  .menu-btn { display: inline-grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border: 0; border-radius: 9px; background: #eaf4ee; color: #168968; font-size: 20px; cursor: pointer; }
+  .main-area { position: relative; z-index: 0; }
+  .sidebar { z-index: 11; width: min(270px, calc(100vw - 54px)); }
+  .sidebar-backdrop { position: fixed; z-index: 10; inset: 0; border: 0; background: rgba(14, 31, 23, .42); }
+}

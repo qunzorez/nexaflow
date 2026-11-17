@@ -5,7 +5,7 @@ import { api, post } from "../services/api.js";
 import "./sidebar-icons.css";
 import "./support-nav.css";
 
-export default function Sidebar({ user, open }) {
+export default function Sidebar({ user, open, onNavigate }) {
   const navigate = useNavigate();
   const location = useLocation();
   const workspaces = user?.workspaces || [];
@@ -126,7 +126,7 @@ export default function Sidebar({ user, open }) {
     window.location.reload();
   }
   return (
-    <aside className={`sidebar ${open ? "open" : ""}`}>
+    <aside id="app-sidebar" className={`sidebar ${open ? "open" : ""}`} onClick={event => event.target.closest('a') && onNavigate?.()}>
       <Link className="side-brand" to="/dashboard">
         <div className="brand-mark">
           <span><Icon name="plus" /></span>

@@ -4,3 +4,6 @@
 @media(max-width:620px){.accounting-header,.accounting-panel-heading{align-items:flex-start;flex-direction:column}.accounting-header{display:block}.accounting-actions{margin-top:16px;flex-wrap:wrap}.accounting-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-filters,.accounting-rule-form{grid-template-columns:1fr}.accounting-panel{padding:15px}.accounting-header h1{font-size:25px}.checklist-controls{width:100%;align-items:stretch;flex-direction:column}}
 .checklist-add{display:flex;gap:8px;margin:16px 0}.checklist-add input{flex:1}
 .checklist-list form{grid-template-columns:minmax(130px,1.2fr) repeat(6,minmax(100px,1fr)) auto}
+
+/* Keep every obligation field visible in the desktop content column. */
+@media(min-width:901px){.accounting-table{table-layout:fixed;min-width:0}.accounting-table th,.accounting-table td{white-space:normal;overflow-wrap:anywhere;word-break:normal}.accounting-table th:nth-child(1){width:19%}.accounting-table th:nth-child(2){width:15%}.accounting-table th:nth-child(3){width:14%}.accounting-table th:nth-child(4),.accounting-table th:nth-child(5){width:13%}.accounting-table th:nth-child(6){width:15%}.accounting-table th:nth-child(7){width:11%}.accounting-table td{padding:10px 7px}.accounting-table .accounting-status{padding:4px 6px;white-space:normal}}
