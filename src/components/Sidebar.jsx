@@ -210,12 +210,9 @@ export default function Sidebar({ user, open, onNavigate }) {
         {canUseSupport && <Link className="nav-item" to="/support" onClick={clearSupportUnread}>
           <span><Icon name="question" /></span> Онлайн підтримка {counts.support > 0 && <b className="support-unread-badge" aria-label={`${counts.support} непрочитаних повідомлень`}>{counts.support}</b>}
         </Link>}
-        <span className="nav-item disabled" aria-disabled="true">
-          <span><Icon name="document" /></span> Документи <b>0</b>
-        </span>
-        <span className="nav-item disabled" aria-disabled="true">
-          <span><Icon name="chart" /></span> Аналітика <b>0</b>
-        </span>
+        <Link className="nav-item" to="/faq">
+          <span><Icon name="question" /></span> FAQ · Як користуватися
+        </Link>
         <div className="sidebar-social-block">
           <p className="nav-label">СОЦІАЛЬНІ МЕРЕЖІ</p>
           <a href="https://www.instagram.com/nexaflow.top/" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faInstagram} /></span> Instagram</a>

@@ -16,5 +16,12 @@ Disallow: /settings
 Disallow: /verify-email
 Disallow: /reset-password
 Disallow: /accept-invite
+Disallow: /admin
+Disallow: /accounting
+Disallow: /patients
+Disallow: /appointments
+Disallow: /dentistry
+Disallow: /banned
+Disallow: /faq
 
 Sitemap: https://nexaflow.top/sitemap.xml

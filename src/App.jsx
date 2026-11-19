@@ -1,38 +1,40 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import Login from "./pages/Login.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
-import Team from "./pages/Team.jsx";
-import AcceptInvite from "./pages/AcceptInvite.jsx";
-import NotificationsPage from "./pages/NotificationsPage.jsx";
-import Projects from "./pages/Projects.jsx";
-import ProjectCreatePage from "./pages/ProjectCreatePage.jsx";
-import ProjectEditPage from "./pages/ProjectEditPage.jsx";
-import Tasks from "./pages/Tasks.jsx";
-import TaskDetail from "./pages/TaskDetail.jsx";
-import Settings from "./pages/Settings.jsx";
-import VerifyEmail from "./pages/VerifyEmail.jsx";
-import ResetPassword from "./pages/ResetPassword.jsx";
-import Clients from "./pages/Clients.jsx";
-import ClientCreatePage from "./pages/ClientCreatePage.jsx";
-import ClientEditPage from "./pages/ClientEditPage.jsx";
-import Calendar from "./pages/Calendar.jsx";
-import Services from "./pages/Services.jsx";
+const Login = lazy(() => import("./pages/Login.jsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
+const Team = lazy(() => import("./pages/Team.jsx"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite.jsx"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage.jsx"));
+const Projects = lazy(() => import("./pages/Projects.jsx"));
+const ProjectCreatePage = lazy(() => import("./pages/ProjectCreatePage.jsx"));
+const ProjectEditPage = lazy(() => import("./pages/ProjectEditPage.jsx"));
+const Tasks = lazy(() => import("./pages/Tasks.jsx"));
+const TaskDetail = lazy(() => import("./pages/TaskDetail.jsx"));
+const Settings = lazy(() => import("./pages/Settings.jsx"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail.jsx"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword.jsx"));
+const Clients = lazy(() => import("./pages/Clients.jsx"));
+const ClientCreatePage = lazy(() => import("./pages/ClientCreatePage.jsx"));
+const ClientEditPage = lazy(() => import("./pages/ClientEditPage.jsx"));
+const Calendar = lazy(() => import("./pages/Calendar.jsx"));
+const Services = lazy(() => import("./pages/Services.jsx"));
 import Landing from "./pages/Landing.jsx";
 import PlanFeatureRoute from "./components/PlanFeatureRoute.jsx";
-import Support from "./pages/Support.jsx";
-import Appointments from "./pages/Appointments.jsx";
-import AppointmentEditPage from "./pages/AppointmentEditPage.jsx";
-import AppointmentDetailPage from "./pages/AppointmentDetailPage.jsx";
+const Support = lazy(() => import("./pages/Support.jsx"));
+const Appointments = lazy(() => import("./pages/Appointments.jsx"));
+const AppointmentEditPage = lazy(() => import("./pages/AppointmentEditPage.jsx"));
+const AppointmentDetailPage = lazy(() => import("./pages/AppointmentDetailPage.jsx"));
 import DentistryModuleRoute from "./components/DentistryModuleRoute.jsx";
-import DentistryPatientPage from "./pages/DentistryPatientPage.jsx";
-import DentistryERPPage from "./pages/DentistryERPPage.jsx";
-import Accounting from "./pages/Accounting.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
-import BannedPage from "./pages/BannedPage.jsx";
+const DentistryPatientPage = lazy(() => import("./pages/DentistryPatientPage.jsx"));
+const DentistryERPPage = lazy(() => import("./pages/DentistryERPPage.jsx"));
+const Accounting = lazy(() => import("./pages/Accounting.jsx"));
+const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
+const BannedPage = lazy(() => import("./pages/BannedPage.jsx"));
+const FAQ = lazy(() => import("./pages/FAQ.jsx"));
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<div className="loading-screen">Завантаження…</div>}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
       <Route path="/register" element={<Login initialMode="register" />} />
@@ -51,6 +53,7 @@ export default function App() {
       <Route path="/dentistry/payroll" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_doctor_payroll"><DentistryERPPage key="payroll" module="payroll" /></PlanFeatureRoute></DentistryModuleRoute>} />
       <Route path="/dentistry/equipment" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_equipment"><DentistryERPPage key="equipment" module="equipment" /></PlanFeatureRoute></DentistryModuleRoute>} />
       <Route path="/calendar" element={<PlanFeatureRoute feature="calendar"><Calendar /></PlanFeatureRoute>} />
+      <Route path="/faq" element={<FAQ />} />
       <Route path="/appointments" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><Appointments /></DentistryModuleRoute></PlanFeatureRoute>} />
       <Route path="/appointments/:id" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><AppointmentDetailPage /></DentistryModuleRoute></PlanFeatureRoute>} />
       <Route path="/appointments/:id/edit" element={<PlanFeatureRoute feature="calendar"><DentistryModuleRoute><AppointmentEditPage /></DentistryModuleRoute></PlanFeatureRoute>} />
@@ -68,6 +71,6 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></Suspense>
   );
 }
