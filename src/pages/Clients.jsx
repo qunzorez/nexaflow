@@ -262,7 +262,7 @@ export function serviceTaskPayload(client, service, clientId) {
   return {
     action: "create",
     workspace_owner_id: client.workspace_owner_id || "",
-    title: `${service.name} — ${client.name}`,
+    title: `${service.name} - ${client.name}`,
     description: `Послуга для клієнта «${client.name}».\n\nФорма власності: ${client.legal_form || "не вказано"}\nСистема оподаткування: ${client.tax_system || "не вказано"}\nПДВ: ${client.has_vat ? "так" : "ні"}\nАкциз: ${client.has_excise ? "так" : "ні"}\nНаймані працівники: ${employeeText}\nСпецифічні податки: ${taxes}\n\nПослуга: ${service.name}.${packageDetails}\nПеріодичність: ${service.period || "не вказано"}\nОфіційна дата: ${dueDate || "не вказано"}\nВнутрішній дедлайн: ${service.internal_days_before ?? 5} дн. до офіційної дати.`,
     client_ids: normalizedClientId ? [normalizedClientId] : [],
     assignee_ids: accountantIds,
@@ -296,7 +296,7 @@ export function serviceAppointmentTaskPayload(client, service, clientId) {
     action: "create",
     appointment_booking: true,
     workspace_owner_id: client.workspace_owner_id || "",
-    title: `Запис клієнта · ${client.name} — ${service.name}`,
+    title: `Запис клієнта · ${client.name} - ${service.name}`,
     description: `Запис клієнта «${client.name}» на послугу «${service.name}».${teeth ? `\nЗуби: ${teeth}.` : ""}${client.module_data?.doctor ? `\nЛікар: ${client.module_data.doctor}.` : ""}`,
     client_name: client.name || "",
     client_ids: normalizeId(clientId) ? [normalizeId(clientId)] : [],
@@ -553,7 +553,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   }
   const updateService = (index, field, value, allowDuplicate = false) => {
     const services = form.services || [];
-    if (field === "name" && value && !allowDuplicate && services.some((service, itemIndex) => itemIndex !== index && !service.is_package && !service.package_id && service.name.trim().toLocaleLowerCase("uk") === value.trim().toLocaleLowerCase("uk"))) {
+    if (form.module !== "accounting" && field === "name" && value && !allowDuplicate && services.some((service, itemIndex) => itemIndex !== index && !service.is_package && !service.package_id && service.name.trim().toLocaleLowerCase("uk") === value.trim().toLocaleLowerCase("uk"))) {
       if (form.module === "dentistry") setDuplicatePrompt({ index, value });
       else showDuplicateNotice(`Послугу «${value}» уже додано до цього клієнта.`);
       return;
@@ -587,28 +587,29 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
       return { ...service, [field]: value };
     });
     set("services", nextServices);
-    if (((field === "name" && value) || field === "tooth_numbers") && clientId) persistSelectedService(nextServices, index, field === "tooth_numbers" ? "teeth" : "service");
+    if (form.module !== "accounting" && ((field === "name" && value) || field === "tooth_numbers") && clientId) persistSelectedService(nextServices, index, field === "tooth_numbers" ? "teeth" : "service");
   };
+  const newServiceId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
   const addService = () => {
     if (serviceLimitReached) {
       showDuplicateNotice(`У плані «${subscription.name}» дозволено до ${clientServiceLimit} послуг на одного клієнта.`);
       return;
     }
-    set("services", [{ name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_ids: [...globalAccountantIds], accountant_id: globalAccountantIds[0] || "", internal_days_before: 5, parameters: [], tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
+    set("services", [{ id: newServiceId(), name: "", price: 0, responsible_amount: 0, responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: "", accountant_ids: globalAccountantIds.length === 1 ? [...globalAccountantIds] : [], accountant_id: globalAccountantIds.length === 1 ? globalAccountantIds[0] : "", internal_days_before: 5, parameters: [], tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])]);
     if (form.module === "dentistry") setServicePickerIndex(0);
   };
   const addPackage = () => {
     const packageItem = servicePackages.find((item) => String(item.id) === String(selectedPackageId));
     if (!packageItem) return;
-    if ((form.services || []).some((service) => String(service.package_id || "") === String(packageItem.id))) {
+    if (form.module !== "accounting" && (form.services || []).some((service) => String(service.package_id || "") === String(packageItem.id))) {
       showDuplicateNotice(`Пакет «${packageItem.name}» уже додано до цього клієнта.`);
       return;
     }
     if (packageItem.module && packageItem.module !== form.module) set("module", packageItem.module);
     const packageServiceNames = (packageItem.services || []).map((service) => service.name).filter(Boolean);
-    const nextServices = [{ name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: officialDateForService(packageItem.name, "Місяць"), accountant_ids: [...globalAccountantIds], accountant_id: globalAccountantIds[0] || "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
+    const nextServices = [{ id: newServiceId(), name: packageItem.name, price: Number(packageItem.client_price || 0), responsible_amount: Number(packageItem.responsible_amount || 0), responsible_mode: "amount", responsible_percent: "", period: "Місяць", official_due_date: officialDateForService(packageItem.name, "Місяць"), accountant_ids: globalAccountantIds.length === 1 ? [...globalAccountantIds] : [], accountant_id: globalAccountantIds.length === 1 ? globalAccountantIds[0] : "", internal_days_before: 5, parameters: packageServiceNames, tooth_numbers: form.module === "dentistry" ? [...dentalTeeth] : [], add_to_calendar: false, appointment_at: "", appointment_duration_minutes: 60, appointment_reminder_minutes: 1440, appointment_task_id: "", package_id: packageItem.id, package_name: packageItem.name, package_services: packageServiceNames, package_responsible_amount: Number(packageItem.responsible_amount || 0), calendar_enabled: Boolean(packageItem.calendar_enabled), is_package: true, reminders_enabled: true, create_task: false, _isNew: true }, ...(form.services || [])];
     set("services", nextServices);
-    if (clientId) persistSelectedService(nextServices, 0, "package");
+    if (clientId && form.module !== "accounting") persistSelectedService(nextServices, 0, "package");
     setSelectedPackageId("");
   };
   const editServiceTeeth = (index) => {
@@ -650,7 +651,6 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
   const setGlobalAccountants = (accountantIds) => setForm(current => ({
     ...current,
     module_data: { ...current.module_data, accountant_ids: accountantIds },
-    services: current.module === "accounting" ? (current.services || []).map(service => ({ ...service, accountant_ids: accountantIds, accountant_id: accountantIds[0] || "" })) : current.services,
   }));
   const removeService = (index) => set("services", (form.services || []).filter((_, itemIndex) => itemIndex !== index));
   const packagePriceTiers = ["gray", "cyan", "blue", "purple", "red", "gold"];
@@ -910,8 +910,8 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
             </fieldset></>}
             {form.module === "accounting" && <fieldset className="client-services-fieldset">
               <legend>Бухгалтерські послуги</legend>
-              <p className="client-field-hint">Спочатку ваші послуги із збереженими цінами, нижче — стандартні пропозиції.</p>
-              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>{clientServiceLimit !== null ? `До ${clientServiceLimit} послуг на клієнта в плані «${subscription.name}».` : "Оберіть послугу — дата заповниться автоматично за відомим строком."}</small></div><button type="button" className="primary-action" disabled={serviceLimitReached} onClick={addService}><Icon name="plus" /> {serviceLimitReached ? "Ліміт послуг досягнуто" : "Додати послугу"}</button></div>
+              <p className="client-field-hint">Спочатку ваші послуги із збереженими цінами, нижче - стандартні пропозиції.</p>
+              <div className="client-services-add-box"><div><strong>Додати окрему послугу</strong><small>{clientServiceLimit !== null ? `До ${clientServiceLimit} послуг на клієнта в плані «${subscription.name}».` : "Оберіть послугу - дата заповниться автоматично за відомим строком."}</small></div><button type="button" className="primary-action" disabled={serviceLimitReached} onClick={addService}><Icon name="plus" /> {serviceLimitReached ? "Ліміт послуг досягнуто" : "Додати послугу"}</button></div>
               {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Вибір пакета автоматично встановить його модуль клієнта.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((packageItem) => ({ id: packageItem.id, name: `${packageItem.name} · ${Number(packageItem.client_price || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2 })} грн · ${moduleNames[packageItem.module] || moduleNames.accounting}` }))} value={selectedPackageId} onChange={(id) => { setSelectedPackageId(id); const packageItem = servicePackages.find((item) => String(item.id) === String(id)); if (packageItem?.module) set("module", packageItem.module); }} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
               <div className="client-services-list-label">Додані послуги <span>{standaloneServiceCount}{clientServiceLimit !== null ? ` / ${clientServiceLimit}` : ""}</span></div>
               <div className="client-services-list">
@@ -925,7 +925,8 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
                   </div>
                   <div className="client-service-schedule">
                     <label><span className="client-field-label">Офіційна дата<FieldTip>Дата взята з офіційних джерел і типових строків. За потреби ви можете змінити її вручну.</FieldTip></span><DateTimePicker value={service.official_due_date || (service.name ? officialDateForService(service.name, service.period) : "")} onChange={(value) => updateService(index, "official_due_date", value)} /></label>
-                    <label><span className="client-field-label">Відповідальні бухгалтери<FieldTip>За замовчуванням призначені вгорі. Тут можна змінити склад виконавців для окремої послуги.</FieldTip></span><AccountantMultiSelect value={service.accountant_ids || (service.accountant_id ? [service.accountant_id] : globalAccountantIds)} options={eligibleAccountants} emptyMessage="У вашій команді немає доступних бухгалтерів." onChange={(ids) => updateService(index, { accountant_ids: ids, accountant_id: ids[0] || "" })} /></label>
+                    <label><span className="client-field-label">Відповідальний бухгалтер</span><SearchableSelect options={eligibleAccountants.map(person => ({ id: person.id, name: person.name, email: person.email }))} value={service.accountant_id || (service.accountant_ids || [])[0] || ""} onChange={id => updateService(index, { accountant_id: id, accountant_ids: id ? [id] : [] })} placeholder="Оберіть бухгалтера" />{(service.accountant_ids || []).length > 1 && <small>Оберіть одного бухгалтера для цього запису.</small>}</label>
+                    <label><span className="client-field-label">Нарахування оплати</span><select value={service.payout_mode || "period"} onChange={event => updateService(index, "payout_mode", event.target.value)}><option value="period">За період · за запитом</option><option value="task">За завершену задачу</option></select></label>
                     <label><span className="client-field-label">Внутрішній дедлайн (днів до офіційного)<FieldTip>За скільки днів до офіційної дати нагадати виконавцю.</FieldTip></span><input type="number" min="0" max="90" value={service.internal_days_before ?? 5} onChange={(event) => updateService(index, "internal_days_before", event.target.value)} /></label>
                     <div className="client-service-reminders"><label className="service-reminder-switch"><input type="checkbox" checked={service.reminders_enabled !== false} onChange={(event) => updateService(index, "reminders_enabled", event.target.checked)} /><span className="service-reminder-slider" />Нагадувати про цю послугу</label><label className="service-reminder-switch"><input type="checkbox" checked={Boolean(service.create_task)} onChange={(event) => updateService(index, "create_task", event.target.checked)} /><span className="service-reminder-slider" />Створити задачу для відповідального бухгалтера</label></div>
                   </div>
@@ -936,7 +937,7 @@ export function ClientFormModal({ form, setForm, editing, onSave, onClose, onAdd
             </fieldset>}
             {form.module !== "accounting" && form.module !== "dentistry" && <fieldset className="client-services-fieldset">
               <legend>Послуги та пакети · {moduleNames[form.module]}</legend>
-              <p className="client-field-hint">{form.module === "dentistry" ? "Кожен рядок — окрема послуга зі своєю ціною та часом прийому. Для повторного прийому додайте цю послугу ще раз." : "Спочатку ваші послуги із збереженими цінами, нижче — стандартні пропозиції. Можна також додати пакет із каталогу «Послуги»."}</p>
+              <p className="client-field-hint">{form.module === "dentistry" ? "Кожен рядок - окрема послуга зі своєю ціною та часом прийому. Для повторного прийому додайте цю послугу ще раз." : "Спочатку ваші послуги із збереженими цінами, нижче - стандартні пропозиції. Можна також додати пакет із каталогу «Послуги»."}</p>
               {form.module === "dentistry" && <div className="dental-service-scope"><DentalToothChart value={editingDentalServiceIndex !== null ? (form.services?.[editingDentalServiceIndex]?.tooth_numbers || []) : dentalTeeth} onChange={editingDentalServiceIndex !== null ? updateDentalSelection : setDentalTeeth} editingServiceName={editingDentalServiceIndex !== null ? (form.services?.[editingDentalServiceIndex]?.name || "Послуга") : ""} onFinishEditing={finishEditingServiceTeeth} /></div>}
               <div className="client-services-add-box"><div><strong>Додати послугу</strong><small>Оберіть напрямну послугу та вкажіть ціну.</small></div><button type="button" className="primary-action" disabled={serviceLimitReached} onClick={addService}><Icon name="plus" /> Додати послугу</button></div>
               {servicePackages.length > 0 && <div className="client-services-package-box"><div><strong>Додати пакет послуг</strong><small>Пакети активного модуля.</small></div><div className="client-services-package-controls"><SearchableSelect options={servicePackages.map((item) => ({ id: item.id, name: `${item.name} · ${Number(item.client_price || 0).toLocaleString("uk-UA")} грн` }))} value={selectedPackageId} onChange={setSelectedPackageId} placeholder="Оберіть пакет" /><button type="button" className="outline-btn" disabled={!selectedPackageId} onClick={addPackage}><Icon name="plus" /> Додати пакет</button></div></div>}
@@ -1013,10 +1014,10 @@ function ClientViewModal({ client, onClose, user }) {
             <Info
               label="Наймані працівники"
               value={
-                client.has_employees ? `Є — ${client.employee_count}` : "Немає"
+                client.has_employees ? `Є - ${client.employee_count}` : "Немає"
               }
             /></>}
-            <Info label="Створив" value={client.creator_name || "—"} />
+            <Info label="Створив" value={client.creator_name || "-"} />
           </div>
           {client.module === "accounting" && <div className="client-view-taxes">
             <small>СПЕЦИФІЧНІ ПОДАТКИ</small>
@@ -1209,8 +1210,8 @@ export default function Clients() {
             <select value={sort} onChange={(event) => setSort(event.target.value)}>
               <option value="date_desc">Нові спочатку</option>
               <option value="date_asc">Старі спочатку</option>
-              <option value="name_asc">Назва: А — Я</option>
-              <option value="name_desc">Назва: Я — А</option>
+              <option value="name_asc">Назва: А - Я</option>
+              <option value="name_desc">Назва: Я - А</option>
             </select>
           </div>
           {visible.length ? (
@@ -1251,7 +1252,7 @@ export default function Clients() {
                       ))}
                     </span>
                     <span className="client-tags client-service-tags">
-                      {client.services?.length ? client.services.map((service, index) => <i key={`${service.name}-${index}`} title={`${service.name} — ${service.period}`}>{service.name}</i>) : <em>Не додано</em>}
+                      {client.services?.length ? client.services.map((service, index) => <i key={`${service.name}-${index}`} title={`${service.name} - ${service.period}`}>{service.name}</i>) : <em>Не додано</em>}
                     </span>
                     <div className="client-actions">
                       <button
@@ -1283,7 +1284,7 @@ export default function Clients() {
               </div>
               <div className="clients-pagination">
                 <small>
-                  Показано {(page - 1) * pageSize + 1}–
+                  Показано {(page - 1) * pageSize + 1}-
                   {Math.min(page * pageSize, filtered.length)} з{" "}
                   {filtered.length} · Сторінка {page} з {totalPages}
                 </small>

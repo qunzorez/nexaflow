@@ -181,3 +181,5 @@
 .client-service-appointment-save{grid-column:1/-1;justify-self:end;min-height:36px;padding:0 14px;border:0;border-radius:9px;background:var(--green);color:#fff;font:700 11px Manrope;cursor:pointer}.client-service-appointment-save:hover:not(:disabled){filter:brightness(.95)}.client-service-appointment-save:disabled{opacity:.55;cursor:not-allowed}
 
 .client-service-appointment-date{grid-column:1/-1}
+
+.client-service-schedule .searchable-select{width:100%;min-width:0}.client-service-schedule .searchable-select-trigger{height:34px;min-height:34px;padding:7px 10px;border-radius:8px;font-size:11px}.client-service-schedule .searchable-select-value,.client-service-schedule .searchable-select-placeholder{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.client-service-schedule .searchable-select-menu{min-width:220px}.client-service-schedule label{min-width:0}

@@ -77,7 +77,8 @@ if ($method === 'GET') {
     foreach ($clients as &$client) {
         $client['special_taxes'] = $client['special_taxes'] ? (json_decode($client['special_taxes'], true) ?: []) : [];
         $client['services'] = $client['services'] ? (json_decode($client['services'], true) ?: []) : [];
-        foreach ($client['services'] as &$service) {
+        foreach ($client['services'] as $serviceIndex => &$service) {
+            $service['id'] = $service['id'] ?? md5($client['id'] . '|' . $serviceIndex . '|' . ($service['name'] ?? ''));
             if (!array_key_exists('responsible_amount', $service)) {
                 $serviceNameKey = mb_strtolower(trim((string)($service['name'] ?? '')));
                 $service['responsible_amount'] = $catalogResponsibleAmounts[$serviceNameKey] ?? null;
@@ -261,6 +262,8 @@ $services = array_values(array_filter(array_map(static function ($service) use (
         $calendarEnabled = (bool)$packageCalendar->fetchColumn();
     }
     return [
+        'id' => preg_match('/^[a-f0-9]{32}$/', (string)($service['id'] ?? '')) ? (string)$service['id'] : bin2hex(random_bytes(16)),
+        'payout_mode' => ($service['payout_mode'] ?? 'period') === 'task' ? 'task' : 'period',
         'name' => trim((string)($service['name'] ?? '')),
         'price' => max(0, (float)($service['price'] ?? 0)),
         'unit_price' => max(0, (float)($service['unit_price'] ?? ($service['price'] ?? 0))),
@@ -307,17 +310,28 @@ if ($action === 'update' && $id !== '') {
     }
 }
 $seenServiceKeys = [];
-foreach ($services as $service) {
+$seenServiceIds = [];
+foreach ($services as &$service) {
+    if (isset($seenServiceIds[$service['id']])) jsonResponse(false, 'Кожна послуга повинна мати окремий запис.', [], 422);
+    $seenServiceIds[$service['id']] = true;
+    if ($module === 'accounting') {
+        $people = array_values(array_unique(array_filter(array_merge($service['accountant_ids'], [$service['accountant_id']]))));
+        if (count($people) > 1) jsonResponse(false, 'На одну послугу або пакет можна призначити лише одного бухгалтера.', [], 422);
+        $service['accountant_id'] = $people[0] ?? '';
+        $service['accountant_ids'] = $people;
+    }
     $packageId = (string)$service['package_id'];
     $serviceKey = $packageId !== ''
         ? 'package:' . $packageId
         : 'service:' . mb_strtolower(trim((string)$service['name']), 'UTF-8');
+    if ($module === 'accounting') $serviceKey .= '|accountant:' . $service['accountant_id'];
     if (isset($seenServiceKeys[$serviceKey]) && !($module === 'dentistry' && $packageId === '')) {
         $duplicateLabel = $packageId !== '' ? (string)($service['package_name'] ?: $service['name']) : (string)$service['name'];
         jsonResponse(false, '«' . $duplicateLabel . '» уже додано до клієнта. Приберіть повторну позицію.', ['code' => 'duplicate_client_service'], 422);
     }
     $seenServiceKeys[$serviceKey] = true;
 }
+unset($service);
 $packageIds = array_values(array_unique(array_filter(array_map(static fn(array $service): string => (string)($service['package_id'] ?? ''), $services))));
 if ($packageIds) {
     $packageMarks = implode(',', array_fill(0, count($packageIds), '?'));
