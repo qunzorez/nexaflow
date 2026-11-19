@@ -4,7 +4,9 @@ require __DIR__ . '/db.php';
 require_once __DIR__ . '/plans.php';
 
 session_start();
+$optionalSession = ($_GET['optional'] ?? '') === '1';
 if (empty($_SESSION['user_id'])) {
+    if ($optionalSession) jsonResponse(true, 'Гість.', ['authenticated' => false]);
     jsonResponse(false, 'Сесія не знайдена.', [], 401);
 }
 
@@ -16,10 +18,13 @@ $pdo->prepare('UPDATE users SET last_seen_at = NOW() WHERE id = ?')->execute([$_
 $query = $pdo->prepare('SELECT id, name, email, role, is_support_agent, avatar_url FROM users WHERE id = ? LIMIT 1');
 $query->execute([$_SESSION['user_id']]);
 $user = $query->fetch();
-if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
+if (!$user) {
+    if ($optionalSession) jsonResponse(true, 'Гість.', ['authenticated' => false]);
+    jsonResponse(false, 'Користувача не знайдено.', [], 401);
+}
 $planContext = workspacePlan($pdo, (string)$user['id'], (string)$user['role']);
 $user['subscription'] = planSettingsPayload($planContext);
 $user['workspaces'] = $planContext['workspaces'];
 $user['active_workspace_id'] = $planContext['owner_id'];
 $user['workspace_role'] = $planContext['workspace_role'];
-jsonResponse(true, 'Користувач авторизований.', ['user' => $user]);
+jsonResponse(true, 'Користувач авторизований.', ['authenticated' => true, 'user' => $user]);

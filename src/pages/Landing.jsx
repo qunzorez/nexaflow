@@ -185,10 +185,10 @@ export default function Landing() {
   const navigate = useNavigate();
   useEffect(() => {
     let active = true;
-    Promise.all([api("/api/me.php"), api("/api/public-plans.php")])
+    Promise.all([api("/api/me.php?optional=1"), api("/api/public-plans.php")])
       .then(([userResult, planResult]) => {
         if (!active) return;
-        const user = userResult.ok ? userResult.user : null;
+        const user = userResult.ok && userResult.authenticated ? userResult.user : null;
         setCurrentUser(user);
         setSignedIn(Boolean(user));
         if (user?.subscription?.module)
