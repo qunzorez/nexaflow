@@ -13,7 +13,7 @@ WITH RECURSIVE numbers(n) AS (
 SELECT
   REPLACE(UUID(), '-', ''),
   CONCAT('Демо проєкт ', LPAD(n, 2, '0')),
-  CONCAT('Тестовий проєкт для перевірки списків, фільтрів і навігації — №', n),
+  CONCAT('Тестовий проєкт для перевірки списків, фільтрів і навігації, №', n),
   @demo_owner_id,
   CASE MOD(n, 4)
     WHEN 0 THEN 'active'

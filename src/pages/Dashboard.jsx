@@ -205,7 +205,7 @@ export default function Dashboard() {
               Доброго дня, <span>{data.user.name.split(" ")[0]}</span> <Icon name="sparkle" />
             </h1>
             <p className="subtext">
-              Ваші проєкти, задачі та доступи — в одному робочому просторі.
+              Ваші проєкти, задачі та доступи - в одному робочому просторі.
             </p>
           </div>
           <div className="dashboard-actions">

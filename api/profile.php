@@ -25,7 +25,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') { if (!$telegramAllowed) $u
 $data = body(); $name = trim((string)($data['name'] ?? '')); $avatarUrl = trim((string)($data['avatar_url'] ?? '')); $phone = trim((string)($data['phone'] ?? '')); $telegramTag = trim((string)($data['telegram_tag'] ?? '')); $telegramChatId = trim((string)($data['telegram_chat_id'] ?? '')); if ($telegramChatId === '') $telegramChatId = trim((string)($user['telegram_chat_id'] ?? '')); $telegramEnabled = $telegramAllowed && !empty($data['telegram_notifications_enabled']) ? 1 : 0; $emailEnabled = array_key_exists('email_notifications_enabled', $data) ? (!empty($data['email_notifications_enabled']) ? 1 : 0) : (int)($user['email_notifications_enabled'] ?? 1); $bio = trim((string)($data['bio'] ?? '')); $currentPassword = (string)($data['current_password'] ?? ''); $newPassword = (string)($data['new_password'] ?? '');
 if ($name === '') jsonResponse(false, 'Введіть ім’я.', [], 422);
 if ($avatarUrl !== '' && substr($avatarUrl, 0, 11) !== 'data:image/') jsonResponse(false, 'Фото профілю має бути зображенням.', [], 422);
-if (strlen($avatarUrl) > 7 * 1024 * 1024) jsonResponse(false, 'Фото профілю завелике. Максимальний розмір — 5 МБ.', [], 422);
+if (strlen($avatarUrl) > 7 * 1024 * 1024) jsonResponse(false, 'Фото профілю завелике. Максимальний розмір - 5 МБ.', [], 422);
 if (strlen($phone) > 40) jsonResponse(false, 'Номер телефону занадто довгий.', [], 422);
 if (strlen($telegramTag) > 80) jsonResponse(false, 'Telegram-тег занадто довгий.', [], 422);
 if (strlen($telegramChatId) > 80) jsonResponse(false, 'Telegram chat ID занадто довгий.', [], 422);

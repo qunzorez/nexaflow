@@ -11,7 +11,7 @@ import "./dentistry-material-usage.css";
 
 const money = value => `${Number(value || 0).toLocaleString("uk-UA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} грн`;
 const dateTime = value => {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(String(value).replace(" ", "T"));
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("uk-UA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
@@ -323,7 +323,7 @@ export default function DentistryPatientPage() {
 
       {tab === "План лікування" && planFeatures.dental_treatment_plans && <div className="dentistry-care-grid dentistry-treatment-plan-grid">
         <form className="dentistry-care-panel dentistry-care-form" onSubmit={createPlan}>
-          <header><div><h2>Створити план лікування</h2><p>Оберіть зуби один раз — усі додані послуги застосуються до них. Чернетка зберігається автоматично й відновиться після оновлення сторінки.</p></div></header>
+          <header><div><h2>Створити план лікування</h2><p>Оберіть зуби один раз - усі додані послуги застосуються до них. Чернетка зберігається автоматично й відновиться після оновлення сторінки.</p></div></header>
           <label>Назва плану<input required value={plan.title} onChange={event => setPlan({ ...plan, title: event.target.value })} placeholder="Наприклад, лікування карієсу" /></label>
           <label>Коментар<textarea value={plan.comment} onChange={event => setPlan({ ...plan, comment: event.target.value })} rows="2" /></label>
           <label>Відповідальний лікар<SearchableSelect options={[{ id: "", name: user?.name ? `${user.name} (поточний користувач)` : "Поточний користувач" }, ...teamUsers.map(person => ({ id: person.id, name: person.name, email: person.email }))]} value={plan.doctor_id || ""} placeholder="Оберіть лікаря" onChange={value => setPlan({ ...plan, doctor_id: value })} /></label>

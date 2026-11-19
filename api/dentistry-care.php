@@ -273,7 +273,7 @@ $dateTime = static fn($value): string => preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\
 if ($action === 'upload_document') {
     $file = $_FILES['file'] ?? null;
     if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) jsonResponse(false, 'Оберіть файл для завантаження.', [], 422);
-    if ((int)$file['size'] < 1 || (int)$file['size'] > 10 * 1024 * 1024) jsonResponse(false, 'Максимальний розмір документа — 10 МБ.', [], 422);
+    if ((int)$file['size'] < 1 || (int)$file['size'] > 10 * 1024 * 1024) jsonResponse(false, 'Максимальний розмір документа - 10 МБ.', [], 422);
     $finfo = new finfo(FILEINFO_MIME_TYPE); $mime = (string)$finfo->file((string)$file['tmp_name']);
     $allowedMimes = ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
     if (!isset($allowedMimes[$mime])) jsonResponse(false, 'Дозволені формати: PDF, JPG, PNG, WEBP.', [], 422);

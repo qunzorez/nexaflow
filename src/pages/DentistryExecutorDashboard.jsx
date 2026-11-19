@@ -54,7 +54,7 @@ export default function DentistryExecutorDashboard({ dashboard, calendarAvailabl
         <span className="dental-executor-calendar-icon"><Icon name="calendar" /></span>
         <div className="dental-executor-appointment-copy">
           <strong>{task.client_names || task.client_name || "Пацієнт"}</strong>
-          <small>{task.title?.replace(/^Запис клієнта\s*[·—-]?\s*/i, "") || task.appointment_reason || "Прийом"}{task.duration_minutes ? ` · ${task.duration_minutes} хв` : ""}</small>
+          <small>{task.title?.replace(/^Запис клієнта\s*[·\u2013\u2014-]?\s*/i, "") || task.appointment_reason || "Прийом"}{task.duration_minutes ? ` · ${task.duration_minutes} хв` : ""}</small>
           <span className={`dental-executor-status ${statusTone(status)}`}>{appointmentStatuses[status] || "Заплановано"}</span>
         </div>
         <div className="dental-executor-appointment-actions">

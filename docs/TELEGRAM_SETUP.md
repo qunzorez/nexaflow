@@ -46,8 +46,8 @@ api/config.local.php
 3. Отримати свій `chat ID` через `@userinfobot` командою `/start`.
 4. Відкрити NexaFlow → **Налаштування профілю**.
 5. Заповнити:
-   - **Telegram-тег** — наприклад `@andrey`;
-   - **Telegram chat ID** — числовий ID із `@userinfobot`.
+   - **Telegram-тег** - наприклад `@andrey`;
+   - **Telegram chat ID** - числовий ID із `@userinfobot`.
 6. Натиснути **Зберегти зміни**.
 
 Telegram-тег використовується як контактне ім’я. Відправка повідомлень виконується через `chat ID`, тому одного тега недостатньо.

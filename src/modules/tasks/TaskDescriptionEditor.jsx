@@ -11,7 +11,7 @@ export default function TaskDescriptionEditor({ value = '', onChange }) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !editorRef.current) return;
-    if (file.size > 10 * 1024 * 1024) { window.alert('Файл завеликий. Максимальний розмір — 10 МБ.'); return; }
+    if (file.size > 10 * 1024 * 1024) { window.alert('Файл завеликий. Максимальний розмір - 10 МБ.'); return; }
     const safeName = file.name.replace(/[<>"']/g, '');
     const reader = new FileReader();
     reader.onload = () => {

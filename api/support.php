@@ -146,7 +146,7 @@ if ($isSupportStaff) {
 $attachment = null;
 if ($hasFile) {
     if ((int)$file['error'] !== UPLOAD_ERR_OK) jsonResponse(false, 'Не вдалося завантажити зображення.', [], 422);
-    if ((int)$file['size'] < 1 || (int)$file['size'] > 8 * 1024 * 1024) jsonResponse(false, 'Максимальний розмір зображення — 8 МБ.', [], 422);
+    if ((int)$file['size'] < 1 || (int)$file['size'] > 8 * 1024 * 1024) jsonResponse(false, 'Максимальний розмір зображення - 8 МБ.', [], 422);
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mimeType = (string)$finfo->file((string)$file['tmp_name']);
     $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', 'image/avif' => 'avif', 'image/bmp' => 'bmp', 'image/heic' => 'heic', 'image/heif' => 'heif', 'image/tiff' => 'tiff'];

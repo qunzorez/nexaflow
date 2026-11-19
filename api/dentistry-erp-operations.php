@@ -289,7 +289,7 @@ if ($method==='POST' && in_array($action,$operationActions,true)) {
             $amount=dentalErpNumber($data['amount']??'',true); $date=dentalErpDate($data['expense_date']??'');
             if ($reason==='') throw new DomainException('Вкажіть опис витрати.'); $recurring=null;
             if (!empty($data['recurring'])) {
-                $months=filter_var($data['interval_months']??1,FILTER_VALIDATE_INT); if (!$months || $months<1 || $months>12) throw new DomainException('Інтервал: 1–12 місяців.');
+                $months=filter_var($data['interval_months']??1,FILTER_VALIDATE_INT); if (!$months || $months<1 || $months>12) throw new DomainException('Інтервал: 1-12 місяців.');
                 $recurring=$id(); $next=(new DateTimeImmutable($date))->modify('first day of +'.$months.' month'); $day=min((int)substr($date,8,2),(int)$next->format('t')); $next=$next->setDate((int)$next->format('Y'),(int)$next->format('m'),$day)->format('Y-m-d');
                 $pdo->prepare('INSERT INTO dental_erp_recurring_expenses(id,owner_id,category_id,supplier_id,description,amount,next_due,interval_months,created_by) VALUES(?,?,?,?,?,?,?,?,?)')->execute([$recurring,$ownerId,$category['id'],$supplier?:null,$reason,$amount,$next,$months,$userId]);
             }

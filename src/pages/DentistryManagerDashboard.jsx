@@ -49,7 +49,7 @@ export default function DentistryManagerDashboard({ dashboard, calendarAvailable
   return <Layout page="Панель клініки" user={dashboard.user}>
     <main className="content dental-manager-dashboard">
       <section className="dental-dashboard-hero">
-        <div><p className="eyebrow">СТОМАТОЛОГІЧНА КЛІНІКА · {todayLabel}</p><h1>Панель керування</h1><p className="subtext">Записи, пацієнти та робота команди — все важливе на сьогодні.</p></div>
+        <div><p className="eyebrow">СТОМАТОЛОГІЧНА КЛІНІКА · {todayLabel}</p><h1>Панель керування</h1><p className="subtext">Записи, пацієнти та робота команди - все важливе на сьогодні.</p></div>
         <div className="dental-dashboard-actions"><Link className="dental-dashboard-secondary" to="/clients"><Icon name="users" /> Пацієнти</Link>{calendarAvailable && <Link className="primary-action" to="/appointments"><Icon name="plus" /> Записати пацієнта</Link>}</div>
       </section>
 
@@ -58,7 +58,7 @@ export default function DentistryManagerDashboard({ dashboard, calendarAvailable
       <section className="dental-dashboard-stats" aria-label="Показники клініки">
         <Link to="/appointments" className="dental-dashboard-stat dental-stat-green"><span><Icon name="calendar" /></span><strong>{todaysAppointments.length}</strong><small>Прийомів сьогодні</small></Link>
         <Link to="/appointments" className="dental-dashboard-stat dental-stat-blue"><span><Icon name="clock" /></span><strong>{nextWeekAppointments.length}</strong><small>Записів за 7 днів</small></Link>
-        <Link to="/clients" className="dental-dashboard-stat dental-stat-violet"><span><Icon name="users" /></span><strong>{clinic?.clients.length ?? "—"}</strong><small>Пацієнтів у клініці</small></Link>
+        <Link to="/clients" className="dental-dashboard-stat dental-stat-violet"><span><Icon name="users" /></span><strong>{clinic?.clients.length ?? "-"}</strong><small>Пацієнтів у клініці</small></Link>
       </section>
 
       <section className="dental-dashboard-main-grid">

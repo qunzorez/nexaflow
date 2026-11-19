@@ -5,7 +5,7 @@ import SearchableSelect from "../components/SearchableSelect.jsx";
 import { api, post } from "../services/api.js";
 import "./accounting.css";
 
-const date = value => value ? new Date(`${String(value).slice(0,10)}T12:00:00`).toLocaleDateString("uk-UA") : "—";
+const date = value => value ? new Date(`${String(value).slice(0,10)}T12:00:00`).toLocaleDateString("uk-UA") : "-";
 const statusLabel = { planned: "Заплановано", in_progress: "У роботі", submitted_paid: "Подано/Сплачено", overdue: "Прострочено", not_applicable: "Не застосовується", waiting: "Очікуємо", received: "Отримано", not_needed: "Не потрібен" };
 
 export default function Accounting() {

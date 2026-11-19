@@ -222,7 +222,7 @@ if ($action === 'calculate_payroll') {
             $accrualId = md5($ownerId . '|dental-payroll|' . $period['id'] . '|' . $rule['user_id']);
             $details = ['calculation_type' => $rule['calculation_type'], 'calculation_basis' => $rule['calculation_basis'], 'fixed_cents' => $fixedCents, 'percentage_cents' => $percentageCents, 'per_procedure_cents' => $procedureCents];
             $saveAccrual->execute([$accrualId, $ownerId, $period['id'], $rule['user_id'], number_format($basisCents / 100, 2, '.', ''), $procedureCount, number_format($amountCents / 100, 2, '.', ''), json_encode($details, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]);
-            if ($amountCents > 0) dentalErpPostJournal($pdo, $ownerId, $userId, 'payroll_accrual', $accrualId, $ends, 'Нарахування винагороди за ' . $starts . ' — ' . $ends, [
+            if ($amountCents > 0) dentalErpPostJournal($pdo, $ownerId, $userId, 'payroll_accrual', $accrualId, $ends, 'Нарахування винагороди за ' . $starts . ' - ' . $ends, [
                 ['account' => 'labor_expense', 'debit_cents' => $amountCents, 'credit_cents' => 0],
                 ['account' => 'payroll_payable', 'debit_cents' => 0, 'credit_cents' => $amountCents],
             ]);

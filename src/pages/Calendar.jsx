@@ -69,8 +69,8 @@ function viewTitle(date, view) {
   const start = mondayOf(date);
   const end = addDays(start, 6);
   const sameMonth = start.getMonth() === end.getMonth();
-  if (sameMonth) return `${start.getDate()}–${formatDate(end, { day: "numeric", month: "long", year: "numeric" })}`;
-  return `${formatDate(start, { day: "numeric", month: "short" })} – ${formatDate(end, { day: "numeric", month: "short", year: "numeric" })}`;
+  if (sameMonth) return `${start.getDate()}-${formatDate(end, { day: "numeric", month: "long", year: "numeric" })}`;
+  return `${formatDate(start, { day: "numeric", month: "short" })} - ${formatDate(end, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
 function EventChip({ event, onOpen, compact = false }) {
@@ -86,7 +86,7 @@ function TimeGrid({ days, eventsByDay, onOpen, onCreate }) {
   return <div className={`calendar-time-grid ${days.length === 1 ? "single-day" : ""}`}>
     <div className="calendar-time-head"><span>Час</span>{days.map((date, index) => <button type="button" key={dateKey(date)} className={dateKey(date) === dateKey(new Date()) ? "today" : ""} onClick={() => onCreate(date)}>{days.length > 1 ? `${WEEKDAYS[index]} · ` : ""}{date.getDate()} {date.toLocaleDateString("uk-UA", { month: "short" })}</button>)}</div>
     <div className="calendar-all-day-row"><span>Весь день</span>{days.map(date => <div key={dateKey(date)} role="button" tabIndex="0" onClick={() => onCreate(date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") onCreate(date); }}>{(eventsByDay[dateKey(date)] || []).filter(event => !event.time).map(event => <EventChip key={event.id} event={event} onOpen={onOpen} />)}</div>)}</div>
-    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <button type="button" className="calendar-hour-slot" key={hour} onClick={() => onCreate(date, hour)} aria-label={`Створити задачу ${dateTimeKey(date, hour)}`} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}${event.archived ? " archived" : ""}`} style={{ top: `${Math.max(0, minutes)}px`, height: `${Math.max(20, Number(event.task?.duration_minutes || 60))}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })}{event.task?.duration_minutes ? `–${new Date(event.time.getTime() + Number(event.task.duration_minutes) * 60000).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })}` : ""} · {event.title}{event.archived ? " · Архів" : ""}</strong>{Number(event.task?.duration_minutes || 60) >= 45 && <small>{event.subtitle}{event.archived ? " · Запис завершено" : ""}</small>}</button>; })}</div>)}</div></div>
+    <div className="calendar-time-body"><div className="calendar-time-labels">{HOURS.map(hour => <span key={hour}>{String(hour).padStart(2, "0")}:00</span>)}</div><div className="calendar-time-columns">{days.map(date => <div className="calendar-time-column" key={dateKey(date)}>{HOURS.map(hour => <button type="button" className="calendar-hour-slot" key={hour} onClick={() => onCreate(date, hour)} aria-label={`Створити задачу ${dateTimeKey(date, hour)}`} />)}{(eventsByDay[dateKey(date)] || []).filter(event => event.time).map(event => { const minutes = event.time.getHours() * 60 + event.time.getMinutes() - 8 * 60; return <button type="button" className={`calendar-timed-event ${event.kind}${event.archived ? " archived" : ""}`} style={{ top: `${Math.max(0, minutes)}px`, height: `${Math.max(20, Number(event.task?.duration_minutes || 60))}px` }} key={event.id} onClick={() => onOpen(event)}><strong>{event.time.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })}{event.task?.duration_minutes ? `-${new Date(event.time.getTime() + Number(event.task.duration_minutes) * 60000).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })}` : ""} · {event.title}{event.archived ? " · Архів" : ""}</strong>{Number(event.task?.duration_minutes || 60) >= 45 && <small>{event.subtitle}{event.archived ? " · Запис завершено" : ""}</small>}</button>; })}</div>)}</div></div>
   </div>;
 }
 
@@ -130,7 +130,7 @@ export default function Calendar() {
       return item.status !== "not_applicable" && Boolean(parseDate(item.official_due));
     }).map(item => ({
       id: `tax-${item.id}`, kind: "tax", title: item.title,
-      subtitle: `${item.client_name} · ${item.tax_type} · ${item.period_key} · ${item.accountant_name ? `відповідальний: ${item.accountant_name} · ` : ""}внутр. ${item.internal_due ? formatDate(parseDate(item.internal_due)) : "—"}`,
+      subtitle: `${item.client_name} · ${item.tax_type} · ${item.period_key} · ${item.accountant_name ? `відповідальний: ${item.accountant_name} · ` : ""}внутр. ${item.internal_due ? formatDate(parseDate(item.internal_due)) : "-"}`,
       date: parseDate(item.official_due), official: parseDate(item.official_due),
       task: tasksById.get(String(item.task_id || "")) || (item.task_id ? { id: item.task_id } : null),
       obligation: item,

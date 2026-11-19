@@ -1,6 +1,6 @@
 # NexaFlow
 
-NexaFlow — SRM-система для керування клієнтами, проєктами, задачами й командою. Frontend побудований на React/Vite, backend — PHP API з MySQL.
+NexaFlow - SRM-система для керування клієнтами, проєктами, задачами й командою. Frontend побудований на React/Vite, backend - PHP API з MySQL.
 
 ## Локальний запуск
 
@@ -14,7 +14,7 @@ NexaFlow — SRM-система для керування клієнтами, п
 
 ## Production-збірка
 
-Виконайте `npm ci` і `npm run build:live`. Сайт очікує, що вміст `dist` буде розгорнутий у `public_html/dist`, API — у `public_html/api`, а кореневий `.htaccess` залишиться в `public_html`. Для cPanel Git ця структура налаштована в `.cpanel.yml`.
+Виконайте `npm ci` і `npm run build:live`. Сайт очікує, що вміст `dist` буде розгорнутий у `public_html/dist`, API - у `public_html/api`, а кореневий `.htaccess` залишиться в `public_html`. Для cPanel Git ця структура налаштована в `.cpanel.yml`.
 
 Перед публікацією потрібні серверний `api/config.web.php` (або сумісний старий конфіг), застосовані SQL-міграції та HTTPS. Платіжний модуль залишайте вимкненим (`billing_enabled: false`), доки не буде готової бойової LiqPay-конфігурації.
 
@@ -22,8 +22,8 @@ NexaFlow — SRM-система для керування клієнтами, п
 
 ## Важливі файли
 
-- `appsettings.json` — перемикач середовища й публічні параметри профілю; секретів тут немає.
-- `api/config.example.php` — шаблон PHP-конфігурації, без реальних ключів.
-- `database/live_migration.sql` — production bootstrap-міграція.
-- `database/email_notifications_default_on.sql` — одноразове ввімкнення email-сповіщень для наявних користувачів.
-- `.cpanel.yml` — копіювання збірки й API без перезапису серверних секретів.
+- `appsettings.json` - перемикач середовища й публічні параметри профілю; секретів тут немає.
+- `api/config.example.php` - шаблон PHP-конфігурації, без реальних ключів.
+- `database/live_migration.sql` - production bootstrap-міграція.
+- `database/email_notifications_default_on.sql` - одноразове ввімкнення email-сповіщень для наявних користувачів.
+- `.cpanel.yml` - копіювання збірки й API без перезапису серверних секретів.

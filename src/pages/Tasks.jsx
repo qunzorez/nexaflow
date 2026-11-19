@@ -504,7 +504,7 @@ export default function Tasks() {
                           ? new Date(
                               `${String(task.due_date).slice(0, 10)}T00:00:00`,
                             ).toLocaleDateString("uk-UA")
-                          : "—"}
+                          : "-"}
                       </span>
                     </td>
                     <td className="task-status-cell">
@@ -553,7 +553,7 @@ export default function Tasks() {
           </div>
           <div className="task-table-footer">
             <span>
-              Показано {firstRow}–{lastRow} із {filteredTasks.length}
+              Показано {firstRow}-{lastRow} із {filteredTasks.length}
             </span>
             <div className="pagination">
               <button

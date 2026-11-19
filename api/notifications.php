@@ -7,7 +7,7 @@ session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 
 $pdo = db();
-// Старі інсталяції можуть ще не мати полів рекламного показу — додаємо їх
+// Старі інсталяції можуть ще не мати полів рекламного показу - додаємо їх
 // безпечно під час першого звернення до API.
 $notificationColumns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME IN ('is_banner', 'banner_dismissed_at', 'banner_view_count')")->fetchAll(PDO::FETCH_COLUMN);
 if (!in_array('is_banner', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD is_banner TINYINT(1) NOT NULL DEFAULT 0 AFTER content_html");
@@ -118,7 +118,7 @@ try {
                 $emailSkipped++;
                 continue;
             }
-            if (sendUserNotificationEmail($pdo, (string)$recipient['id'], $recipientEmail, $title . ' — NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) $emailSent++;
+            if (sendUserNotificationEmail($pdo, (string)$recipient['id'], $recipientEmail, $title . ' - NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) $emailSent++;
             else $emailSkipped++;
             usleep(250000);
         }
@@ -161,7 +161,7 @@ try {
                     $emailSkipped++;
                     continue;
                 }
-                if (sendUserNotificationEmail($pdo, (string)$recipient['id'], $recipientEmail, $title . ' — NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) {
+                if (sendUserNotificationEmail($pdo, (string)$recipient['id'], $recipientEmail, $title . ' - NexaFlow', $message, notificationEmailHtml($title, $contentHtml !== '' ? $contentHtml : '<p>' . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'))) {
                     $emailSent++;
                 } else {
                     $emailSkipped++;

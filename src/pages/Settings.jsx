@@ -471,7 +471,7 @@ export default function Settings() {
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
               <span className={subscription?.features.support ? "enabled" : "locked"}>{subscription?.features.support ? "✓" : "×"} Онлайн-підтримка</span>
             </div>}
-            {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план — ми відкриємо його можливості без списання коштів.</span></div>}
+            {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план - ми відкриємо його можливості без списання коштів.</span></div>}
             <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
             <div className="plan-comparison-grid">
               {(subscription?.available_plans || []).filter(plan => (plan.module || "accounting") === selectedPlanModule).map((plan) => <article className={`plan-tier plan-tier-${plan.key}${selectedPlanModule === "dentistry" ? " dental-plan-tier" : ""}${plan.key === subscription?.key ? " current" : ""}`} key={plan.key}>
@@ -498,12 +498,12 @@ export default function Settings() {
                       <section className="dental-plan-feature-section"><h4>Доступно в плані</h4><div className="dental-plan-feature-list">{Object.entries(dentalFeatureNames).filter(([feature]) => plan.features[feature]).map(([feature, label]) => <span className="available" key={feature}><i>✓</i>{label}</span>)}</div></section>
                       {Object.entries(dentalFeatureNames).some(([feature]) => !plan.features[feature]) && <section className="dental-plan-feature-section is-locked"><h4>Недоступно в цьому плані</h4><div className="dental-plan-feature-list">{Object.entries(dentalFeatureNames).filter(([feature]) => !plan.features[feature]).map(([feature, label]) => <span className="unavailable" key={feature}><i>×</i>{label}</span>)}</div></section>}
                     </> : <>
-                      <span className={plan.features.accounting ? "available" : "unavailable"}>{plan.features.accounting ? "✓" : "–"} Бухгалтерський модуль</span>
-                      <span className={plan.features.calendar ? "available" : "unavailable"}>{plan.features.calendar ? "✓" : "–"} Календар</span>
-                      <span className={plan.features.analytics ? "available" : "unavailable"}>{plan.features.analytics ? "✓" : "–"} Аналітика</span>
-                      <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "– Послуги"}</span>
-                      <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "–"} Telegram</span>
-                      <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "– Онлайн-підтримка"}</span>
+                      <span className={plan.features.accounting ? "available" : "unavailable"}>{plan.features.accounting ? "✓" : "-"} Бухгалтерський модуль</span>
+                      <span className={plan.features.calendar ? "available" : "unavailable"}>{plan.features.calendar ? "✓" : "-"} Календар</span>
+                      <span className={plan.features.analytics ? "available" : "unavailable"}>{plan.features.analytics ? "✓" : "-"} Аналітика</span>
+                      <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "- Послуги"}</span>
+                      <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "-"} Telegram</span>
+                      <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "- Онлайн-підтримка"}</span>
                     </>}
                   </div>
                   {(plan.limits.project_leads > 0 || plan.limits.moderators > 0) && <small className="plan-tier-roles">{plan.limits.project_leads > 0 ? `${plan.limits.project_leads === 1 ? "1 керівник проєкту" : `До ${plan.limits.project_leads} керівників проєктів`}` : ""}{plan.limits.project_leads > 0 && plan.limits.moderators > 0 ? " · " : ""}{plan.limits.moderators > 0 ? `До ${plan.limits.moderators} модераторів` : ""}</small>}

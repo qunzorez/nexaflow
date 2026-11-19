@@ -95,7 +95,7 @@ if ($action === 'resend') {
         $pdo->prepare('INSERT INTO notifications (id, user_id, sender_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([bin2hex(random_bytes(16)), $existingUserId, $_SESSION['user_id'], $notificationType, $title, $message, $entityType, $entityId]);
     }
-    jsonResponse(true, $sent ? 'Запрошення повторно надіслано. Термін дії посилання — 7 днів.' : 'Посилання оновлено, але поштовий сервер не підтвердив надсилання.', ['sent' => $sent]);
+    jsonResponse(true, $sent ? 'Запрошення повторно надіслано. Термін дії посилання - 7 днів.' : 'Посилання оновлено, але поштовий сервер не підтвердив надсилання.', ['sent' => $sent]);
 }
 
 $email = strtolower(trim((string)($data['email'] ?? '')));
