@@ -6,7 +6,6 @@ import { api, post } from "../services/api.js";
 import "./calendar.css";
 import "./calendar-appointments.css";
 import "./calendar-accounting.css";
-import "./calendar-filters.css";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const VIEWS = [
@@ -102,8 +101,6 @@ export default function Calendar() {
   });
   const [view, setView] = useState(() => VIEWS.some(option => option.id === searchParams.get("view")) ? searchParams.get("view") : "month");
   const [doctorFilter, setDoctorFilter] = useState("");
-  const [taxFilter, setTaxFilter] = useState({ system: "", employees: "0", year: String(new Date().getFullYear()), quarter: String(Math.floor(new Date().getMonth() / 3) + 1) });
-  const [selectedTaxTypes, setSelectedTaxTypes] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -120,7 +117,7 @@ export default function Calendar() {
           }
         }
       }
-      if (active) setData({ ...clientsResult, tasks: tasksResult.ok ? (tasksResult.tasks || []) : [], taxObligations: accountingResult?.ok ? (accountingResult.obligations || []) : [], taxRules: accountingResult?.ok ? (accountingResult.rules || []) : [] });
+      if (active) setData({ ...clientsResult, tasks: tasksResult.ok ? (tasksResult.tasks || []) : [], taxObligations: accountingResult?.ok ? (accountingResult.obligations || []) : [] });
     })();
     return () => { active = false; };
   }, [navigate]);
@@ -129,19 +126,8 @@ export default function Calendar() {
     if (!data) return [];
     const taxTaskIds = new Set((data.taxObligations || []).map(item => String(item.task_id || "")).filter(Boolean));
     const tasksById = new Map((data.tasks || []).map(task => [String(task.id), task]));
-    const taxTypes = [...new Set([...(data.taxRules || []).map(rule => rule.tax_type), ...(data.taxObligations || []).map(item => item.tax_type)].filter(Boolean))];
-    const selectedTypes = selectedTaxTypes === null ? taxTypes : selectedTaxTypes;
     const taxEvents = (data.taxObligations || []).filter(item => {
-      if (item.status === "not_applicable" || !selectedTypes.includes(item.tax_type)) return false;
-      const client = (data.clients || []).find(candidate => String(candidate.id) === String(item.client_id));
-      const systemCode = taxSystemCode(client || item);
-      if (taxFilter.system && systemCode !== taxFilter.system) return false;
-      if (taxFilter.employees === "1" && Number(item.has_employees) !== 1) return false;
-      if (taxFilter.employees === "0" && Number(item.has_employees) === 1) return false;
-      const date = parseDate(item.official_due);
-      if (!date || String(date.getFullYear()) !== taxFilter.year) return false;
-      if (taxFilter.quarter !== "all" && String(Math.floor(date.getMonth() / 3) + 1) !== taxFilter.quarter) return false;
-      return true;
+      return item.status !== "not_applicable" && Boolean(parseDate(item.official_due));
     }).map(item => ({
       id: `tax-${item.id}`, kind: "tax", title: item.title,
       subtitle: `${item.client_name} · ${item.tax_type} · ${item.period_key} · ${item.accountant_name ? `відповідальний: ${item.accountant_name} · ` : ""}внутр. ${item.internal_due ? formatDate(parseDate(item.internal_due)) : "—"}`,
@@ -172,7 +158,7 @@ export default function Calendar() {
     return [...serviceEvents, ...taxEvents, ...taskEvents]
       .filter(item => item.date && (!doctorFilter || !item.task || (item.task.assignee_ids || []).some(personId => String(personId) === String(doctorFilter))))
       .sort((a, b) => a.date - b.date);
-  }, [data, doctorFilter, selectedTaxTypes, taxFilter]);
+  }, [data, doctorFilter]);
 
   const eventsByDay = useMemo(() => events.reduce((result, event) => {
     (result[dateKey(event.date)] ||= []).push(event);
@@ -221,8 +207,6 @@ export default function Calendar() {
           </div>
         </section>
 
-        {data.active_client_module === "accounting" && <TaxCalendarFilters data={data} filters={taxFilter} setFilters={setTaxFilter} selectedTypes={selectedTaxTypes} setSelectedTypes={setSelectedTaxTypes} />}
-
         {data.active_client_module === "dentistry" && <label className="calendar-doctor-filter">Лікар у календарі<select value={doctorFilter} onChange={event => setDoctorFilter(event.target.value)}><option value="">Уся команда</option>{(data.team_users || []).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
 
         <div className="calendar-layout">
@@ -265,41 +249,4 @@ export default function Calendar() {
       </div>
     </Layout>
   );
-}
-
-function TaxCalendarFilters({ data, filters, setFilters, selectedTypes, setSelectedTypes }) {
-  const eventGroups = {
-    "1": ["Єдиний податок", "Єдиний соціальний внесок", "Звіт по доходу", "Розрахунок 4ДФ", "Зміна групи", "Військовий збір"],
-    "2": ["Єдиний податок", "Єдиний соціальний внесок", "Звіт по доходу", "ЄСВ за працівника", "Звітність акциз", "Зміна групи", "МПЗ", "Об'єднаний звіт 4ДФ", "ПДФО + ВЗ", "Сплата акцизу", "Військовий збір"],
-    "3": ["Єдиний податок", "Єдиний соціальний внесок", "Звіт по доходу", "ЄСВ за працівника", "Звітність акциз", "Зміна групи", "МПЗ", "Об'єднаний звіт 4ДФ", "ПДФО + ВЗ", "Сплата акцизу", "Військовий збір"],
-    "4": ["Єдиний податок", "Єдиний соціальний внесок", "Звіт по доходу", "ЄСВ за працівника", "Звітність акциз", "Зміна групи", "МПЗ", "Об'єднаний звіт 4ДФ", "ПДФО + ВЗ", "Реєстрація ПН / РК з 1 по 15 число", "Реєстрація ПН / РК з 16 по 31 число", "Сплата акцизу", "Сплата ПДВ", "Декларація ПДВ", "Військовий збір"],
-    "5": ["Єдиний соціальний внесок", "Звіт по доходу", "ЄСВ за працівника", "Звітність акциз", "Зміна групи", "МПЗ", "Об'єднаний звіт 4ДФ", "ПДФО + ВЗ", "Сплата акцизу", "Сплата ПДФО", "Військовий збір"],
-    "6": ["Єдиний соціальний внесок", "Звіт по доходу", "ЄСВ за працівника", "Звітність акциз", "Зміна групи", "МПЗ", "Об'єднаний звіт 4ДФ", "ПДФО + ВЗ", "Реєстрація ПН / РК з 1 по 15 число", "Реєстрація ПН / РК з 16 по 31 число", "Сплата акцизу", "Сплата ПДВ", "Декларація ПДВ", "Сплата ПДФО", "Військовий збір"],
-  };
-  const matched = filters.system ? (eventGroups[filters.system] || []) : Object.values(eventGroups).flat();
-  const types = [...new Set([...matched, ...(data.taxRules || []).map(rule => rule.tax_type), ...(data.taxObligations || []).map(item => item.tax_type)].filter(Boolean))];
-  const selected = selectedTypes === null ? types : selectedTypes;
-  const systems = [["1","1 група"],["2","2 група"],["3","3 група 5%"],["4","3 група 3% + ПДВ"],["5","Загальна система"],["6","Загальна система (+ПДВ)"]];
-  const years = ["2025","2026"];
-  const toggle = type => setSelectedTypes(selected.includes(type) ? selected.filter(item=>item!==type) : [...selected,type]);
-  return <div className="tax-calendar-filters" aria-label="Фільтри податкового календаря">
-    <label>Система оподаткування<select value={filters.system} onChange={event=>{setFilters({...filters,system:event.target.value});setSelectedTypes(null)}}><option value="">Усі системи</option>{systems.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
-    <details className="tax-event-filter"><summary><span>{selected.length ? `Вибрані події ${selected.length}` : "Події не вибрані"}</span><span className="tax-filter-chevron">⌄</span></summary><div className="tax-event-options">{types.length?types.map(type=><label key={type}><input type="checkbox" checked={selected.includes(type)} onChange={()=>toggle(type)}/>{type}</label>):<span>Немає налаштованих видів подій</span>}</div></details>
-    <label>Працівники<select value={filters.employees} onChange={event=>setFilters({...filters,employees:event.target.value})}><option value="0">Без найманих працівників</option><option value="1">З найманими працівниками</option></select></label>
-    <label>Рік<select value={filters.year} onChange={event=>setFilters({...filters,year:event.target.value})}>{years.map(year=><option key={year}>{year}</option>)}</select></label>
-    <label>Період<select value={filters.quarter} onChange={event=>setFilters({...filters,quarter:event.target.value})}><option value="1">1 квартал</option><option value="2">2 квартал</option><option value="3">3 квартал</option><option value="4">4 квартал</option></select></label>
-  </div>;
-}
-
-function taxSystemCode(client) {
-  if (!client) return "";
-  const system = String(client.tax_system || "").toLowerCase();
-  const legalForm = String(client.legal_form || "").toLowerCase();
-  const vat = Number(client.has_vat) === 1 || client.has_vat === true;
-  if (system.includes("1 група") || system.includes("1 group")) return "1";
-  if (system.includes("2 група") || system.includes("2 group")) return "2";
-  if (system.includes("3 група") || system.includes("3 group") || system.includes("єдиний податок, 3")) return vat ? "4" : "3";
-  if (system.includes("загальна")) return vat ? "6" : "5";
-  if (legalForm === "фоп" && system.includes("спрощ")) return vat ? "4" : "3";
-  return "";
 }
