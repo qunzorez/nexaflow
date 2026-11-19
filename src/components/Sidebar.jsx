@@ -1,4 +1,6 @@
 import Icon from './Icon.jsx';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faInstagram, faTiktok, faTelegram } from "@fortawesome/free-brands-svg-icons";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, post } from "../services/api.js";
@@ -214,6 +216,12 @@ export default function Sidebar({ user, open, onNavigate }) {
         <span className="nav-item disabled" aria-disabled="true">
           <span><Icon name="chart" /></span> Аналітика <b>0</b>
         </span>
+        <div className="sidebar-social-block">
+          <p className="nav-label">СОЦІАЛЬНІ МЕРЕЖІ</p>
+          <a href="https://www.instagram.com/nexaflow.top/" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faInstagram} /></span> Instagram</a>
+          <a href="https://www.tiktok.com/@nexaflowtop" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faTiktok} /></span> TikTok</a>
+          <a href="https://t.me/nexaflow_ua" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faTelegram} /></span> Telegram</a>
+        </div>
       </nav>
       <div className="sidebar-bottom">
         <button className="logout" onClick={logout}>

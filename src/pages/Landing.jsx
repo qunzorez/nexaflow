@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Icon from "../components/Icon.jsx";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faInstagram, faTiktok, faTelegram } from "@fortawesome/free-brands-svg-icons";
 import { api } from "../services/api.js";
 import "./landing.css";
 
@@ -926,6 +928,12 @@ export default function Landing() {
           <a className="contact-email" href="mailto:support@nexaflow.top">
             support@nexaflow.top <Icon name="forward" />
           </a>
+          <div className="contact-social-heading">Слідкуйте за NexaFlow</div>
+          <nav className="contact-social-links" aria-label="Соціальні мережі NexaFlow">
+            <a className="social-pill social-instagram" href="https://www.instagram.com/nexaflow.top/" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faInstagram} /></span> Instagram</a>
+            <a className="social-pill social-tiktok" href="https://www.tiktok.com/@nexaflowtop" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faTiktok} /></span> TikTok</a>
+            <a className="social-pill social-telegram" href="https://t.me/nexaflow_ua" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faTelegram} /></span> Telegram</a>
+          </nav>
         </div>
       </section>
 
@@ -1002,6 +1010,11 @@ export default function Landing() {
           <img src="/assets/logo-color-text.png" alt="NexaFlow" />
         </Link>
         <span>SRM для команд, які створюють результат.</span>
+        <nav className="landing-social-links" aria-label="Соціальні мережі NexaFlow">
+          <a href="https://www.instagram.com/nexaflow.top/" target="_blank" rel="noreferrer"><FontAwesomeIcon icon={faInstagram} /> Instagram</a>
+          <a href="https://www.tiktok.com/@nexaflowtop" target="_blank" rel="noreferrer"><FontAwesomeIcon icon={faTiktok} /> TikTok</a>
+          <a href="https://t.me/nexaflow_ua" target="_blank" rel="noreferrer"><FontAwesomeIcon icon={faTelegram} /> Telegram</a>
+        </nav>
         <div>
           <Link to={signedIn ? "/dashboard" : "/login"}>
             {signedIn ? "Мій простір" : "Увійти"}
