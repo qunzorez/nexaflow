@@ -200,6 +200,7 @@ export default function Sidebar({ user, open, onNavigate }) {
             Сповіщення <b>{counts.notifications}</b>
           </Link>
         )}
+        {isAdmin && <Link className="nav-item" to="/admin"><span><Icon name="settings" /></span> Адмінпанель</Link>}
         <p className="nav-label">РОБОЧІ ІНСТРУМЕНТИ</p>
         {planFeatures.calendar && <Link className="nav-item" to="/calendar">
           <span><Icon name="calendar" /></span> Календар

@@ -27,6 +27,8 @@ import DentistryModuleRoute from "./components/DentistryModuleRoute.jsx";
 import DentistryPatientPage from "./pages/DentistryPatientPage.jsx";
 import DentistryERPPage from "./pages/DentistryERPPage.jsx";
 import Accounting from "./pages/Accounting.jsx";
+import AdminPage from "./pages/AdminPage.jsx";
+import BannedPage from "./pages/BannedPage.jsx";
 
 export default function App() {
   return (
@@ -60,6 +62,8 @@ export default function App() {
       <Route path="/tasks" element={<Tasks />} />
       <Route path="/tasks/:id" element={<TaskDetail />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/banned" element={<BannedPage />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />

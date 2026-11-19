@@ -6,16 +6,30 @@ require_once __DIR__ . '/claims.php';
 function db(): PDO
 {
     static $pdo;
-    if ($pdo instanceof PDO) return $pdo;
-
-    $config = appConfig();
-    $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $config['host'], $config['port'], $config['database'], $config['charset']);
-    $pdo = new PDO($dsn, $config['username'], $config['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
-    ]);
+    static $accountStatusReady = false;
+    if (!($pdo instanceof PDO)) {
+        $config = appConfig();
+        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $config['host'], $config['port'], $config['database'], $config['charset']);
+        $pdo = new PDO($dsn, $config['username'], $config['password'], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+        ]);
+    }
+    if (!$accountStatusReady) {
+        $userColumns = array_column($pdo->query('SHOW COLUMNS FROM users')->fetchAll(), 'Field');
+        if (!in_array('is_blocked', $userColumns, true)) $pdo->exec('ALTER TABLE users ADD is_blocked TINYINT(1) NOT NULL DEFAULT 0');
+        if (!in_array('blocked_at', $userColumns, true)) $pdo->exec('ALTER TABLE users ADD blocked_at DATETIME NULL');
+        if (!in_array('blocked_reason', $userColumns, true)) $pdo->exec('ALTER TABLE users ADD blocked_reason VARCHAR(500) NULL');
+        $accountStatusReady = true;
+    }
+    if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['user_id'])) {
+        $accountStatus = $pdo->prepare('SELECT is_blocked, blocked_reason FROM users WHERE id = ? LIMIT 1');
+        $accountStatus->execute([(string)$_SESSION['user_id']]);
+        $status = $accountStatus->fetch();
+        if ($status && (int)$status['is_blocked'] === 1) jsonResponse(false, 'Обліковий запис заблоковано.', ['code' => 'account_blocked', 'reason' => (string)($status['blocked_reason'] ?? '')], 423);
+    }
     // Keep the API usable when the live database predates the time-tracking
     // migration. Dashboard reads this table before the Tasks page gets a
     // chance to create it, so initialize it centrally during DB bootstrap.

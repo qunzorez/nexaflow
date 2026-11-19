@@ -13,6 +13,10 @@ export async function api(path, options = {}) {
     }
     if (!result || typeof result !== 'object') result = { ok: false, message: `Сервер повернув некоректну відповідь (${response.status}).` };
     if (!response.ok && result.ok !== false) return { ok: false, message: `Помилка сервера (${response.status}).` };
+    if (result.code === 'account_blocked') {
+      try { window.sessionStorage.setItem('nexaflow.block_reason', String(result.reason || '')); } catch {}
+      if (window.location.pathname !== '/banned') window.location.assign('/banned');
+    }
     return result;
   } catch {
     return { ok: false, code: 'network_error', message: 'Не вдалося підключитися до сервера. Перевірте мережу та спробуйте ще раз.' };
