@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/plans.php';
+require_once __DIR__ . '/verification.php';
 
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
@@ -67,6 +68,30 @@ if ($method === 'POST') {
     $data = body();
     $action = (string)($data['action'] ?? '');
     $reason = trim((string)($data['reason'] ?? '')) ?: null;
+    if ($action === 'resend_email_verification') {
+        $userId = trim((string)($data['user_id'] ?? ''));
+        if ($userId === '') jsonResponse(false, 'Користувача не вказано.', [], 422);
+        $query = $pdo->prepare('SELECT id, name, email, email_verified_at FROM users WHERE id = ? LIMIT 1');
+        $query->execute([$userId]);
+        $target = $query->fetch();
+        if (!$target) jsonResponse(false, 'Користувача не знайдено.', [], 404);
+        if ($target['email_verified_at']) jsonResponse(false, 'Email цього користувача вже підтверджено.', [], 409);
+
+        $sent = issueEmailVerification($pdo, (string)$target['id'], (string)$target['email'], (string)$target['name']);
+        adminAudit(
+            $pdo,
+            $actorId,
+            'resend_email_verification',
+            'user',
+            $userId,
+            ['email' => (string)$target['email'], 'email_verified_at' => null],
+            ['email' => (string)$target['email'], 'sent' => $sent],
+            $reason,
+            $sent ? 'success' : 'failed'
+        );
+        if (!$sent) jsonResponse(false, 'Не вдалося відправити лист підтвердження. Перевірте налаштування пошти.', [], 502);
+        jsonResponse(true, 'Лист підтвердження повторно надіслано на ' . (string)$target['email'] . '.');
+    }
     if ($action === 'update_user') {
         $userId = trim((string)($data['user_id'] ?? ''));
         if ($userId === '') jsonResponse(false, 'Користувача не вказано.', [], 422);

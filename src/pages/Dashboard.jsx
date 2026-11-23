@@ -49,6 +49,7 @@ const reminderLabel = (value) =>
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [activeClientModule, setActiveClientModule] = useState("");
+  const [clientPortalClients, setClientPortalClients] = useState([]);
   const [reminderTask, setReminderTask] = useState(null);
   const [notice, setNotice] = useState(() => {
     const message = window.sessionStorage.getItem("nexaflow.dashboard.notice") || "";
@@ -87,6 +88,16 @@ export default function Dashboard() {
       setActiveClientModule(result.active_client_module);
       try { window.localStorage.setItem(`nexaflow.client.module.${workspaceKey}`, result.active_client_module); } catch {}
     });
+    return () => { active = false; };
+  }, [data?.user?.id, data?.user?.active_workspace_id, data?.user?.subscription?.workspace_id]);
+  useEffect(() => {
+    if (!data?.user?.id) return undefined;
+    let active = true;
+    api("/api/accounting-portal.php").then(result => {
+      if (!active || !result.ok || result.manager_view) return;
+      const clients = result.client ? [result.client] : (result.clients || []);
+      setClientPortalClients(clients.filter(client => client.client_id));
+    }).catch(() => {});
     return () => { active = false; };
   }, [data?.user?.id, data?.user?.active_workspace_id, data?.user?.subscription?.workspace_id]);
   useEffect(() => {
@@ -222,6 +233,10 @@ export default function Dashboard() {
             )}
           </div>
         </section>
+        {clientPortalClients.length > 0 && <section className="client-portal-shortcuts" aria-label="Кабінет клієнта">
+          <div><span className="eyebrow">ДОСТУП КЛІЄНТА</span><h2>Кабінет клієнта</h2><p>Документи, запити та рахунки вашої компанії.</p></div>
+          <div className="client-portal-shortcut-list">{clientPortalClients.map(client => <Link key={client.client_id} to={`/accounting/portal?client=${encodeURIComponent(client.client_id)}`}><span><Icon name="contact" /></span><strong>{client.name}</strong><Icon name="right" /></Link>)}</div>
+        </section>}
         {data.reminders?.length > 0 && (
           <section className="panel reminders-panel reminder-panel-enter">
             <div className="panel-heading">

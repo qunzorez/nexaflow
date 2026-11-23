@@ -83,7 +83,7 @@ try {
         PDO::ATTR_TIMEOUT => 5,
     ]);
     $pdo->query('SELECT 1');
-    $requiredTables = ['users', 'projects', 'tasks', 'clients', 'notifications', 'api_rate_limits'];
+    $requiredTables = ['users', 'projects', 'tasks', 'time_entries', 'clients', 'notifications', 'api_rate_limits', 'plan_subscriptions'];
     $placeholders = implode(',', array_fill(0, count($requiredTables), '?'));
     $tableQuery = $pdo->prepare("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ({$placeholders})");
     $tableQuery->execute(array_merge([(string)$config['database']], $requiredTables));
@@ -91,6 +91,24 @@ try {
     $missingTables = array_values(array_diff($requiredTables, $availableTables));
     if ($missingTables) {
         fwrite(STDERR, "Production database is missing required tables: " . implode(', ', $missingTables) . ". Apply database/live_migration.sql before deploying.\n");
+        exit(9);
+    }
+    $requiredColumns = [
+        'users' => ['is_blocked', 'blocked_reason'],
+        'plan_subscriptions' => ['module_key'],
+    ];
+    foreach ($requiredColumns as $table => $columns) {
+        $columnQuery = $pdo->prepare('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?');
+        $columnQuery->execute([(string)$config['database'], $table]);
+        $missingColumns = array_diff($columns, $columnQuery->fetchAll(PDO::FETCH_COLUMN));
+        if ($missingColumns) {
+            fwrite(STDERR, "Production database is missing required {$table} columns: " . implode(', ', $missingColumns) . ". Apply the release migrations before deploying.\n");
+            exit(9);
+        }
+    }
+    $dueDateType = $pdo->query("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'due_date'")->fetchColumn();
+    if ($dueDateType !== 'datetime') {
+        fwrite(STDERR, "Production tasks.due_date must be DATETIME. Apply database/task_due_datetime.sql before deploying.\n");
         exit(9);
     }
 } catch (Throwable $error) {

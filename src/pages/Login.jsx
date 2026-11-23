@@ -1,5 +1,5 @@
 import Icon from '../components/Icon.jsx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { post } from '../services/api.js';
 import './auth.css';
@@ -10,24 +10,30 @@ export default function Login({ initialMode = 'login' }) {
   if (supportedPlans.includes(requestedPlan)) window.localStorage.setItem('nexaflow.pending-plan', requestedPlan);
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: requestedPlan ? 'manager' : 'user', terms: false });
-  const [notice, setNotice] = useState(() => new URLSearchParams(window.location.search).get('verified') === '1' ? 'Пошту підтверджено. Увійдіть, щоб відкрити свій робочий простір.' : '');
+  const [toast, setToast] = useState(() => new URLSearchParams(window.location.search).get('verified') === '1' ? 'Пошту підтверджено. Увійдіть, щоб відкрити свій робочий простір.' : '');
   const [verificationEmail, setVerificationEmail] = useState('');
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeout = window.setTimeout(() => setToast(''), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
   const update = event => setForm({ ...form, [event.target.name]: event.target.type === 'checkbox' ? event.target.checked : event.target.value });
-  function switchMode(next) { setMode(next); setNotice(''); setVerificationEmail(''); }
+  function switchMode(next) { setMode(next); setToast(''); setVerificationEmail(''); }
 
   async function submit(event) {
     event.preventDefault();
-    setNotice('');
-    if (mode === 'register' && !form.terms) return setNotice('Підтвердіть умови використання.');
-    if (mode === 'register' && form.password !== form.password_confirmation) return setNotice('Паролі не співпадають.');
+    setToast('');
+    if (mode === 'register' && !form.terms) { setToast('Підтвердіть умови використання.'); return; }
+    if (mode === 'register' && form.password !== form.password_confirmation) return setToast('Паролі не співпадають.');
     const result = await post(`/api/${mode === 'login' ? 'login' : 'register'}.php`, form);
     if (!result.ok) {
       if (result.code === 'email_not_verified') {
         setVerificationEmail(result.email || form.email);
-        setNotice('Спочатку підтвердіть email. Перевірте пошту або надішліть лист повторно.');
-      } else setNotice(result.message);
+        setToast('Спочатку підтвердіть email. Перевірте пошту або надішліть лист повторно.');
+      } else setToast(result.message);
       return;
     }
     if (result.requires_verification) {
@@ -35,7 +41,7 @@ export default function Login({ initialMode = 'login' }) {
       setMode('login');
       setForm(current => ({ ...current, email, password: '', password_confirmation: '', terms: false }));
       setVerificationEmail(email);
-      setNotice(`Акаунт створено. Лист підтвердження надіслано на ${email}. Підтвердьте email перед входом.`);
+      setToast(`Акаунт створено. Лист підтвердження надіслано на ${email}. Підтвердьте email перед входом.`);
       return;
     }
     const planToActivate = requestedPlan || window.localStorage.getItem('nexaflow.pending-plan') || '';
@@ -49,7 +55,7 @@ export default function Login({ initialMode = 'login' }) {
 
   async function resend() {
     const result = await post('/api/resend-verification.php', { email: verificationEmail });
-    setNotice(result.message);
+    setToast(result.message);
   }
 
   return <main className="auth-page auth-modern">
@@ -67,8 +73,8 @@ export default function Login({ initialMode = 'login' }) {
         {mode === 'login' && <button type="button" className="forgot-link" onClick={() => navigate(`/reset-password?email=${encodeURIComponent(form.email)}`)}>Забули пароль?</button>}
         {mode === 'register' && <label className="terms"><input name="terms" type="checkbox" checked={form.terms} onChange={update} /> Я погоджуюсь з умовами використання</label>}
         <button className="primary-action auth-submit">{mode === 'login' ? 'Увійти в систему' : 'Створити акаунт'} <span><Icon name="forward" /></span></button>
-        {notice && <div className="form-notice">{notice}</div>}
         {verificationEmail && <button type="button" className="resend-button" onClick={resend}><Icon name="refresh" /> Відправити лист підтвердження ще раз</button>}
       </form><small className="auth-footer">Ваші дані захищені шифруванням</small></section>
+    {toast && <div className="auth-toast" role="alert" aria-live="assertive"><span aria-hidden="true">!</span>{toast}</div>}
   </main>;
 }
