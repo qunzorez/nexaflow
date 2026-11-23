@@ -59,6 +59,22 @@ function systemModuleEnabled(PDO $pdo, string $module): bool
     } catch (Throwable $ignored) { return true; }
 }
 
+function ensureSystemModuleSettingsSchema(PDO $pdo): void
+{
+    static $ready = false;
+    if ($ready) return;
+    $pdo->exec("CREATE TABLE IF NOT EXISTS system_module_settings (
+        module_key VARCHAR(32) NOT NULL PRIMARY KEY,
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        updated_by CHAR(32) NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_system_module_enabled (enabled),
+        CONSTRAINT fk_system_module_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("INSERT IGNORE INTO system_module_settings (module_key, enabled) VALUES ('accounting', 1), ('dentistry', 1)");
+    $ready = true;
+}
+
 function dentalPlanFeatures(): array
 {
     return ['dental_medical_records','dental_service_catalog','dental_patient_invoices','dental_documents','dental_tooth_chart','dental_treatment_plans','dental_inventory','dental_basic_reports','dental_procurement','dental_procedure_costing','dental_doctor_payroll','dental_financial_analytics','dental_equipment','dental_advanced_analytics','dental_management_accounting','dental_priority_support','services','calendar'];
