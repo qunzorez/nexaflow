@@ -34,7 +34,7 @@ export default function AdminPage() {
     }).finally(() => setLoading(false));
   };
   useEffect(() => { const timer = window.setTimeout(() => { setPage(1); setSearch(searchInput.trim()); }, 300); return () => window.clearTimeout(timer); }, [searchInput]);
-  useEffect(load, [page, search]);
+  useEffect(() => { void load(); }, [page, search]);
   const stats = data?.stats || {};
   const planNames = useMemo(() => Object.fromEntries((data?.plans || []).map(plan => [plan.key, plan.name])), [data]);
   async function saveUser(user) {
