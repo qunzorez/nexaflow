@@ -12,6 +12,8 @@ deployment:
     - /usr/bin/test -f database/account_blocking.sql
     - /usr/bin/test -f api/data/vchasno-tax-events-2026.json
     - /bin/mkdir -p $DEPLOYPATH/dist $DEPLOYPATH/api/support-private $DEPLOYPATH/api/accounting-private $DEPLOYPATH/api/data $DEPLOYPATH/database
+    - /bin/mkdir -p $DEPLOYPATH/dist/assets
+    - /bin/cp -R dist/assets/. $DEPLOYPATH/dist/assets/
     - /bin/cp -R dist/. $DEPLOYPATH/dist/
     - /bin/cp .htaccess $DEPLOYPATH/.htaccess
     - /bin/cp api/.htaccess $DEPLOYPATH/api/.htaccess

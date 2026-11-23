@@ -29,8 +29,6 @@ try {
         $event->execute([$user['id'] ?? null, $email]);
         jsonResponse(false, 'Невірна пошта або пароль.', [], 401);
     }
-    if (empty($user['email_verified_at'])) jsonResponse(false, 'Підтвердіть email перед входом.', ['code' => 'email_not_verified', 'email' => $email], 403);
-
     session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
     session_start();
     session_regenerate_id(true);
@@ -40,7 +38,7 @@ try {
     $_SESSION['user_role'] = $user['role'];
     $event = $pdo->prepare("INSERT INTO auth_event_log (user_id, email, event_type, result) VALUES (?, ?, 'login', 'success')");
     $event->execute([$user['id'], $user['email']]);
-    jsonResponse(true, 'Вхід виконано.', ['user' => ['name' => $user['name'], 'email' => $user['email'], 'role' => $user['role']]]);
+    jsonResponse(true, 'Вхід виконано.', ['user' => ['name' => $user['name'], 'email' => $user['email'], 'role' => $user['role'], 'email_verified_at' => $user['email_verified_at']]]);
 } catch (Throwable $error) {
     error_log($error->getMessage());
     jsonResponse(false, 'Помилка бази даних під час входу.', [], 500);

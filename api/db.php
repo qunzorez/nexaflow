@@ -17,10 +17,15 @@ function db(): PDO
         ]);
     }
     if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['user_id'])) {
-        $accountStatus = $pdo->prepare('SELECT is_blocked, blocked_reason FROM users WHERE id = ? LIMIT 1');
+        $accountStatus = $pdo->prepare('SELECT is_blocked, blocked_reason, email_verified_at FROM users WHERE id = ? LIMIT 1');
         $accountStatus->execute([(string)$_SESSION['user_id']]);
         $status = $accountStatus->fetch();
+        if (!$status) jsonResponse(false, 'Користувача не знайдено.', [], 401);
         if ($status && (int)$status['is_blocked'] === 1) jsonResponse(false, 'Обліковий запис заблоковано.', ['code' => 'account_blocked', 'reason' => (string)($status['blocked_reason'] ?? '')], 423);
+        $selfService = ['me.php', 'profile.php', 'email-verification-account.php'];
+        if ($status && empty($status['email_verified_at']) && !in_array(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')), $selfService, true)) {
+            jsonResponse(false, 'Підтвердьте email у налаштуваннях профілю, щоб продовжити.', ['code' => 'email_verification_required'], 403);
+        }
     }
     return $pdo;
 }
