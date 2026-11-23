@@ -452,8 +452,8 @@ export default function Settings() {
                 {(user?.workspace_role || user?.role) === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
               </div>}
               <div className="plan-direction-switch" role="group" aria-label="Напрям тарифного плану">
-                {subscription?.modules?.accounting !== false && <button type="button" className={selectedPlanModule === "accounting" ? "active" : ""} onClick={() => setSelectedPlanModule("accounting")}>Бухгалтерія</button>}
-                {subscription?.modules?.dentistry !== false && <button type="button" className={selectedPlanModule === "dentistry" ? "active" : ""} onClick={() => setSelectedPlanModule("dentistry")}>Стоматологія</button>}
+                {subscription?.modules?.accounting !== false && <button type="button" aria-pressed={selectedPlanModule === "accounting"} className={selectedPlanModule === "accounting" ? "active" : ""} onClick={() => setSelectedPlanModule("accounting")}>Бухгалтерія</button>}
+                {subscription?.modules?.dentistry !== false && <button type="button" aria-pressed={selectedPlanModule === "dentistry"} className={selectedPlanModule === "dentistry" ? "active" : ""} onClick={() => setSelectedPlanModule("dentistry")}>Стоматологія</button>}
               </div>
               {subscription?.modules && !subscription.modules.accounting && !subscription.modules.dentistry && <p className="admin-muted">Наразі всі модулі вимкнені адміністратором. Тарифи недоступні.</p>}
             </div>
