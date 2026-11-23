@@ -28,6 +28,7 @@ if (!$actor || !in_array((string)$actor['role'], ['admin', 'owner'], true)) {
     $attempt->execute([$actorId !== '' ? $actorId : null, is_array($actor) ? (string)$actor['email'] : null]);
     jsonResponse(false, 'Адміністративний доступ заборонено.', [], 403);
 }
+ensureSystemModuleSettingsSchema($pdo);
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS admin_audit_log (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -71,8 +72,6 @@ if ($method === 'POST') {
     if ($action === 'update_modules') {
         $modules = $data['modules'] ?? null;
         if (!is_array($modules) || !array_key_exists('accounting', $modules) || !array_key_exists('dentistry', $modules)) jsonResponse(false, 'Передайте стан бухгалтерії та стоматології.', [], 422);
-        $settingsTable = $pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_module_settings'")->fetchColumn();
-        if (!(int)$settingsTable) jsonResponse(false, 'Налаштування модулів ще не встановлені. Виконайте міграцію database/system_module_settings.sql.', [], 409);
         $pdo->beginTransaction();
         try {
             $current = $pdo->query('SELECT module_key, enabled FROM system_module_settings FOR UPDATE')->fetchAll(PDO::FETCH_KEY_PAIR);

@@ -3,10 +3,16 @@ declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/plans.php';
 
+$pdo = db();
 $definitions = planDefinitions();
+$moduleAvailability = [
+    'accounting' => systemModuleEnabled($pdo, 'accounting'),
+    'dentistry' => systemModuleEnabled($pdo, 'dentistry'),
+];
 $plans = [];
 foreach ($definitions as $key => $plan) {
     $module = (string)($plan['module'] ?? 'accounting');
+    if (empty($moduleAvailability[$module])) continue;
     $metrics = $module === 'dentistry'
         ? ['doctors', 'patients', 'appointments_month']
         : ['managers', 'participants', 'projects', 'tasks_month', 'clients'];
@@ -30,5 +36,6 @@ foreach ($definitions as $key => $plan) {
 $config = appConfig();
 jsonResponse(true, 'Тарифи завантажено.', [
     'plans' => $plans,
+    'modules' => $moduleAvailability,
     'billing_enabled' => filter_var($config['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
 ]);

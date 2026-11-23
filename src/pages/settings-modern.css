@@ -115,7 +115,9 @@
 .subscription-current-plan.plan-tier-start .subscription-current-icon,.subscription-current-plan.plan-tier-growth .subscription-current-icon,.subscription-current-plan.plan-tier-team .subscription-current-icon,.subscription-current-plan.plan-tier-business .subscription-current-icon{background:color-mix(in srgb,var(--plan-accent) 14%,white);color:var(--plan-accent)}
 .subscription-current-plan.plan-tier-start .subscription-state,.subscription-current-plan.plan-tier-growth .subscription-state,.subscription-current-plan.plan-tier-team .subscription-state,.subscription-current-plan.plan-tier-business .subscription-state{background:color-mix(in srgb,var(--plan-accent) 12%,white);color:var(--plan-accent)}
 .plan-direction-switch{display:flex;gap:8px;width:max-content;max-width:100%;padding:5px;margin:20px 0 14px;background:#f0f6f3;border:1px solid #dce9e2;border-radius:14px}
-.plan-direction-switch button{border:0;background:transparent;color:#60736a;font:inherit;font-weight:700;padding:10px 18px;border-radius:10px;cursor:pointer;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+.plan-direction-switch button{border:1px solid transparent;background:transparent;color:#315f4d;font:inherit;font-weight:700;padding:10px 18px;border-radius:10px;cursor:pointer;transition:background .15s ease,color .15s ease,box-shadow .15s ease,border-color .15s ease}
+.plan-direction-switch button:hover{background:#fff;color:#147d5b;border-color:#dce9e2}
+.plan-direction-switch button:focus-visible{outline:3px solid #168d6c33;outline-offset:2px}
 .plan-direction-switch button.active{background:#fff;color:#147d5b;box-shadow:0 2px 8px #193d2c18}
 .dental-plan-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
 .dental-current-features{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}

@@ -8,13 +8,31 @@ import './notifications-page.css';
 const roleNames = { admin: 'Адміністратори', manager: 'Менеджери', user: 'Користувачі' };
 
 export default function NotificationsPage() {
-  const [user, setUser] = useState(null); const [counts, setCounts] = useState({}); const [history, setHistory] = useState([]); const [selectedGroups, setSelectedGroups] = useState(['all']); const [status, setStatus] = useState(''); const [progress, setProgress] = useState(null); const [sending, setSending] = useState(false); const navigate = useNavigate();
+  const [user, setUser] = useState(null); const [counts, setCounts] = useState({}); const [history, setHistory] = useState([]); const [selectedGroups, setSelectedGroups] = useState(['all']); const [status, setStatus] = useState(''); const [progress, setProgress] = useState(null); const [sending, setSending] = useState(false); const [loading, setLoading] = useState(true); const [loadError, setLoadError] = useState(''); const [loadAttempt, setLoadAttempt] = useState(0); const navigate = useNavigate();
   useEffect(() => {
-    Promise.all([api('/api/me.php'), api('/api/notifications.php')]).then(([me, notifications]) => {
-      if (!me.ok || !['admin', 'owner'].includes(me.user.role)) return navigate('/dashboard', { replace: true });
-      setUser(me.user); setCounts(Object.fromEntries((notifications.audience_counts || []).map(item => [item.role, item.total]))); setHistory(notifications.notifications || []);
-    });
-  }, [navigate]);
+    let active = true;
+    async function loadPage() {
+      setLoading(true); setLoadError('');
+      try {
+        const [me, notifications] = await Promise.all([api('/api/me.php'), api('/api/notifications.php')]);
+        if (!active) return;
+        if (!me.ok || !me.user || !['admin', 'owner'].includes(me.user.role)) { navigate('/dashboard', { replace: true }); return; }
+        setUser(me.user);
+        if (!notifications.ok) {
+          setCounts({}); setHistory([]);
+          setStatus(notifications.message || 'Не вдалося завантажити сповіщення.');
+        } else {
+          const audienceCounts = Array.isArray(notifications.audience_counts) ? notifications.audience_counts : [];
+          setCounts(Object.fromEntries(audienceCounts.filter(item => item && item.role).map(item => [item.role, item.total])));
+          setHistory(Array.isArray(notifications.notifications) ? notifications.notifications.filter(Boolean) : []);
+        }
+      } catch {
+        if (active) setLoadError('Не вдалося завантажити сторінку сповіщень. Перевірте з’єднання та спробуйте ще раз.');
+      } finally { if (active) setLoading(false); }
+    }
+    loadPage();
+    return () => { active = false; };
+  }, [navigate, loadAttempt]);
   function toggleGroup(group) { setSelectedGroups(current => { if (group === 'all') return ['all']; const next = current.includes(group) ? current.filter(item => item !== group) : [...current.filter(item => item !== 'all'), group]; return next.length ? next : ['all']; }); }
   async function send(event) {
     event.preventDefault();
@@ -48,7 +66,7 @@ export default function NotificationsPage() {
     } finally { setSending(false); }
   }
   async function getHistory() { const result = await api('/api/notifications.php'); return result.notifications || []; }
-  if (!user) return <div className="loading-screen">Перевірка прав доступу…</div>;
+  if (!user) return <div className="loading-screen" role={loadError ? 'alert' : 'status'}>{loading ? 'Перевірка прав доступу…' : loadError || 'Не вдалося завантажити сторінку.'}{!loading && <button type="button" className="outline-btn" onClick={() => setLoadAttempt(value => value + 1)}>Спробувати ще раз</button>}</div>;
   const groupOptions = [['all', 'Усі користувачі', total(counts)], ['admin', 'Адміністратори', counts.admin || 0], ['manager', 'Менеджери', counts.manager || 0], ['user', 'Користувачі', counts.user || 0]];
   const progressPercent = progress?.total ? Math.round((progress.processed / progress.total) * 100) : 0;
   return <Layout page="Сповіщення" user={user}><div className="content notifications-page"><section className="welcome-row"><div><p className="eyebrow">АДМІНІСТРУВАННЯ</p><h1>Сповіщення</h1><p className="subtext">Надсилайте внутрішні повідомлення всій системі або окремим групам.</p></div></section><div className="notifications-admin-grid"><section className="panel notification-compose"><div className="panel-heading"><div><h2>Нове повідомлення</h2><p>Оберіть групи та додайте звичайний або HTML-контент.</p></div></div><form onSubmit={send}><fieldset className="group-selector" disabled={sending}><legend>Групи отримувачів</legend>{groupOptions.map(([value, label, amount]) => <label className={`group-option ${selectedGroups.includes(value) ? 'selected' : ''}`} key={value}><input type="checkbox" checked={selectedGroups.includes(value)} onChange={() => toggleGroup(value)} /><span>{label}</span><b>{amount}</b></label>)}</fieldset><label>Заголовок<input name="title" required maxLength="180" disabled={sending} placeholder="Наприклад, Оновлення системи" /></label><label>Текст повідомлення - HTML<textarea name="html" required rows="9" disabled={sending} placeholder={'<p>Важливе повідомлення</p>\n<img src="https://example.com/banner.jpg" alt="Банер">'} /></label><small className="html-help">Дозволені форматування, посилання та зображення. JavaScript автоматично видаляється.</small><label className="banner-option"><input name="is_banner" type="checkbox" disabled={sending} /><span><strong>Показувати як рекламний банер</strong><small>Відкривати це повідомлення модальним вікном для вибраних груп користувачів.</small></span></label><label className="banner-option email-option"><input name="send_email" type="checkbox" disabled={sending} /><span><strong>Надіслати також на email</strong><small>Лист отримають лише користувачі вибраних груп, у яких увімкнені email-сповіщення.</small></span></label><button className="primary-action" type="submit" disabled={sending}>{sending ? 'Відправлення…' : 'Відправити повідомлення'}</button>{progress && <div className="broadcast-progress" role="status" aria-live="polite"><div className="broadcast-progress-copy"><strong>{progress.total ? `Опрацьовано ${progress.processed} з ${progress.total}` : 'Підготовка списку отримувачів…'}</strong><b>{progress.total ? `${progressPercent}%` : ''}</b></div><div className="broadcast-progress-track"><span style={{ width: `${progressPercent}%` }} /></div>{progress.total > 0 && <small>{progress.emailSent} листів прийнято сервером{progress.emailSkipped ? ` · ${progress.emailSkipped} пропущено` : ''}</small>}</div>}{status && <div className="notification-status">{status}</div>}</form></section><section className="panel notification-history"><div className="panel-heading"><div><h2>Останні сповіщення</h2><p>Ваші отримані системні повідомлення</p></div></div>{history.length ? history.slice(0, 12).map(item => <div className="history-row" key={item.id}><span className="notification-icon">{item.type === 'broadcast' ? <Icon name="sparkle" /> : <Icon name="project" />}</span><div><strong>{item.title}</strong><small>{item.message}</small><time>{new Date(String(item.created_at).replace(' ', 'T')).toLocaleString('uk-UA')}</time></div></div>) : <div className="notification-empty">Історія сповіщень порожня.</div>}</section></div></div></Layout>;

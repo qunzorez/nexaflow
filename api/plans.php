@@ -59,6 +59,22 @@ function systemModuleEnabled(PDO $pdo, string $module): bool
     } catch (Throwable $ignored) { return true; }
 }
 
+function ensureSystemModuleSettingsSchema(PDO $pdo): void
+{
+    static $ready = false;
+    if ($ready) return;
+    $pdo->exec("CREATE TABLE IF NOT EXISTS system_module_settings (
+        module_key VARCHAR(32) NOT NULL PRIMARY KEY,
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        updated_by CHAR(32) NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_system_module_enabled (enabled),
+        CONSTRAINT fk_system_module_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("INSERT IGNORE INTO system_module_settings (module_key, enabled) VALUES ('accounting', 1), ('dentistry', 1)");
+    $ready = true;
+}
+
 function dentalPlanFeatures(): array
 {
     return ['dental_medical_records','dental_service_catalog','dental_patient_invoices','dental_documents','dental_tooth_chart','dental_treatment_plans','dental_inventory','dental_basic_reports','dental_procurement','dental_procedure_costing','dental_doctor_payroll','dental_financial_analytics','dental_equipment','dental_advanced_analytics','dental_management_accounting','dental_priority_support','services','calendar'];
@@ -506,8 +522,13 @@ function planSettingsPayload(array $context): array
     $pending = $context['pending_subscription'] ?? null;
     $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'module' => $pending['module_key'] ?? planModuleForKey((string)$pending['plan_key']), 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
     $availablePlans = [];
+    $moduleAvailability = [
+        'accounting' => systemModuleEnabled(db(), 'accounting'),
+        'dentistry' => systemModuleEnabled(db(), 'dentistry'),
+    ];
     foreach ($context['plans'] as $key => $plan) {
         $planIsDental = ($plan['module'] ?? 'accounting') === 'dentistry';
+        if (empty($moduleAvailability[$planIsDental ? 'dentistry' : 'accounting'])) continue;
         $planLabels = $planIsDental ? ['doctors' => 'Лікарі', 'participants' => 'Виконавці', 'patients' => 'Пацієнти', 'appointments_month' => 'Записи цього місяця'] : ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники', 'managers' => 'Менеджери', 'project_leads' => 'Керівники проєктів', 'moderators' => 'Модератори'];
         $planLimits = [];
         foreach ($planLabels as $metric => $label) $planLimits[$metric] = $plan[$metric] ?? null;
@@ -517,5 +538,5 @@ function planSettingsPayload(array $context): array
     }
     $features = [];
     foreach ($isDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
-    return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
+    return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'modules' => $moduleAvailability, 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
 }

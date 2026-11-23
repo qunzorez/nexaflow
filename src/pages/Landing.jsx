@@ -179,6 +179,7 @@ export default function Landing() {
   const [signedIn, setSignedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [moduleAvailability, setModuleAvailability] = useState({ accounting: true, dentistry: true });
   const [billingEnabled, setBillingEnabled] = useState(false);
   const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlanModule, setSelectedPlanModule] = useState("accounting");
@@ -194,7 +195,13 @@ export default function Landing() {
         if (user?.subscription?.module)
           setSelectedPlanModule(user.subscription.module);
         if (planResult.ok) {
-          setPlans(planResult.plans || []);
+          const modules = planResult.modules || { accounting: true, dentistry: true };
+          setModuleAvailability(modules);
+          const preferredModule = user?.subscription?.module || "accounting";
+          if (modules[preferredModule] === false) {
+            setSelectedPlanModule(modules.accounting ? "accounting" : modules.dentistry ? "dentistry" : "accounting");
+          }
+          setPlans(Array.isArray(planResult.plans) ? planResult.plans : []);
           setBillingEnabled(Boolean(planResult.billing_enabled));
         }
       })
@@ -633,27 +640,28 @@ export default function Landing() {
           >
             <button
               type="button"
+              aria-pressed={selectedPlanModule === "accounting"}
               className={selectedPlanModule === "accounting" ? "active" : ""}
               onClick={() => setSelectedPlanModule("accounting")}
+              hidden={moduleAvailability.accounting === false}
             >
               Бухгалтерія
             </button>
-            <button
+            {moduleAvailability.dentistry !== false && <button
               type="button"
-              className="temporarily-unavailable"
-              disabled
-              aria-disabled="true"
-              title="Тимчасово недоступно"
-            >
-              Стоматологія
-            </button>
+              aria-pressed={selectedPlanModule === "dentistry"}
+              className={selectedPlanModule === "dentistry" ? "active" : ""}
+              onClick={() => setSelectedPlanModule("dentistry")}
+            >Стоматологія</button>}
           </div>
         </div>
         {plansLoading ? (
           <div className="landing-plans-state">Завантажуємо тарифи…</div>
         ) : !visiblePlans.length ? (
           <div className="landing-plans-state">
-            Не вдалося завантажити тарифи. Оновіть сторінку.
+            {moduleAvailability.accounting || moduleAvailability.dentistry
+              ? "Для цього напряму зараз немає доступних тарифів."
+              : "Тарифи тимчасово недоступні: адміністратор вимкнув усі модулі."}
           </div>
         ) : (
           <div
