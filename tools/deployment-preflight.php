@@ -83,7 +83,7 @@ try {
         PDO::ATTR_TIMEOUT => 5,
     ]);
     $pdo->query('SELECT 1');
-    $requiredTables = ['users', 'projects', 'tasks', 'time_entries', 'clients', 'notifications', 'api_rate_limits', 'plan_subscriptions'];
+    $requiredTables = ['users', 'projects', 'tasks', 'time_entries', 'clients', 'notifications', 'api_rate_limits', 'plan_subscriptions', 'accounting_requisites', 'accounting_service_invoices'];
     $placeholders = implode(',', array_fill(0, count($requiredTables), '?'));
     $tableQuery = $pdo->prepare("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ({$placeholders})");
     $tableQuery->execute(array_merge([(string)$config['database']], $requiredTables));
