@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import Icon from './components/Icon.jsx';
 import './components/maintenance-warning.css';
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
@@ -73,7 +74,14 @@ export default function App() {
 
   const secondsLeft = maintenanceStarts ? Math.max(0, Math.ceil((maintenanceStarts - now) / 1000)) : 0;
   return (
-    <>{maintenanceStarts && <div className="maintenance-warning" role="alert"><strong>Незабаром технічні роботи</strong><span>Збережіть введені дані й завершіть поточну дію. До початку: {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}.</span></div>}
+    <>{maintenanceStarts && <aside className={`maintenance-warning${secondsLeft <= 60 ? ' maintenance-warning-urgent' : ''}`} aria-label="Попередження про технічні роботи">
+      <div className="maintenance-warning-main">
+        <span className="maintenance-warning-icon"><Icon name="hourglass" /></span>
+        <div className="maintenance-warning-copy"><strong>Незабаром технічні роботи</strong><span>Збережіть введені дані та завершіть поточну дію.</span></div>
+        <span className="maintenance-warning-timer" aria-label={`До початку ${Math.floor(secondsLeft / 60)} хвилин ${secondsLeft % 60} секунд`}><Icon name="clock" />{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
+      </div>
+      <div className="maintenance-warning-track" aria-hidden="true"><span style={{ width: `${Math.min(100, secondsLeft / 300 * 100)}%` }} /></div>
+    </aside>}
     <RouteErrorBoundary><Suspense fallback={<div className="loading-screen" role="status">Завантажуємо сторінку…</div>}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
