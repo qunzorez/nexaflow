@@ -68,6 +68,14 @@ export default function AdminPage() {
     if (!result.ok) { setError(result.message || 'Не вдалося змінити статус.'); return; }
     setNotice(result.message); load();
   }
+  async function updateModules(event) {
+    event.preventDefault(); setSaving('modules'); setError(''); setNotice('');
+    const result = await post('/api/admin.php', { action: 'update_modules', modules: data.settings.modules, reason: 'Керування модулями в системних налаштуваннях' });
+    setSaving('');
+    if (!result.ok) { setError(result.message || 'Не вдалося зберегти модулі.'); return; }
+    setData(current => ({ ...current, settings: { ...current.settings, modules: result.modules } }));
+    setNotice(result.message);
+  }
   const userRows = data?.users || [];
   if (accessDenied || !me && !loading) return <Navigate to="/dashboard" replace />;
   if (loading || !me || !data) return <main className="admin-page"><section className="admin-empty" role="status">Перевіряємо адміністративний доступ…</section></main>;
@@ -87,7 +95,7 @@ export default function AdminPage() {
         {tab === 'subscriptions' && <section className="admin-panel"><h2>Підписки й тарифи</h2><p className="admin-muted">Дані з наявної платіжної логіки. Платіжні реквізити не відображаються.</p><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Простір</th><th>План</th><th>Статус</th><th>Сума</th><th>Період до</th></tr></thead><tbody>{(data.subscriptions || []).map(item => <tr key={item.id}><td>{item.owner_name}</td><td>{planNames[item.plan_key] || item.plan_key}</td><td><span className={`admin-status ${item.status}`}>{item.status}</span></td><td>{item.amount} {item.currency}</td><td>{item.current_period_end || 'Безстроково'}</td></tr>)}</tbody></table></div></section>}
         {tab === 'audit' && <section className="admin-panel"><h2>Журнал аудиту</h2><p className="admin-muted">Журнал доступний для пошуку й перегляду та не має операцій редагування.</p><AuditTable rows={data.audit || []} /></section>}
         {tab === 'roles' && <section className="admin-panel"><h2>Ролі та права</h2><p className="admin-muted">Системні ролі перевіряються сервером для кожної операції.</p><div className="admin-role-grid">{Object.entries(roleLabels).map(([role, label]) => <article key={role}><strong>{label}</strong><span className="admin-role-key">{role}</span><p>{role === 'admin' || role === 'owner' ? 'Глобальний адміністративний доступ.' : role === 'manager' ? 'Керування власним робочим простором.' : 'Доступ до призначених просторів.'}</p></article>)}</div></section>}
-        {tab === 'settings' && <section className="admin-panel"><h2>Системні налаштування</h2><p className="admin-muted">Секрети інтеграцій не повертаються з API.</p><div className="admin-settings-grid"><article><span>Платіжна інтеграція</span><strong>{data.settings?.billing_enabled ? 'Увімкнена' : 'Вимкнена'}</strong></article><article><span>Модулі</span><strong>Бухгалтерія · Стоматологія</strong></article><article><span>Аудит адміністратора</span><strong>Увімкнений</strong></article></div></section>}
+        {tab === 'settings' && <section className="admin-panel"><h2>Системні налаштування</h2><p className="admin-muted">Секрети інтеграцій не повертаються з API.</p><div className="admin-settings-grid"><article><span>Платіжна інтеграція</span><strong>{data.settings?.billing_enabled ? 'Увімкнена' : 'Вимкнена'}</strong></article><article><span>Аудит адміністратора</span><strong>Увімкнений</strong></article></div><form className="admin-module-settings" onSubmit={updateModules}><div><h3>Доступні модулі</h3><p>Вимкнений модуль буде недоступний користувачам у всій системі.</p></div>{[['accounting','Бухгалтерія'],['dentistry','Стоматологія']].map(([key,label])=><label className="admin-module-toggle" key={key}><span><strong>{label}</strong><small>{data.settings?.modules?.[key] ? 'Модуль увімкнений' : 'Модуль вимкнений'}</small></span><input type="checkbox" checked={Boolean(data.settings?.modules?.[key])} onChange={event=>setData(current=>({...current,settings:{...current.settings,modules:{...current.settings.modules,[key]:event.target.checked}}}))}/></label>)}<button className="admin-button primary" disabled={saving==='modules'}>{saving==='modules'?'Зберігаємо…':'Зберегти модулі'}</button></form></section>}
       </>}
     </main>
   </Layout>;

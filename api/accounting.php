@@ -9,6 +9,7 @@ $pdo = db(); $userId = (string)$_SESSION['user_id']; $method = $_SERVER['REQUEST
 $uq = $pdo->prepare('SELECT id, name, email, role, avatar_url FROM users WHERE id = ? LIMIT 1'); $uq->execute([$userId]); $user = $uq->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $context = workspacePlan($pdo, $userId, (string)$user['role']); $ownerId = (string)$context['owner_id'];
+if (!systemModuleEnabled($pdo, 'accounting')) jsonResponse(false, 'Модуль бухгалтерії тимчасово вимкнений адміністратором.', ['code' => 'module_disabled', 'module' => 'accounting'], 403);
 $user['subscription'] = planSettingsPayload($context); $user['workspaces'] = $context['workspaces']; $user['active_workspace_id'] = $ownerId; $user['workspace_role'] = $context['workspace_role'];
 $module = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ?'); $module->execute([$ownerId]);
 if ((string)$module->fetchColumn() !== 'accounting') jsonResponse(false, 'Функції доступні лише в бухгалтерському модулі.', ['code' => 'accounting_module_required'], 403);

@@ -49,6 +49,16 @@ function planModuleForKey(string $key): string
     return str_starts_with($key, 'dental_') ? 'dentistry' : 'accounting';
 }
 
+function systemModuleEnabled(PDO $pdo, string $module): bool
+{
+    try {
+        $query = $pdo->prepare('SELECT enabled FROM system_module_settings WHERE module_key = ? LIMIT 1');
+        $query->execute([$module]);
+        $value = $query->fetchColumn();
+        return $value === false ? true : (bool)$value;
+    } catch (Throwable $ignored) { return true; }
+}
+
 function dentalPlanFeatures(): array
 {
     return ['dental_medical_records','dental_service_catalog','dental_patient_invoices','dental_documents','dental_tooth_chart','dental_treatment_plans','dental_inventory','dental_basic_reports','dental_procurement','dental_procedure_costing','dental_doctor_payroll','dental_financial_analytics','dental_equipment','dental_advanced_analytics','dental_management_accounting','dental_priority_support','services','calendar'];

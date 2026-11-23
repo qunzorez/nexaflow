@@ -21,6 +21,7 @@ const Services = lazy(() => import("./pages/Services.jsx"));
 import Landing from "./pages/Landing.jsx";
 import PlanFeatureRoute from "./components/PlanFeatureRoute.jsx";
 import EmailVerifiedRoute from "./components/EmailVerifiedRoute.jsx";
+import RouteErrorBoundary from "./components/RouteErrorBoundary.jsx";
 const Support = lazy(() => import("./pages/Support.jsx"));
 const Appointments = lazy(() => import("./pages/Appointments.jsx"));
 const AppointmentEditPage = lazy(() => import("./pages/AppointmentEditPage.jsx"));
@@ -53,7 +54,7 @@ export default function App() {
   }, []);
 
   return (
-    <Suspense fallback={<div className="loading-screen">Завантаження…</div>}><Routes>
+    <RouteErrorBoundary><Suspense fallback={<div className="loading-screen" role="status">Завантажуємо сторінку…</div>}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
       <Route path="/register" element={<Login initialMode="register" />} />
@@ -94,6 +95,6 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes></Suspense>
+    </Routes></Suspense></RouteErrorBoundary>
   );
 }
