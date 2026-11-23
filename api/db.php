@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/runtime-config.php';
 require_once __DIR__ . '/claims.php';
+require_once __DIR__ . '/maintenance.php';
 
 function db(): PDO
 {
@@ -15,6 +16,15 @@ function db(): PDO
             PDO::ATTR_EMULATE_PREPARES => false,
             PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
         ]);
+    }
+    $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (!in_array($script, ['login.php', 'logout.php', 'maintenance-status.php'], true)) {
+        try {
+            $maintenance = maintenanceState($pdo);
+            if ((bool)$maintenance['enabled'] && !maintenanceAdmin($pdo)) jsonResponse(false, 'NexaFlow тимчасово недоступний через технічні роботи.', ['code' => 'maintenance_mode'], 503);
+        } catch (PDOException $error) {
+            if ($error->getCode() !== '42S02') jsonResponse(false, 'Сервіс тимчасово недоступний.', ['code' => 'maintenance_mode'], 503);
+        }
     }
     if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['user_id'])) {
         $accountStatus = $pdo->prepare('SELECT is_blocked, blocked_reason, email_verified_at FROM users WHERE id = ? LIMIT 1');

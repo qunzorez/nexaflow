@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/plans.php';
 require_once __DIR__ . '/verification.php';
+require_once __DIR__ . '/maintenance.php';
 
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
@@ -29,6 +30,7 @@ if (!$actor || !in_array((string)$actor['role'], ['admin', 'owner'], true)) {
     jsonResponse(false, 'Адміністративний доступ заборонено.', [], 403);
 }
 ensureSystemModuleSettingsSchema($pdo);
+ensureMaintenanceSchema($pdo);
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS admin_audit_log (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -69,6 +71,29 @@ if ($method === 'POST') {
     $data = body();
     $action = (string)($data['action'] ?? '');
     $reason = trim((string)($data['reason'] ?? '')) ?: null;
+    if ($action === 'update_maintenance') {
+        $enabled = filter_var($data['enabled'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $title = trim((string)($data['title'] ?? ''));
+        $message = trim((string)($data['message'] ?? ''));
+        $note = trim((string)($data['note'] ?? ''));
+        $estimatedEnd = trim((string)($data['estimated_end'] ?? ''));
+        if ($enabled === null || $title === '' || mb_strlen($title) > 160 || $message === '' || mb_strlen($message) > 2000 || mb_strlen($note) > 255) jsonResponse(false, 'Перевірте заголовок, повідомлення та стан режиму.', [], 422);
+        if ($estimatedEnd !== '') {
+            $parsedEnd = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $estimatedEnd);
+            if (!$parsedEnd || $parsedEnd->format('Y-m-d\TH:i') !== $estimatedEnd) jsonResponse(false, 'Некоректний час завершення.', [], 422);
+        }
+        $before = maintenanceState($pdo);
+        $endValue = $estimatedEnd === '' ? null : str_replace('T', ' ', $estimatedEnd) . ':00';
+        $pdo->beginTransaction();
+        try {
+            $startsAt = $enabled ? ((int)$before['requested_enabled'] === 1 ? $before['starts_at'] : $pdo->query("SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 5 MINUTE), '%Y-%m-%d %H:%i:%s')")->fetchColumn()) : null;
+            $pdo->prepare('UPDATE system_maintenance SET enabled = ?, starts_at = ?, title = ?, message = ?, estimated_end = ?, note = ?, updated_by = ? WHERE id = 1')->execute([(int)$enabled, $startsAt, $title, $message, $endValue, $note ?: null, $actorId]);
+            $after = maintenanceState($pdo);
+            adminAudit($pdo, $actorId, 'update_maintenance', 'system', 'maintenance', $before, $after, $reason);
+            $pdo->commit();
+        } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $error; }
+        jsonResponse(true, 'Налаштування технічних робіт збережено.', ['maintenance' => $after]);
+    }
     if ($action === 'update_modules') {
         $modules = $data['modules'] ?? null;
         if (!is_array($modules) || !array_key_exists('accounting', $modules) || !array_key_exists('dentistry', $modules)) jsonResponse(false, 'Передайте стан бухгалтерії та стоматології.', [], 422);
@@ -224,4 +249,4 @@ $accessAttempts = $pdo->query("SELECT a.id, a.user_id, COALESCE(u.name, a.email,
 $authEvents = $pdo->query('SELECT e.id, e.user_id, COALESCE(u.name, e.email) AS user_name, e.email, e.event_type, e.result, e.source, e.created_at FROM auth_event_log e LEFT JOIN users u ON u.id = e.user_id ORDER BY e.created_at DESC LIMIT 100')->fetchAll();
 $groups = $pdo->query("SELECT g.id, g.name, g.role_name, g.project_id, p.name AS project_name, COUNT(gm.user_id) AS member_count FROM project_groups g LEFT JOIN projects p ON p.id = g.project_id LEFT JOIN project_group_members gm ON gm.group_id = g.id GROUP BY g.id, g.name, g.role_name, g.project_id, p.name ORDER BY g.name LIMIT 200")->fetchAll();
 $invitations = $pdo->query("SELECT i.id, i.email, i.role, i.group_id, g.name AS group_name, i.status, i.expires_at, i.created_at, u.name AS inviter_name, 'team' AS invite_type, NULL AS project_name FROM user_invitations i LEFT JOIN project_groups g ON g.id = i.group_id LEFT JOIN users u ON u.id = i.invited_by UNION ALL SELECT i.id, i.email, i.role, i.group_id, g.name AS group_name, i.status, i.expires_at, i.created_at, u.name AS inviter_name, 'project' AS invite_type, p.name AS project_name FROM project_invitations i JOIN projects p ON p.id = i.project_id LEFT JOIN project_groups g ON g.id = i.group_id LEFT JOIN users u ON u.id = i.invited_by ORDER BY created_at DESC LIMIT 100")->fetchAll();
-jsonResponse(true, 'Адміністративні дані завантажено.', ['stats' => $stats, 'users' => $userRows, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalUsers], 'workspaces' => $workspaces, 'subscriptions' => $subscriptions, 'audit' => $audit->fetchAll(), 'online' => $online, 'auth_events' => $authEvents, 'admin_access_attempts' => $accessAttempts, 'groups' => $groups, 'invitations' => $invitations, 'settings' => ['billing_enabled' => filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN), 'modules' => $moduleSettings], 'plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'module' => $plan['module']], planDefinitions(), array_keys(planDefinitions()))]);
+jsonResponse(true, 'Адміністративні дані завантажено.', ['stats' => $stats, 'users' => $userRows, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalUsers], 'workspaces' => $workspaces, 'subscriptions' => $subscriptions, 'audit' => $audit->fetchAll(), 'online' => $online, 'auth_events' => $authEvents, 'admin_access_attempts' => $accessAttempts, 'groups' => $groups, 'invitations' => $invitations, 'settings' => ['billing_enabled' => filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN), 'modules' => $moduleSettings, 'maintenance' => maintenanceState($pdo)], 'plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'module' => $plan['module']], planDefinitions(), array_keys(planDefinitions()))]);

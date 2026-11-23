@@ -1,6 +1,8 @@
-DirectoryIndex index.html
+DirectoryIndex maintenance.php
 
 RewriteEngine On
+RewriteRule ^maintenance\.php$ - [L]
+RewriteRule ^index\.html$ maintenance.php [L]
 
 # HTTPS is enforced only on the live domain, not local development.
 RewriteCond %{HTTPS} !=on
@@ -11,4 +13,4 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
-RewriteRule ^ index.html [L]
+RewriteRule ^ maintenance.php [L]

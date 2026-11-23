@@ -19,7 +19,8 @@ deployment:
     - /bin/cp api/.htaccess $DEPLOYPATH/api/.htaccess
     - /bin/cp api/support-private/.htaccess $DEPLOYPATH/api/support-private/.htaccess
     - /bin/cp api/accounting-private/.htaccess $DEPLOYPATH/api/accounting-private/.htaccess
-    - /bin/cp database/.htaccess database/dentistry_care.sql database/dentistry_patient_ledger.sql database/dentistry_erp.sql database/dentistry_erp_operations.sql database/admin_audit.sql database/account_blocking.sql $DEPLOYPATH/database/
+    - /bin/cp database/.htaccess database/dentistry_care.sql database/dentistry_patient_ledger.sql database/dentistry_erp.sql database/dentistry_erp_operations.sql database/admin_audit.sql database/account_blocking.sql database/system_maintenance.sql $DEPLOYPATH/database/
+    - /bin/cp maintenance-page.php $DEPLOYPATH/maintenance-page.php
     - /bin/cp appsettings.json $DEPLOYPATH/appsettings.json
     - /bin/sh tools/deploy-php.sh tools/set-web-environment.php $DEPLOYPATH
     - /usr/bin/find api -maxdepth 1 -name '*.php' ! -name 'config.local.php' ! -name 'config.web.php' ! -name 'config.php' ! -name 'liqpay.local.php' -exec /bin/cp {} $DEPLOYPATH/api/ \;

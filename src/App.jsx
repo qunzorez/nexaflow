@@ -1,5 +1,6 @@
-import { lazy, Suspense, useLayoutEffect } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import './components/maintenance-warning.css';
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Team = lazy(() => import("./pages/Team.jsx"));
@@ -37,6 +38,23 @@ const BannedPage = lazy(() => import("./pages/BannedPage.jsx"));
 const FAQ = lazy(() => import("./pages/FAQ.jsx"));
 
 export default function App() {
+  const [maintenanceStarts, setMaintenanceStarts] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    let active = true;
+    const check = () => fetch('/api/maintenance-status.php', { cache: 'no-store', credentials: 'same-origin' })
+      .then(response => response.json())
+      .then(state => {
+        if (!active) return;
+        if (!state.ok || (state.enabled && !state.is_admin)) { window.location.replace('/maintenance-page.php'); return; }
+        setMaintenanceStarts(state.starts_at_epoch ? Number(state.starts_at_epoch) * 1000 : null);
+      })
+      .catch(() => { if (active) window.location.replace('/maintenance-page.php'); });
+    check();
+    const poll = window.setInterval(check, 15000);
+    const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => { active = false; window.clearInterval(poll); window.clearInterval(clock); };
+  }, []);
   useLayoutEffect(() => {
     const reloadForStaleBundle = (event) => {
       event.preventDefault();
@@ -53,7 +71,9 @@ export default function App() {
     document.documentElement.classList.remove('nf-spa-route-loading');
   }, []);
 
+  const secondsLeft = maintenanceStarts ? Math.max(0, Math.ceil((maintenanceStarts - now) / 1000)) : 0;
   return (
+    <>{maintenanceStarts && <div className="maintenance-warning" role="alert"><strong>Незабаром технічні роботи</strong><span>Збережіть введені дані й завершіть поточну дію. До початку: {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}.</span></div>}
     <RouteErrorBoundary><Suspense fallback={<div className="loading-screen" role="status">Завантажуємо сторінку…</div>}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
@@ -95,6 +115,6 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes></Suspense></RouteErrorBoundary>
+    </Routes></Suspense></RouteErrorBoundary></>
   );
 }

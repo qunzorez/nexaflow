@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/maintenance.php';
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') jsonResponse(false, 'Метод не підтримується.', [], 405);
 
 $data = body();
@@ -29,6 +30,7 @@ try {
         $event->execute([$user['id'] ?? null, $email]);
         jsonResponse(false, 'Невірна пошта або пароль.', [], 401);
     }
+    if ((bool)maintenanceState($pdo)['enabled'] && !in_array((string)$user['role'], ['admin', 'owner'], true)) jsonResponse(false, 'Зараз тривають технічні роботи. Спробуйте увійти пізніше.', ['code' => 'maintenance_mode'], 503);
     session_set_cookie_params(['httponly' => true, 'secure' => isset($_SERVER['HTTPS']), 'samesite' => 'Lax']);
     session_start();
     session_regenerate_id(true);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import Icon from '../components/Icon.jsx';
+import AdminMaintenance from './AdminMaintenance.jsx';
 import { api, post } from '../services/api.js';
 import './admin.css';
 
@@ -96,6 +97,7 @@ export default function AdminPage() {
         {tab === 'audit' && <section className="admin-panel"><h2>Журнал аудиту</h2><p className="admin-muted">Журнал доступний для пошуку й перегляду та не має операцій редагування.</p><AuditTable rows={data.audit || []} /></section>}
         {tab === 'roles' && <section className="admin-panel"><h2>Ролі та права</h2><p className="admin-muted">Системні ролі перевіряються сервером для кожної операції.</p><div className="admin-role-grid">{Object.entries(roleLabels).map(([role, label]) => <article key={role}><strong>{label}</strong><span className="admin-role-key">{role}</span><p>{role === 'admin' || role === 'owner' ? 'Глобальний адміністративний доступ.' : role === 'manager' ? 'Керування власним робочим простором.' : 'Доступ до призначених просторів.'}</p></article>)}</div></section>}
         {tab === 'settings' && <section className="admin-panel"><h2>Системні налаштування</h2><p className="admin-muted">Секрети інтеграцій не повертаються з API.</p><div className="admin-settings-grid"><article><span>Платіжна інтеграція</span><strong>{data.settings?.billing_enabled ? 'Увімкнена' : 'Вимкнена'}</strong></article><article><span>Аудит адміністратора</span><strong>Увімкнений</strong></article></div><form className="admin-module-settings" onSubmit={updateModules}><div><h3>Доступні модулі</h3><p>Вимкнений модуль буде недоступний користувачам у всій системі.</p></div>{[['accounting','Бухгалтерія'],['dentistry','Стоматологія']].map(([key,label])=><label className="admin-module-toggle" key={key}><span><strong>{label}</strong><small>{data.settings?.modules?.[key] ? 'Модуль увімкнений' : 'Модуль вимкнений'}</small></span><input type="checkbox" checked={Boolean(data.settings?.modules?.[key])} onChange={event=>setData(current=>({...current,settings:{...current.settings,modules:{...current.settings.modules,[key]:event.target.checked}}}))}/></label>)}<button className="admin-button primary" disabled={saving==='modules'}>{saving==='modules'?'Зберігаємо…':'Зберегти модулі'}</button></form></section>}
+        {tab === 'settings' && <AdminMaintenance value={data.settings?.maintenance} onSaved={maintenance => setData(current => ({ ...current, settings: { ...current.settings, maintenance } }))} />}
       </>}
     </main>
   </Layout>;

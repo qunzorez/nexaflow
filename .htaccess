@@ -1,4 +1,4 @@
-DirectoryIndex dist/index.html
+DirectoryIndex maintenance-page.php
 Options -Indexes
 
 <IfModule mod_headers.c>
@@ -14,8 +14,13 @@ RewriteCond %{HTTPS} !=on
 RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|dist\.test|nexaflow\.test)$ [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
+# Apply the maintenance gate before any API handler reads private data.
+RewriteRule ^api/(?!login\.php$|logout\.php$|maintenance-status\.php$|maintenance-entry\.php$)([A-Za-z0-9_-]+\.php)$ api/maintenance-entry.php [END]
+
 # The PHP API is served directly from the project root.
 RewriteRule ^api(?:/|$) - [L]
+RewriteRule ^maintenance-page\.php$ - [L]
+RewriteRule ^dist/index\.html$ maintenance-page.php [L]
 
 # Serve React's generated assets and other files from dist/.
 RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f [OR]
@@ -26,4 +31,4 @@ RewriteRule ^(.+)$ dist/$1 [L]
 RewriteRule ^assets/ - [R=404,L]
 
 # React Router handles /dashboard, /team and future application pages.
-RewriteRule ^ dist/index.html [L]
+RewriteRule ^ maintenance-page.php [L]
