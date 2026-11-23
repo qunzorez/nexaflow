@@ -10,22 +10,27 @@ function maintenanceConnection(): PDO
 
 function ensureMaintenanceSchema(PDO $pdo): void
 {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS system_maintenance (id TINYINT UNSIGNED NOT NULL PRIMARY KEY, enabled TINYINT(1) NOT NULL DEFAULT 0, starts_at DATETIME NULL, title VARCHAR(160) NOT NULL DEFAULT 'Технічні роботи', message TEXT NOT NULL, estimated_end DATETIME NULL, note VARCHAR(255) NULL, updated_by CHAR(32) NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, KEY idx_maintenance_updated_by (updated_by), CONSTRAINT fk_maintenance_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS system_maintenance (id TINYINT UNSIGNED NOT NULL PRIMARY KEY, enabled TINYINT(1) NOT NULL DEFAULT 0, starts_at DATETIME NULL, notice_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 5, title VARCHAR(160) NOT NULL DEFAULT 'Технічні роботи', message TEXT NOT NULL, estimated_end DATETIME NULL, note VARCHAR(255) NULL, updated_by CHAR(32) NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, KEY idx_maintenance_updated_by (updated_by), CONSTRAINT fk_maintenance_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     if (!$pdo->query("SHOW COLUMNS FROM system_maintenance LIKE 'starts_at'")->fetch()) $pdo->exec('ALTER TABLE system_maintenance ADD COLUMN starts_at DATETIME NULL AFTER enabled');
+    if (!$pdo->query("SHOW COLUMNS FROM system_maintenance LIKE 'notice_minutes'")->fetch()) $pdo->exec('ALTER TABLE system_maintenance ADD COLUMN notice_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 5 AFTER starts_at');
     $pdo->exec("INSERT IGNORE INTO system_maintenance (id, enabled, title, message) VALUES (1, 0, 'Технічні роботи', 'Ми оновлюємо NexaFlow. Спробуйте зайти трохи пізніше.')");
 }
 
 function maintenanceState(PDO $pdo): array
 {
     try {
-        try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
+        try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, notice_minutes, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
         catch (PDOException $error) {
             if ($error->getCode() !== '42S22') throw $error;
-            $row = $pdo->query('SELECT enabled AS requested_enabled, enabled, NULL AS starts_at, NULL AS starts_at_epoch, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch();
+            try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, 5 AS notice_minutes, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
+            catch (PDOException $legacyError) {
+                if ($legacyError->getCode() !== '42S22') throw $legacyError;
+                $row = $pdo->query('SELECT enabled AS requested_enabled, enabled, NULL AS starts_at, NULL AS starts_at_epoch, 5 AS notice_minutes, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch();
+            }
         }
-        return $row ?: ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'title' => 'Технічні роботи', 'message' => 'Ми оновлюємо NexaFlow. Спробуйте зайти трохи пізніше.', 'estimated_end' => null, 'note' => null, 'updated_by' => null, 'updated_at' => null];
+        return $row ?: ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'notice_minutes' => 5, 'title' => 'Технічні роботи', 'message' => 'Ми оновлюємо NexaFlow. Спробуйте зайти трохи пізніше.', 'estimated_end' => null, 'note' => null, 'updated_by' => null, 'updated_at' => null];
     } catch (PDOException $error) {
-        if ($error->getCode() === '42S02') return ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'title' => 'Технічні роботи', 'message' => '', 'estimated_end' => null, 'note' => null, 'updated_at' => null];
+        if ($error->getCode() === '42S02') return ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'notice_minutes' => 5, 'title' => 'Технічні роботи', 'message' => '', 'estimated_end' => null, 'note' => null, 'updated_at' => null];
         throw $error;
     }
 }

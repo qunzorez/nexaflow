@@ -40,6 +40,7 @@ const FAQ = lazy(() => import("./pages/FAQ.jsx"));
 
 export default function App() {
   const [maintenanceStarts, setMaintenanceStarts] = useState(null);
+  const [maintenanceNoticeMinutes, setMaintenanceNoticeMinutes] = useState(5);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     let active = true;
@@ -49,6 +50,7 @@ export default function App() {
         if (!active) return;
         if (!state.ok || (state.enabled && !state.is_admin)) { window.location.replace('/maintenance-page.php'); return; }
         setMaintenanceStarts(state.starts_at_epoch ? Number(state.starts_at_epoch) * 1000 : null);
+        setMaintenanceNoticeMinutes(Math.max(1, Number(state.notice_minutes) || 5));
       })
       .catch(() => { if (active) window.location.replace('/maintenance-page.php'); });
     check();
@@ -80,7 +82,7 @@ export default function App() {
         <div className="maintenance-warning-copy"><strong>Незабаром технічні роботи</strong><span>Збережіть введені дані та завершіть поточну дію.</span></div>
         <span className="maintenance-warning-timer" aria-label={`До початку ${Math.floor(secondsLeft / 60)} хвилин ${secondsLeft % 60} секунд`}><Icon name="clock" />{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
       </div>
-      <div className="maintenance-warning-track" aria-hidden="true"><span style={{ width: `${Math.min(100, secondsLeft / 300 * 100)}%` }} /></div>
+      <div className="maintenance-warning-track" aria-hidden="true"><span style={{ width: `${Math.min(100, secondsLeft / (maintenanceNoticeMinutes * 60) * 100)}%` }} /></div>
     </aside>}
     <RouteErrorBoundary><Suspense fallback={<div className="loading-screen" role="status">Завантажуємо сторінку…</div>}><Routes>
       <Route path="/" element={<Landing />} />

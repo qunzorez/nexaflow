@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS system_maintenance (
   id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
   enabled TINYINT(1) NOT NULL DEFAULT 0,
   starts_at DATETIME NULL,
+  notice_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 5,
   title VARCHAR(160) NOT NULL DEFAULT 'Технічні роботи',
   message TEXT NOT NULL,
   estimated_end DATETIME NULL,
@@ -17,6 +18,12 @@ VALUES (1, 0, 'Технічні роботи', 'Ми оновлюємо NexaFlow
 -- Existing installations: add the column only if it is missing.
 SET @maintenance_column_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_maintenance' AND COLUMN_NAME = 'starts_at');
 SET @maintenance_sql := IF(@maintenance_column_exists = 0, 'ALTER TABLE system_maintenance ADD COLUMN starts_at DATETIME NULL AFTER enabled', 'SELECT 1');
+PREPARE maintenance_stmt FROM @maintenance_sql;
+EXECUTE maintenance_stmt;
+DEALLOCATE PREPARE maintenance_stmt;
+
+SET @maintenance_column_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_maintenance' AND COLUMN_NAME = 'notice_minutes');
+SET @maintenance_sql := IF(@maintenance_column_exists = 0, 'ALTER TABLE system_maintenance ADD COLUMN notice_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 5 AFTER starts_at', 'SELECT 1');
 PREPARE maintenance_stmt FROM @maintenance_sql;
 EXECUTE maintenance_stmt;
 DEALLOCATE PREPARE maintenance_stmt;

@@ -77,7 +77,9 @@ if ($method === 'POST') {
         $message = trim((string)($data['message'] ?? ''));
         $note = trim((string)($data['note'] ?? ''));
         $estimatedEnd = trim((string)($data['estimated_end'] ?? ''));
+        $noticeMinutes = filter_var($data['notice_minutes'] ?? maintenanceState($pdo)['notice_minutes'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1440]]);
         if ($enabled === null || $title === '' || mb_strlen($title) > 160 || $message === '' || mb_strlen($message) > 2000 || mb_strlen($note) > 255) jsonResponse(false, 'Перевірте заголовок, повідомлення та стан режиму.', [], 422);
+        if ($noticeMinutes === false) jsonResponse(false, 'Вкажіть час попередження від 1 до 1440 хвилин.', [], 422);
         if ($estimatedEnd !== '') {
             $parsedEnd = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $estimatedEnd);
             if (!$parsedEnd || $parsedEnd->format('Y-m-d\TH:i') !== $estimatedEnd) jsonResponse(false, 'Некоректний час завершення.', [], 422);
@@ -86,8 +88,14 @@ if ($method === 'POST') {
         $endValue = $estimatedEnd === '' ? null : str_replace('T', ' ', $estimatedEnd) . ':00';
         $pdo->beginTransaction();
         try {
-            $startsAt = $enabled ? ((int)$before['requested_enabled'] === 1 ? $before['starts_at'] : $pdo->query("SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 5 MINUTE), '%Y-%m-%d %H:%i:%s')")->fetchColumn()) : null;
-            $pdo->prepare('UPDATE system_maintenance SET enabled = ?, starts_at = ?, title = ?, message = ?, estimated_end = ?, note = ?, updated_by = ? WHERE id = 1')->execute([(int)$enabled, $startsAt, $title, $message, $endValue, $note ?: null, $actorId]);
+            $reschedule = (int)$before['requested_enabled'] === 0 || (!(bool)$before['enabled'] && (int)$before['notice_minutes'] !== $noticeMinutes);
+            $startsAt = $enabled ? $before['starts_at'] : null;
+            if ($enabled && $reschedule) {
+                $startQuery = $pdo->prepare("SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL ? MINUTE), '%Y-%m-%d %H:%i:%s')");
+                $startQuery->execute([$noticeMinutes]);
+                $startsAt = $startQuery->fetchColumn();
+            }
+            $pdo->prepare('UPDATE system_maintenance SET enabled = ?, starts_at = ?, notice_minutes = ?, title = ?, message = ?, estimated_end = ?, note = ?, updated_by = ? WHERE id = 1')->execute([(int)$enabled, $startsAt, $noticeMinutes, $title, $message, $endValue, $note ?: null, $actorId]);
             $after = maintenanceState($pdo);
             adminAudit($pdo, $actorId, 'update_maintenance', 'system', 'maintenance', $before, $after, $reason);
             $pdo->commit();
