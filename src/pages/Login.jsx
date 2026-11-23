@@ -12,6 +12,7 @@ export default function Login({ initialMode = 'login' }) {
   const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', requested_role: requestedPlan ? 'manager' : 'user', terms: false });
   const [toast, setToast] = useState(() => new URLSearchParams(window.location.search).get('verified') === '1' ? 'Пошту підтверджено. Увійдіть, щоб відкрити свій робочий простір.' : '');
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,7 +29,9 @@ export default function Login({ initialMode = 'login' }) {
     setToast('');
     if (mode === 'register' && !form.terms) { setToast('Підтвердіть умови використання.'); return; }
     if (mode === 'register' && form.password !== form.password_confirmation) return setToast('Паролі не співпадають.');
+    setBusy(true);
     const result = await post(`/api/${mode === 'login' ? 'login' : 'register'}.php`, form);
+    setBusy(false);
     if (!result.ok) {
       if (result.code === 'email_not_verified') {
         setVerificationEmail(result.email || form.email);
@@ -41,7 +44,11 @@ export default function Login({ initialMode = 'login' }) {
       setMode('login');
       setForm(current => ({ ...current, email, password: '', password_confirmation: '', terms: false }));
       setVerificationEmail(email);
-      setToast(`Акаунт створено. Лист підтвердження надіслано на ${email}. Підтвердьте email перед входом.`);
+      setToast('Якщо реєстрацію завершено, увійдіть і підтвердьте email у налаштуваннях профілю.');
+      return;
+    }
+    if (!result.user?.email_verified_at) {
+      navigate('/settings?verify_email=1', { replace: true });
       return;
     }
     const planToActivate = requestedPlan || window.localStorage.getItem('nexaflow.pending-plan') || '';
@@ -72,7 +79,7 @@ export default function Login({ initialMode = 'login' }) {
         {mode === 'register' && <><label>Підтвердження пароля<input name="password_confirmation" type="password" value={form.password_confirmation} onChange={update} required minLength="8" placeholder="Повторіть пароль" /></label><label>Тип роботи<select name="requested_role" value={form.requested_role} onChange={update}><option value="user">Виконавець - працюю із задачами</option><option value="manager">Менеджер - створюю проєкти</option></select><small className="auth-field-hint">Вибрана роль буде призначена після підтвердження email.</small></label></>}
         {mode === 'login' && <button type="button" className="forgot-link" onClick={() => navigate(`/reset-password?email=${encodeURIComponent(form.email)}`)}>Забули пароль?</button>}
         {mode === 'register' && <label className="terms"><input name="terms" type="checkbox" checked={form.terms} onChange={update} /> Я погоджуюсь з умовами використання</label>}
-        <button className="primary-action auth-submit">{mode === 'login' ? 'Увійти в систему' : 'Створити акаунт'} <span><Icon name="forward" /></span></button>
+        <button className="primary-action auth-submit" disabled={busy}>{busy ? 'Зачекайте…' : mode === 'login' ? 'Увійти в систему' : 'Створити акаунт'} <span><Icon name="forward" /></span></button>
         {verificationEmail && <button type="button" className="resend-button" onClick={resend}><Icon name="refresh" /> Відправити лист підтвердження ще раз</button>}
       </form><small className="auth-footer">Ваші дані захищені шифруванням</small></section>
     {toast && <div className="auth-toast" role="alert" aria-live="assertive"><span aria-hidden="true">!</span>{toast}</div>}

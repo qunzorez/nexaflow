@@ -22,7 +22,7 @@ try {
     enforcePublicRateLimit($pdo, 'register', $email, 10, 3, 3600);
     $check = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
     $check->execute([$email]);
-    if ($check->fetch()) jsonResponse(false, 'Користувач з такою поштою вже існує.', [], 409);
+    if ($check->fetch()) jsonResponse(true, 'Якщо адресу можна зареєструвати, лист підтвердження буде надіслано.', ['requires_verification' => true]);
 
     $id = bin2hex(random_bytes(16));
     $hash = password_hash($password, PASSWORD_DEFAULT);

@@ -95,7 +95,7 @@ if ($method === 'POST') {
     if ($action === 'update_user') {
         $userId = trim((string)($data['user_id'] ?? ''));
         if ($userId === '') jsonResponse(false, 'Користувача не вказано.', [], 422);
-        $query = $pdo->prepare('SELECT id, name, email, role, requested_role, is_support_agent, plan_key, active_client_module FROM users WHERE id = ? LIMIT 1');
+        $query = $pdo->prepare('SELECT id, name, email, email_verified_at, role, requested_role, is_support_agent, plan_key, active_client_module FROM users WHERE id = ? LIMIT 1');
         $query->execute([$userId]);
         $before = $query->fetch();
         if (!$before) jsonResponse(false, 'Користувача не знайдено.', [], 404);
@@ -117,8 +117,9 @@ if ($method === 'POST') {
         if (!in_array($module, ['accounting', 'dentistry'], true)) jsonResponse(false, 'Недопустимий модуль.', [], 422);
         $support = array_key_exists('is_support_agent', $data) ? (int)(bool)$data['is_support_agent'] : (int)$before['is_support_agent'];
         try {
-            $update = $pdo->prepare('UPDATE users SET name = ?, email = ?, role = ?, plan_key = ?, active_client_module = ?, is_support_agent = ? WHERE id = ?');
-            $update->execute([$name, $email, $nextRole, $planKey, $module, $support, $userId]);
+            $update = $pdo->prepare('UPDATE users SET name = ?, email_verified_at = ?, email = ?, role = ?, plan_key = ?, active_client_module = ?, is_support_agent = ? WHERE id = ?');
+            $update->execute([$name, $email !== (string)$before['email'] ? null : $before['email_verified_at'], $email, $nextRole, $planKey, $module, $support, $userId]);
+            if ($email !== (string)$before['email']) $pdo->prepare('DELETE FROM email_verification_tokens WHERE user_id = ?')->execute([$userId]);
         } catch (PDOException $error) {
             if ((int)$error->errorInfo[1] === 1062) jsonResponse(false, 'Цей email уже використовується.', [], 409);
             throw $error;

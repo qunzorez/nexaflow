@@ -20,6 +20,7 @@ const Calendar = lazy(() => import("./pages/Calendar.jsx"));
 const Services = lazy(() => import("./pages/Services.jsx"));
 import Landing from "./pages/Landing.jsx";
 import PlanFeatureRoute from "./components/PlanFeatureRoute.jsx";
+import EmailVerifiedRoute from "./components/EmailVerifiedRoute.jsx";
 const Support = lazy(() => import("./pages/Support.jsx"));
 const Appointments = lazy(() => import("./pages/Appointments.jsx"));
 const AppointmentEditPage = lazy(() => import("./pages/AppointmentEditPage.jsx"));
@@ -44,6 +45,8 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
       <Route path="/register" element={<Login initialMode="register" />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route element={<EmailVerifiedRoute />}>
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/team" element={<Team />} />
       <Route path="/notifications" element={<NotificationsPage />} />
@@ -72,8 +75,8 @@ export default function App() {
       <Route path="/projects/:id" element={<ProjectEditPage />} />
       <Route path="/tasks" element={<Tasks />} />
       <Route path="/tasks/:id" element={<TaskDetail />} />
-      <Route path="/settings" element={<Settings />} />
       <Route path="/admin" element={<AdminPage />} />
+      </Route>
       <Route path="/banned" element={<BannedPage />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/reset-password" element={<ResetPassword />} />

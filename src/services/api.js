@@ -17,6 +17,9 @@ export async function api(path, options = {}) {
       try { window.sessionStorage.setItem('nexaflow.block_reason', String(result.reason || '')); } catch {}
       if (window.location.pathname !== '/banned') window.location.assign('/banned');
     }
+    if (result.code === 'email_verification_required' && window.location.pathname !== '/settings') {
+      window.location.assign('/settings?verify_email=1');
+    }
     return result;
   } catch {
     return { ok: false, code: 'network_error', message: 'Не вдалося підключитися до сервера. Перевірте мережу та спробуйте ще раз.' };

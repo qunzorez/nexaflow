@@ -256,6 +256,7 @@ export default function Settings() {
         </section>
         {notice && <div className="team-notice success">{notice}</div>}
         {error && <div className="form-notice">{error}</div>}
+        <EmailVerificationCard user={user} onUser={setUser} onNotice={setNotice} onError={setError} />
         <form className="settings-grid-page" onSubmit={save}>
           <section className="panel settings-profile-card">
             <div className="settings-section-title">
@@ -522,4 +523,30 @@ export default function Settings() {
       </div>
     </Layout>
   );
+}
+
+function EmailVerificationCard({ user, onUser, onNotice, onError }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState('');
+  async function resend() {
+    setBusy('resend'); onError(''); onNotice('');
+    const result = await post('/api/email-verification-account.php', { action: 'resend' });
+    setBusy('');
+    if (result.ok) onNotice(result.message); else onError(result.message || 'Не вдалося надіслати лист.');
+  }
+  async function changeEmail(event) {
+    event.preventDefault();
+    setBusy('change'); onError(''); onNotice('');
+    const result = await post('/api/email-verification-account.php', { action: 'change_email', email, current_password: password });
+    setBusy('');
+    if (!result.ok) { onError(result.message || 'Не вдалося змінити email.'); return; }
+    onUser(current => ({ ...current, email: result.email, email_verified_at: null }));
+    setEmail(''); setPassword(''); onNotice(result.message);
+  }
+  return <section className="panel settings-email-verification" aria-labelledby="email-verification-title">
+    <div><h2 id="email-verification-title">Підтвердження email</h2><p><strong>{user.email}</strong> · {user.email_verified_at ? 'Підтверджено' : 'Не підтверджено'}</p>{!user.email_verified_at && <p>До підтвердження доступні профіль, зміна пароля й вихід. Інші функції відкриються після переходу за посиланням у листі.</p>}</div>
+    {!user.email_verified_at && <button type="button" className="outline-btn" disabled={Boolean(busy)} onClick={resend}>{busy === 'resend' ? 'Надсилаємо…' : 'Надіслати лист повторно'}</button>}
+    <form onSubmit={changeEmail} className="settings-email-change"><h3>Змінити адресу</h3><label>Новий email<input type="email" value={email} onChange={event => setEmail(event.target.value)} required autoComplete="email" /></label><label>Поточний пароль<input type="password" value={password} onChange={event => setPassword(event.target.value)} required autoComplete="current-password" /></label><button type="submit" className="outline-btn" disabled={Boolean(busy)}>{busy === 'change' ? 'Змінюємо…' : 'Змінити email'}</button></form>
+  </section>;
 }

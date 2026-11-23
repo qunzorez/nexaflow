@@ -22,5 +22,8 @@ RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f [OR]
 RewriteCond %{DOCUMENT_ROOT}/dist/$1 -d
 RewriteRule ^(.+)$ dist/$1 [L]
 
+# Missing hashed bundles must be a 404, never the React HTML fallback.
+RewriteRule ^assets/ - [R=404,L]
+
 # React Router handles /dashboard, /team and future application pages.
 RewriteRule ^ dist/index.html [L]

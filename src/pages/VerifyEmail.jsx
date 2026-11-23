@@ -10,7 +10,10 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     api(`/api/verify-email.php?token=${encodeURIComponent(params.get('token') || '')}`)
-      .then(result => setState({ loading: false, ok: result.ok, message: result.message }))
+      .then(async result => {
+        const session = result.ok ? await api('/api/me.php?optional=1') : null;
+        setState({ loading: false, ok: result.ok, message: result.message, destination: session?.authenticated ? '/dashboard' : '/login?verified=1' });
+      })
       .catch(() => setState({ loading: false, ok: false, message: 'Не вдалося перевірити посилання. Спробуйте відкрити його ще раз.' }));
   }, [params]);
 
@@ -21,9 +24,9 @@ export default function VerifyEmail() {
       </div>
       <p className="eyebrow">NEXAFLOW · EMAIL</p>
       <h2>{state.ok ? 'Пошту підтверджено' : state.loading ? 'Перевірка пошти' : 'Не вдалося підтвердити пошту'}</h2>
-      <p>{state.loading ? 'Зачекайте, підтверджуємо вашу адресу.' : state.ok ? 'Ваш акаунт активовано. Тепер увійдіть, щоб перейти до робочого простору.' : state.message}</p>
-      {!state.loading && <Link className="primary-action auth-submit" to={state.ok ? '/login?verified=1' : '/login'}>
-        {state.ok ? 'Увійти в NexaFlow' : state.loading ? 'До сторінки входу' : 'Повернутися до входу'}
+      <p>{state.loading ? 'Зачекайте, підтверджуємо вашу адресу.' : state.ok ? (state.destination === '/dashboard' ? 'Пошту підтверджено. Повний доступ уже відкрито.' : 'Пошту підтверджено. Увійдіть у свій акаунт.') : state.message}</p>
+      {!state.loading && <Link className="primary-action auth-submit" to={state.ok ? state.destination : '/login'}>
+        {state.ok ? (state.destination === '/dashboard' ? 'Перейти до робочого простору' : 'Увійти в NexaFlow') : 'Повернутися до входу'}
         <span><Icon name="forward" /></span>
       </Link>}
       {!state.ok && !state.loading && <small className="auth-result-hint">Якщо посилання застаріло, увійдіть або надішліть лист підтвердження повторно.</small>}
