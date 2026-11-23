@@ -68,6 +68,26 @@ if ($method === 'POST') {
     $data = body();
     $action = (string)($data['action'] ?? '');
     $reason = trim((string)($data['reason'] ?? '')) ?: null;
+    if ($action === 'update_modules') {
+        $modules = $data['modules'] ?? null;
+        if (!is_array($modules) || !array_key_exists('accounting', $modules) || !array_key_exists('dentistry', $modules)) jsonResponse(false, 'Передайте стан бухгалтерії та стоматології.', [], 422);
+        $settingsTable = $pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_module_settings'")->fetchColumn();
+        if (!(int)$settingsTable) jsonResponse(false, 'Налаштування модулів ще не встановлені. Виконайте міграцію database/system_module_settings.sql.', [], 409);
+        $pdo->beginTransaction();
+        try {
+            $current = $pdo->query('SELECT module_key, enabled FROM system_module_settings FOR UPDATE')->fetchAll(PDO::FETCH_KEY_PAIR);
+            $next = [];
+            foreach (['accounting', 'dentistry'] as $moduleKey) {
+                $value = filter_var($modules[$moduleKey], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($value === null) { $pdo->rollBack(); jsonResponse(false, 'Некоректне значення стану модуля.', [], 422); }
+                $next[$moduleKey] = (int)$value;
+                $pdo->prepare('INSERT INTO system_module_settings (module_key, enabled, updated_by) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled), updated_by=VALUES(updated_by)')->execute([$moduleKey, (int)$value, $actorId]);
+            }
+            $pdo->commit();
+        } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $error; }
+        adminAudit($pdo, $actorId, 'update_modules', 'system', 'modules', $current, $next, $reason);
+        jsonResponse(true, 'Стан модулів оновлено.', ['modules' => ['accounting' => (bool)$next['accounting'], 'dentistry' => (bool)$next['dentistry']]]);
+    }
     if ($action === 'resend_email_verification') {
         $userId = trim((string)($data['user_id'] ?? ''));
         if ($userId === '') jsonResponse(false, 'Користувача не вказано.', [], 422);
@@ -189,6 +209,8 @@ $auditPage = max(1, (int)($_GET['audit_page'] ?? 1));
 $auditOffset = ($auditPage - 1) * $perPage;
 $audit = $pdo->prepare('SELECT a.id, a.action, a.entity_type, a.entity_id, a.before_json, a.after_json, a.reason, a.result, a.created_at, u.name AS actor_name, u.email AS actor_email FROM admin_audit_log a JOIN users u ON u.id = a.actor_id ORDER BY a.created_at DESC LIMIT ? OFFSET ?');
 $audit->bindValue(1, $perPage, PDO::PARAM_INT); $audit->bindValue(2, $auditOffset, PDO::PARAM_INT); $audit->execute();
+$moduleSettings = ['accounting' => true, 'dentistry' => true];
+try { foreach ($pdo->query('SELECT module_key, enabled FROM system_module_settings')->fetchAll(PDO::FETCH_KEY_PAIR) as $key => $value) if (array_key_exists($key, $moduleSettings)) $moduleSettings[$key] = (bool)$value; } catch (Throwable $ignored) {}
 $stats = [
     'users' => (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(),
     'workspaces' => (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role IN ('admin','owner','manager')")->fetchColumn(),
@@ -203,4 +225,4 @@ $accessAttempts = $pdo->query("SELECT a.id, a.user_id, COALESCE(u.name, a.email,
 $authEvents = $pdo->query('SELECT e.id, e.user_id, COALESCE(u.name, e.email) AS user_name, e.email, e.event_type, e.result, e.source, e.created_at FROM auth_event_log e LEFT JOIN users u ON u.id = e.user_id ORDER BY e.created_at DESC LIMIT 100')->fetchAll();
 $groups = $pdo->query("SELECT g.id, g.name, g.role_name, g.project_id, p.name AS project_name, COUNT(gm.user_id) AS member_count FROM project_groups g LEFT JOIN projects p ON p.id = g.project_id LEFT JOIN project_group_members gm ON gm.group_id = g.id GROUP BY g.id, g.name, g.role_name, g.project_id, p.name ORDER BY g.name LIMIT 200")->fetchAll();
 $invitations = $pdo->query("SELECT i.id, i.email, i.role, i.group_id, g.name AS group_name, i.status, i.expires_at, i.created_at, u.name AS inviter_name, 'team' AS invite_type, NULL AS project_name FROM user_invitations i LEFT JOIN project_groups g ON g.id = i.group_id LEFT JOIN users u ON u.id = i.invited_by UNION ALL SELECT i.id, i.email, i.role, i.group_id, g.name AS group_name, i.status, i.expires_at, i.created_at, u.name AS inviter_name, 'project' AS invite_type, p.name AS project_name FROM project_invitations i JOIN projects p ON p.id = i.project_id LEFT JOIN project_groups g ON g.id = i.group_id LEFT JOIN users u ON u.id = i.invited_by ORDER BY created_at DESC LIMIT 100")->fetchAll();
-jsonResponse(true, 'Адміністративні дані завантажено.', ['stats' => $stats, 'users' => $userRows, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalUsers], 'workspaces' => $workspaces, 'subscriptions' => $subscriptions, 'audit' => $audit->fetchAll(), 'online' => $online, 'auth_events' => $authEvents, 'admin_access_attempts' => $accessAttempts, 'groups' => $groups, 'invitations' => $invitations, 'settings' => ['billing_enabled' => filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN)], 'plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'module' => $plan['module']], planDefinitions(), array_keys(planDefinitions()))]);
+jsonResponse(true, 'Адміністративні дані завантажено.', ['stats' => $stats, 'users' => $userRows, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalUsers], 'workspaces' => $workspaces, 'subscriptions' => $subscriptions, 'audit' => $audit->fetchAll(), 'online' => $online, 'auth_events' => $authEvents, 'admin_access_attempts' => $accessAttempts, 'groups' => $groups, 'invitations' => $invitations, 'settings' => ['billing_enabled' => filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN), 'modules' => $moduleSettings], 'plans' => array_map(static fn(array $plan, string $key): array => ['key' => $key, 'name' => $plan['name'], 'price' => $plan['price'], 'module' => $plan['module']], planDefinitions(), array_keys(planDefinitions()))]);
