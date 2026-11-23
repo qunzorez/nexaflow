@@ -126,6 +126,8 @@ $planContext = $user ? workspacePlan($pdo, (string)$user['id'], (string)$user['r
 if (!$user || ($planContext['workspace_role'] ?? '') !== 'manager') jsonResponse(false, 'Тариф цього робочого простору може змінювати лише його менеджер.', [], 403);
 $workspaceOwnerId = (string)$planContext['owner_id'];
 ensurePlanSchema($pdo);
+$requestedModule = isset($plans[$planKey]) ? (string)($plans[$planKey]['module'] ?? 'accounting') : '';
+if ($requestedModule !== '' && !systemModuleEnabled($pdo, $requestedModule) && in_array($requestAction, ['', 'select_plan', 'activate_without_payment'], true)) jsonResponse(false, 'Цей модуль тимчасово недоступний. Оберіть інший напрям.', ['code' => 'module_disabled', 'module' => $requestedModule], 409);
 $billingEnabled = filter_var(appConfig()['billing_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if ($requestAction === 'activate_without_payment') {
     if (!isset($plans[$planKey])) jsonResponse(false, 'Оберіть тариф.', [], 422);

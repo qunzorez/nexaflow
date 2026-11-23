@@ -51,7 +51,18 @@ export default function Settings() {
   const [cancelingPlan, setCancelingPlan] = useState(false);
   const [verifyingPlan, setVerifyingPlan] = useState(false);
   const requestedPlan = new URLSearchParams(window.location.search).get("plan") || "";
-  useEffect(() => { if (subscription?.module) setSelectedPlanModule(subscription.module); }, [subscription?.module]);
+  useEffect(() => {
+    const modules = subscription?.modules;
+    if (!modules) {
+      if (subscription?.module) setSelectedPlanModule(subscription.module);
+      return;
+    }
+    setSelectedPlanModule(current => {
+      if (modules[current] !== false) return current;
+      if (modules[subscription?.module] !== false) return subscription?.module || "accounting";
+      return modules.accounting ? "accounting" : modules.dentistry ? "dentistry" : current;
+    });
+  }, [subscription?.module, subscription?.modules]);
   async function startPlanCheckout(planKey) {
     if (payingPlan) return;
     setPayingPlan(planKey);
@@ -441,9 +452,10 @@ export default function Settings() {
                 {(user?.workspace_role || user?.role) === "manager" && <button type="button" onClick={verifyPlanPayment} disabled={verifyingPlan}>{verifyingPlan ? "Перевіряємо…" : "Перевірити оплату"}</button>}
               </div>}
               <div className="plan-direction-switch" role="group" aria-label="Напрям тарифного плану">
-                <button type="button" className={selectedPlanModule === "accounting" ? "active" : ""} onClick={() => setSelectedPlanModule("accounting")}>Бухгалтерія</button>
-                <button type="button" className={selectedPlanModule === "dentistry" ? "active" : ""} onClick={() => setSelectedPlanModule("dentistry")}>Стоматологія</button>
+                {subscription?.modules?.accounting !== false && <button type="button" className={selectedPlanModule === "accounting" ? "active" : ""} onClick={() => setSelectedPlanModule("accounting")}>Бухгалтерія</button>}
+                {subscription?.modules?.dentistry !== false && <button type="button" className={selectedPlanModule === "dentistry" ? "active" : ""} onClick={() => setSelectedPlanModule("dentistry")}>Стоматологія</button>}
               </div>
+              {subscription?.modules && !subscription.modules.accounting && !subscription.modules.dentistry && <p className="admin-muted">Наразі всі модулі вимкнені адміністратором. Тарифи недоступні.</p>}
             </div>
             <div className="subscription-meta">
               <div>
@@ -511,6 +523,7 @@ export default function Settings() {
                 </div>
                 {(user?.workspace_role || user?.role) === "manager" && <button type="button" className="plan-select-button" disabled={Boolean(payingPlan) || (plan.key === subscription?.key && (subscription?.billing?.status === "active" || Number(plan.amount) === 0 || !subscription?.billing_enabled))} onClick={() => startPlanCheckout(plan.key)}>{payingPlan === plan.key ? (subscription?.billing_enabled && Number(plan.amount) > 0 ? "Готуємо оплату…" : "Підключаємо…") : plan.key === subscription?.key && (subscription?.billing?.status === "active" || Number(plan.amount) === 0 || !subscription?.billing_enabled) ? "Поточний план" : subscription?.billing_enabled && Number(plan.amount) > 0 ? "Обрати план" : "Підключити план"}</button>}
               </article>)}
+              {!(subscription?.available_plans || []).some(plan => (plan.module || "accounting") === selectedPlanModule) && <p className="admin-muted">Для цього напряму зараз немає доступних тарифів.</p>}
             </div>
             {selectedPlanModule !== subscription?.module && <p className="plan-switch-hint">Зміна напряму відбудеться лише після успішного підключення плану.</p>}
             {subscription?.billing_enabled && (user?.workspace_role || user?.role) === "manager" && subscription?.billing?.status === "active" && <button type="button" className="outline-btn subscription-button" disabled={cancelingPlan} onClick={cancelPlanSubscription}>{cancelingPlan ? "Скасовуємо…" : "Скасувати автопродовження"}</button>}

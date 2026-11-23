@@ -522,8 +522,13 @@ function planSettingsPayload(array $context): array
     $pending = $context['pending_subscription'] ?? null;
     $pendingPlan = $pending && $pending['plan_key'] !== $context['key'] ? ['key' => $pending['plan_key'], 'module' => $pending['module_key'] ?? planModuleForKey((string)$pending['plan_key']), 'name' => $context['plans'][$pending['plan_key']]['name'] ?? '', 'price' => $context['plans'][$pending['plan_key']]['price'] ?? '', 'order_id' => $pending['order_id']] : null;
     $availablePlans = [];
+    $moduleAvailability = [
+        'accounting' => systemModuleEnabled(db(), 'accounting'),
+        'dentistry' => systemModuleEnabled(db(), 'dentistry'),
+    ];
     foreach ($context['plans'] as $key => $plan) {
         $planIsDental = ($plan['module'] ?? 'accounting') === 'dentistry';
+        if (empty($moduleAvailability[$planIsDental ? 'dentistry' : 'accounting'])) continue;
         $planLabels = $planIsDental ? ['doctors' => 'Лікарі', 'participants' => 'Виконавці', 'patients' => 'Пацієнти', 'appointments_month' => 'Записи цього місяця'] : ['projects' => 'Проєкти', 'tasks_month' => 'Задачі цього місяця', 'clients' => 'Клієнти', 'participants' => 'Учасники', 'managers' => 'Менеджери', 'project_leads' => 'Керівники проєктів', 'moderators' => 'Модератори'];
         $planLimits = [];
         foreach ($planLabels as $metric => $label) $planLimits[$metric] = $plan[$metric] ?? null;
@@ -533,5 +538,5 @@ function planSettingsPayload(array $context): array
     }
     $features = [];
     foreach ($isDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
-    return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
+    return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'modules' => $moduleAvailability, 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
 }
