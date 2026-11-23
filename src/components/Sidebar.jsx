@@ -2,13 +2,12 @@ import Icon from './Icon.jsx';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faInstagram, faTiktok, faTelegram } from "@fortawesome/free-brands-svg-icons";
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api, post } from "../services/api.js";
 import "./sidebar-icons.css";
 import "./support-nav.css";
 
 export default function Sidebar({ user, open, onNavigate }) {
-  const navigate = useNavigate();
   const location = useLocation();
   const workspaces = user?.workspaces || [];
   const activeWorkspaceId = user?.active_workspace_id || user?.subscription?.workspace_id || "";
@@ -112,10 +111,6 @@ export default function Sidebar({ user, open, onNavigate }) {
   useEffect(() => {
     if (location.pathname === "/support") clearSupportUnread();
   }, [location.pathname, countsStorageKey]);
-  async function logout() {
-    await post("/api/logout.php", {});
-    navigate("/");
-  }
   async function switchWorkspace(workspaceId) {
     if (!workspaceId || workspaceId === activeWorkspaceId || switchingWorkspace) return;
     setSwitchingWorkspace(true);
@@ -224,11 +219,6 @@ export default function Sidebar({ user, open, onNavigate }) {
           <a href="https://t.me/nexaflow_ua" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faTelegram} /></span> Telegram</a>
         </div>
       </nav>
-      <div className="sidebar-bottom">
-        <button className="logout" onClick={logout}>
-          <span><Icon name="logout" /></span> Вийти
-        </button>
-      </div>
     </aside>
   );
 }
