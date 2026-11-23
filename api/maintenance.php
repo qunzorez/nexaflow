@@ -19,18 +19,18 @@ function ensureMaintenanceSchema(PDO $pdo): void
 function maintenanceState(PDO $pdo): array
 {
     try {
-        try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, notice_minutes, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
+        try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, notice_minutes, title, message, estimated_end, UNIX_TIMESTAMP(estimated_end) AS estimated_end_epoch, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
         catch (PDOException $error) {
             if ($error->getCode() !== '42S22') throw $error;
-            try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, 5 AS notice_minutes, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
+            try { $row = $pdo->query('SELECT enabled AS requested_enabled, CASE WHEN enabled = 1 AND (starts_at IS NULL OR starts_at <= NOW()) THEN 1 ELSE 0 END AS enabled, starts_at, UNIX_TIMESTAMP(starts_at) AS starts_at_epoch, 5 AS notice_minutes, title, message, estimated_end, UNIX_TIMESTAMP(estimated_end) AS estimated_end_epoch, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch(); }
             catch (PDOException $legacyError) {
                 if ($legacyError->getCode() !== '42S22') throw $legacyError;
-                $row = $pdo->query('SELECT enabled AS requested_enabled, enabled, NULL AS starts_at, NULL AS starts_at_epoch, 5 AS notice_minutes, title, message, estimated_end, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch();
+                $row = $pdo->query('SELECT enabled AS requested_enabled, enabled, NULL AS starts_at, NULL AS starts_at_epoch, 5 AS notice_minutes, title, message, estimated_end, UNIX_TIMESTAMP(estimated_end) AS estimated_end_epoch, note, updated_by, updated_at FROM system_maintenance WHERE id = 1')->fetch();
             }
         }
-        return $row ?: ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'notice_minutes' => 5, 'title' => 'Технічні роботи', 'message' => 'Ми оновлюємо NexaFlow. Спробуйте зайти трохи пізніше.', 'estimated_end' => null, 'note' => null, 'updated_by' => null, 'updated_at' => null];
+        return $row ?: ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'notice_minutes' => 5, 'title' => 'Технічні роботи', 'message' => 'Ми оновлюємо NexaFlow. Спробуйте зайти трохи пізніше.', 'estimated_end' => null, 'estimated_end_epoch' => null, 'note' => null, 'updated_by' => null, 'updated_at' => null];
     } catch (PDOException $error) {
-        if ($error->getCode() === '42S02') return ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'notice_minutes' => 5, 'title' => 'Технічні роботи', 'message' => '', 'estimated_end' => null, 'note' => null, 'updated_at' => null];
+        if ($error->getCode() === '42S02') return ['enabled' => 0, 'requested_enabled' => 0, 'starts_at' => null, 'starts_at_epoch' => null, 'notice_minutes' => 5, 'title' => 'Технічні роботи', 'message' => '', 'estimated_end' => null, 'estimated_end_epoch' => null, 'note' => null, 'updated_at' => null];
         throw $error;
     }
 }
