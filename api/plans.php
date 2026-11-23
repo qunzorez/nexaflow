@@ -67,22 +67,8 @@ function ensurePlanSchema(PDO $pdo): void
         $pdo->exec("ALTER TABLE users ADD is_support_agent TINYINT(1) NOT NULL DEFAULT 0");
         $pdo->exec("UPDATE users SET is_support_agent = 1 WHERE role IN ('admin', 'owner')");
     }
-    $pdo->exec("CREATE TABLE IF NOT EXISTS plan_subscriptions (
-        id CHAR(32) NOT NULL PRIMARY KEY,
-        owner_id CHAR(32) NOT NULL,
-        plan_key VARCHAR(24) NOT NULL,
-        order_id VARCHAR(64) NOT NULL UNIQUE,
-        liqpay_subscription_id VARCHAR(100) NULL,
-        liqpay_payment_id VARCHAR(100) NULL,
-        amount DECIMAL(10,2) NOT NULL,
-        currency CHAR(3) NOT NULL DEFAULT 'USD',
-        status VARCHAR(24) NOT NULL DEFAULT 'pending',
-        current_period_end DATETIME NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_plan_subscription_payment (liqpay_payment_id),
-        KEY idx_plan_subscription_owner (owner_id, status, current_period_end)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    // The billing table is provisioned by database/liqpay_billing.sql during
+    // deployment. Do not issue CREATE TABLE on every authenticated API request.
     $subscriptionColumns = array_column($pdo->query("SHOW COLUMNS FROM plan_subscriptions")->fetchAll(), 'Field');
     if (!in_array('module_key', $subscriptionColumns, true)) {
         $pdo->exec("ALTER TABLE plan_subscriptions ADD module_key VARCHAR(24) NOT NULL DEFAULT 'accounting'");

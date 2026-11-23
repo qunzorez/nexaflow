@@ -22,3 +22,6 @@
 .claims-edit-heading > small { color: var(--muted); font-size: 10px; line-height: 1.45; }
 @media (max-width: 1050px) { .claims-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 550px) { .claims-grid { grid-template-columns: 1fr; } }
+.manager-team-view .remove-member,.global-groups-list .remove-member{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:8px 13px;border:1px solid #e6c9c4;border-radius:8px;background:#fff;color:#a64d42;font:700 10px/1.2 Inter,sans-serif;text-decoration:none;white-space:nowrap;transition:background .18s ease,border-color .18s ease,color .18s ease}
+.manager-team-view .remove-member:hover:not(:disabled),.global-groups-list .remove-member:hover:not(:disabled){border-color:#d99c92;background:#fff6f4;color:#913a31}
+.manager-team-view .remove-member:disabled,.global-groups-list .remove-member:disabled{opacity:.5;cursor:not-allowed}

@@ -13,10 +13,8 @@ $notificationColumns = $pdo->query("SELECT COLUMN_NAME FROM information_schema.C
 if (!in_array('is_banner', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD is_banner TINYINT(1) NOT NULL DEFAULT 0 AFTER content_html");
 if (!in_array('banner_dismissed_at', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD banner_dismissed_at DATETIME NULL AFTER is_banner");
 if (!in_array('banner_view_count', $notificationColumns, true)) $pdo->exec("ALTER TABLE notifications ADD banner_view_count TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER banner_dismissed_at");
-// Зберігаємо історію сповіщень лише останні 30 днів.
-// Очищення виконується перед кожним зверненням до API, тому не потребує
-// окремого ручного запуску для користувачів, які відкривають сповіщення.
-$pdo->exec("DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+// Історію за 30 днів очищує reminders-cron.php, щоб API читання не сканував
+// та не змінював всю таблицю сповіщень.
 $userId = (string)$_SESSION['user_id'];
 $userQuery = $pdo->prepare('SELECT id, name, role FROM users WHERE id = ? LIMIT 1');
 $userQuery->execute([$userId]);

@@ -1,5 +1,6 @@
 import Icon from './Icon.jsx';
 import './searchable-multi-placement.css';
+import './searchable-multi-select.css';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 

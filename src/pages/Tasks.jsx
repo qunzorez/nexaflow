@@ -7,7 +7,6 @@ import TaskFormModal from "../modules/tasks/TaskFormModal.jsx";
 import { api, post } from "../services/api.js";
 import { isPlanLimitReached, planLimitHint } from "../utils/planLimits.js";
 import "./tasks.css";
-import "./tasks-multiselect.css";
 import "./tasks-page-extra.css";
 import "./tasks-status.css";
 import "./tasks-table.css";

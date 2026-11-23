@@ -41,6 +41,7 @@ export default function Sidebar({ user, open, onNavigate }) {
   const userRole = String(user?.workspace_role || user?.role || "").toLowerCase();
   const globalAdmin = ["admin", "owner"].includes(String(user?.role || "").toLowerCase());
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole) || globalAdmin;
+  const canManageRequisites = ["admin", "owner", "manager"].includes(userRole) || globalAdmin;
   const isAdmin = ["admin", "owner"].includes(userRole) || globalAdmin;
   const canUseSupport = isAdmin || ["admin", "owner"].includes(String(user?.role || "").toLowerCase()) || Number(user?.is_support_agent) === 1 || Boolean(planFeatures.support);
   const dentalNavFeatures = ["dental_inventory", "dental_procurement", "dental_management_accounting", "dental_doctor_payroll", "dental_equipment"];
@@ -185,6 +186,9 @@ export default function Sidebar({ user, open, onNavigate }) {
         </Link>}
         {activeClientModule === "accounting" && planFeatures.accounting && <Link className="nav-item" to="/accounting">
           <span><Icon name="settings" /></span> Податкові налаштування
+        </Link>}
+        {activeClientModule === "accounting" && planFeatures.accounting && canManageRequisites && <Link className="nav-item" to="/accounting/requisites">
+          <span><Icon name="briefcase" /></span> Реквізити
         </Link>}
         {activeClientModule === "dentistry" && hasDentalNav && <>
           <p className="nav-label">ОБЛІК КЛІНІКИ</p>

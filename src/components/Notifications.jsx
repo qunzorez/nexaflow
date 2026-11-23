@@ -2,9 +2,11 @@ import Icon from './Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { api, post } from '../services/api.js';
 import DOMPurify from 'dompurify';
+import { useNavigate } from 'react-router-dom';
 import './notifications.css';
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false); const [selected, setSelected] = useState(null);
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -22,7 +24,7 @@ export default function Notifications() {
   }
   useEffect(() => { load(); const interval = window.setInterval(load, 15000); const refreshOnFocus = () => load(); window.addEventListener('focus', refreshOnFocus); return () => { window.clearInterval(interval); window.removeEventListener('focus', refreshOnFocus); }; }, []);
   useEffect(() => { const closeOnOutsideClick = event => { if (open && wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false); }; document.addEventListener('pointerdown', closeOnOutsideClick); return () => document.removeEventListener('pointerdown', closeOnOutsideClick); }, [open]);
-  async function mark(item) { setOpen(false); setSelected(item); if (!Number(item.is_read)) { await post('/api/notifications.php', { action: 'read', id: item.id }); load(); } }
+  async function mark(item) { setOpen(false); if (item.type === 'accounting') { if (!Number(item.is_read)) await post('/api/notifications.php', { action: 'read', id: item.id }); navigate('/accounting'); return; } setSelected(item); if (!Number(item.is_read)) { await post('/api/notifications.php', { action: 'read', id: item.id }); load(); } }
   async function markAll() { await post('/api/notifications.php', { action: 'read_all' }); load(); }
   async function dismissBanner() { if (!selected) return; await post('/api/notifications.php', { action: 'dismiss_banner', id: selected.id }); setItems(current => current.map(item => item.id === selected.id ? { ...item, banner_dismissed_at: new Date().toISOString() } : item)); setSelected(null); }
   const preview = value => String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__ . '/db.php';
 require_once __DIR__ . '/plans.php';
+require_once __DIR__ . '/accounting-requisites-lib.php';
 session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db();
@@ -11,6 +12,7 @@ $userQuery->execute([$userId]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $planContext = workspacePlan($pdo, $userId, (string)$user['role']);
+ensureAccountingRequisitesSchema($pdo);
 $userColumns = array_column($pdo->query('SHOW COLUMNS FROM users')->fetchAll(), 'Field');
 if (!in_array('active_client_module', $userColumns, true)) $pdo->exec("ALTER TABLE users ADD active_client_module VARCHAR(40) NOT NULL DEFAULT 'accounting'");
 $moduleQuery = $pdo->prepare('SELECT active_client_module FROM users WHERE id = ?'); $moduleQuery->execute([(string)$planContext['owner_id']]);
@@ -74,6 +76,20 @@ if ($method === 'GET') {
     } catch (Throwable $exception) {
         // The service catalog is optional for older installations.
     }
+    $canViewAccountingRequisites = in_array((string)($planContext['workspace_role'] ?? ''), ['manager', 'admin', 'owner'], true) || $isAdmin;
+    $requisitesOwnerId = (string)$planContext['owner_id'];
+    $requisitesWorkspaceIds = $workspaceIds;
+    $requestedRequisitesOwner = trim((string)($_GET['workspace_owner_id'] ?? ''));
+    if ($isAdmin && $requestedRequisitesOwner !== '') {
+        $requestedRole = $pdo->prepare("SELECT role FROM users WHERE id=? AND role IN ('manager','admin','owner') LIMIT 1");
+        $requestedRole->execute([$requestedRequisitesOwner]);
+        $requestedRole = $requestedRole->fetchColumn();
+        if ($requestedRole !== false) {
+            $requisitesContext = workspacePlan($pdo, $requestedRequisitesOwner, (string)$requestedRole);
+            $requisitesOwnerId = (string)$requisitesContext['owner_id'];
+            $requisitesWorkspaceIds = array_values(array_unique(array_map('strval', $requisitesContext['member_ids'] ?? [$requisitesOwnerId])));
+        }
+    }
     foreach ($clients as &$client) {
         $client['special_taxes'] = $client['special_taxes'] ? (json_decode($client['special_taxes'], true) ?: []) : [];
         $client['services'] = $client['services'] ? (json_decode($client['services'], true) ?: []) : [];
@@ -88,6 +104,21 @@ if ($method === 'GET') {
         }
         unset($service);
         $client['module_data'] = $client['module_data'] ? (json_decode($client['module_data'], true) ?: []) : [];
+        if ($canViewAccountingRequisites && ($client['module'] ?? '') === 'accounting' && in_array((string)$client['created_by'], $requisitesWorkspaceIds, true)) {
+            $boundId = (string)($client['module_data']['accounting_requisites_id'] ?? '');
+            $client['issuer_requisites'] = null;
+            if ($boundId !== '') {
+                $requisiteQuery = $pdo->prepare('SELECT id,display_name,legal_form,tax_identifier,legal_address,postal_address,iban,bank_name,bank_details,contact_phone,contact_email,tax_status,additional_info,active FROM accounting_requisites WHERE owner_id=? AND id=? AND active=1 LIMIT 1');
+                $requisiteQuery->execute([$requisitesOwnerId, $boundId]);
+                $client['issuer_requisites'] = $requisiteQuery->fetch() ?: null;
+            }
+            if (!$client['issuer_requisites'] && $boundId === '') {
+                $singleRequisiteQuery = $pdo->prepare('SELECT id,display_name,legal_form,tax_identifier,legal_address,postal_address,iban,bank_name,bank_details,contact_phone,contact_email,tax_status,additional_info,active FROM accounting_requisites WHERE owner_id=? AND active=1 ORDER BY display_name');
+                $singleRequisiteQuery->execute([$requisitesOwnerId]);
+                $activeRequisites = $singleRequisiteQuery->fetchAll();
+                if (count($activeRequisites) === 1) $client['issuer_requisites'] = $activeRequisites[0];
+            }
+        }
     }
     unset($client);
     $appointmentStatuses = [];
@@ -244,6 +275,42 @@ $specialTaxes = array_values(array_intersect((array)($data['special_taxes'] ?? [
 $requestedModule = (string)($data['module'] ?? 'accounting');
 $module = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : 'accounting';
 $moduleDataValues = (array)($data['module_data'] ?? []);
+$canBindAccountingRequisites = in_array((string)($planContext['workspace_role'] ?? ''), ['manager', 'admin', 'owner'], true) || in_array((string)$user['role'], ['admin', 'owner'], true);
+if ($module === 'accounting' && $canBindAccountingRequisites) {
+    $requisitesId = trim((string)($moduleDataValues['accounting_requisites_id'] ?? ''));
+    if ($requisitesId !== '') {
+        $selectedRequisite = $pdo->prepare('SELECT active FROM accounting_requisites WHERE id=? AND owner_id=? LIMIT 1');
+        $selectedRequisite->execute([$requisitesId, (string)$planContext['owner_id']]);
+        if ((int)$selectedRequisite->fetchColumn() === 0) $requisitesId = '';
+    }
+    if ($requisitesId === '') {
+        $activeRequisites = $pdo->prepare('SELECT id FROM accounting_requisites WHERE owner_id=? AND active=1 ORDER BY display_name');
+        $activeRequisites->execute([(string)$planContext['owner_id']]);
+        $activeRequisites = $activeRequisites->fetchAll(PDO::FETCH_COLUMN);
+        if (count($activeRequisites) === 1) $requisitesId = (string)$activeRequisites[0];
+        elseif (count($activeRequisites) > 1) jsonResponse(false, 'Оберіть набір реквізитів для цього клієнта.', [], 422);
+    }
+    if ($requisitesId !== '') {
+        $requisitesCheck = $pdo->prepare('SELECT 1 FROM accounting_requisites WHERE id=? AND owner_id=? LIMIT 1');
+        $requisitesCheck->execute([$requisitesId, (string)$planContext['owner_id']]);
+        if (!$requisitesCheck->fetchColumn()) jsonResponse(false, 'Обрані реквізити не належать активному робочому простору.', [], 422);
+        $moduleDataValues['accounting_requisites_id'] = $requisitesId;
+    } else {
+        unset($moduleDataValues['accounting_requisites_id']);
+    }
+} elseif ($module === 'accounting') {
+    $requisitesId = '';
+    if ($clientAction === 'update') {
+        $currentData = $pdo->prepare('SELECT module_data FROM clients WHERE id=?');
+        $currentData->execute([(string)($data['id'] ?? '')]);
+        $currentModuleData = json_decode((string)($currentData->fetchColumn() ?: '{}'), true) ?: [];
+        $requisitesId = (string)($currentModuleData['accounting_requisites_id'] ?? '');
+    }
+    if ($requisitesId !== '') $moduleDataValues['accounting_requisites_id'] = $requisitesId;
+    else unset($moduleDataValues['accounting_requisites_id']);
+} else {
+    unset($moduleDataValues['accounting_requisites_id']);
+}
 $globalAccountantIds = array_values(array_unique(array_filter(array_map(static fn($value): string => trim((string)$value), (array)($moduleDataValues['accountant_ids'] ?? [])), static fn(string $value): bool => preg_match('/^[a-f0-9]{32}$/i', $value) === 1)));
 if ($module === 'accounting') $moduleDataValues['accountant_ids'] = $globalAccountantIds; else unset($moduleDataValues['accountant_ids']);
 $moduleData = json_encode($moduleDataValues, JSON_UNESCAPED_UNICODE);

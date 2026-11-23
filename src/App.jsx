@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useLayoutEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
@@ -28,11 +28,17 @@ import DentistryModuleRoute from "./components/DentistryModuleRoute.jsx";
 const DentistryPatientPage = lazy(() => import("./pages/DentistryPatientPage.jsx"));
 const DentistryERPPage = lazy(() => import("./pages/DentistryERPPage.jsx"));
 const Accounting = lazy(() => import("./pages/Accounting.jsx"));
+const AccountingRequisites = lazy(() => import("./pages/AccountingRequisites.jsx"));
+const AccountingPortal = lazy(() => import("./pages/AccountingPortal.jsx"));
 const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
 const BannedPage = lazy(() => import("./pages/BannedPage.jsx"));
 const FAQ = lazy(() => import("./pages/FAQ.jsx"));
 
 export default function App() {
+  useLayoutEffect(() => {
+    document.documentElement.classList.remove('nf-spa-route-loading');
+  }, []);
+
   return (
     <Suspense fallback={<div className="loading-screen">Завантаження…</div>}><Routes>
       <Route path="/" element={<Landing />} />
@@ -45,6 +51,8 @@ export default function App() {
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/accounting" element={<PlanFeatureRoute feature="accounting"><Accounting /></PlanFeatureRoute>} />
+      <Route path="/accounting/requisites" element={<PlanFeatureRoute feature="accounting"><AccountingRequisites /></PlanFeatureRoute>} />
+      <Route path="/accounting/portal" element={<AccountingPortal />} />
       <Route path="/patients/:id" element={<DentistryModuleRoute><DentistryPatientPage /></DentistryModuleRoute>} />
       <Route path="/dentistry-erp" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_inventory"><DentistryERPPage /></PlanFeatureRoute></DentistryModuleRoute>} />
       <Route path="/dentistry/inventory" element={<DentistryModuleRoute><PlanFeatureRoute feature="dental_inventory"><DentistryERPPage key="inventory" module="inventory" /></PlanFeatureRoute></DentistryModuleRoute>} />
