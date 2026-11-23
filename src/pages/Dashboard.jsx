@@ -234,8 +234,8 @@ export default function Dashboard() {
           </div>
         </section>
         {clientPortalClients.length > 0 && <section className="client-portal-shortcuts" aria-label="Кабінет клієнта">
-          <div><span className="eyebrow">ДОСТУП КЛІЄНТА</span><h2>Кабінет клієнта</h2><p>Документи, запити та рахунки вашої компанії.</p></div>
-          <div className="client-portal-shortcut-list">{clientPortalClients.map(client => <Link key={client.client_id} to={`/accounting/portal?client=${encodeURIComponent(client.client_id)}`}><span><Icon name="contact" /></span><strong>{client.name}</strong><Icon name="right" /></Link>)}</div>
+          <div className="client-portal-shortcuts-copy"><span className="client-portal-shortcuts-icon" aria-hidden="true"><Icon name="contact" /></span><div><span className="eyebrow">ВАШ ПРОСТІР</span><h2>Кабінет клієнта</h2><p>Документи, запити та рахунки вашої компанії в одному місці.</p></div></div>
+          <div className="client-portal-shortcut-list">{clientPortalClients.map(client => <Link key={client.client_id} to={`/accounting/portal?client=${encodeURIComponent(client.client_id)}`}><span className="client-portal-shortcut-avatar" aria-hidden="true"><Icon name="contact" /></span><span className="client-portal-shortcut-details"><strong>{client.name}</strong><small>Відкрити кабінет</small></span><span className="client-portal-shortcut-arrow" aria-hidden="true"><Icon name="right" /></span></Link>)}</div>
         </section>}
         {data.reminders?.length > 0 && (
           <section className="panel reminders-panel reminder-panel-enter">
