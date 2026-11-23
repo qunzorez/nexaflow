@@ -37,6 +37,18 @@ const FAQ = lazy(() => import("./pages/FAQ.jsx"));
 
 export default function App() {
   useLayoutEffect(() => {
+    const reloadForStaleBundle = (event) => {
+      event.preventDefault();
+      const key = `nexaflow.bundle-reload:${window.location.pathname}`;
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, '1');
+      window.location.reload();
+    };
+    window.addEventListener('vite:preloadError', reloadForStaleBundle);
+    return () => window.removeEventListener('vite:preloadError', reloadForStaleBundle);
+  }, []);
+
+  useLayoutEffect(() => {
     document.documentElement.classList.remove('nf-spa-route-loading');
   }, []);
 
