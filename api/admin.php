@@ -167,7 +167,7 @@ $like = '%' . $search . '%';
 $userCount = $pdo->prepare("SELECT COUNT(*) FROM users WHERE (? = '' OR name LIKE ? OR email LIKE ? OR role LIKE ?)");
 $userCount->execute([$search, $like, $like, $like]);
 $totalUsers = (int)$userCount->fetchColumn();
-$users = $pdo->prepare("SELECT id, name, email, role, requested_role, is_support_agent, is_blocked, blocked_reason, plan_key, active_client_module, email_verified_at, created_at, updated_at, last_seen_at FROM users WHERE (? = '' OR name LIKE ? OR email LIKE ? OR role LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?");
+$users = $pdo->prepare("SELECT id, name, email, role, requested_role, is_support_agent, is_blocked, blocked_reason, plan_key, active_client_module, email_verified_at, created_at, updated_at, last_seen_at FROM users WHERE (? = '' OR name LIKE ? OR email LIKE ? OR role LIKE ?) ORDER BY (email_verified_at IS NOT NULL) ASC, created_at DESC, id DESC LIMIT ? OFFSET ?");
 $users->bindValue(1, $search); $users->bindValue(2, $like); $users->bindValue(3, $like); $users->bindValue(4, $like); $users->bindValue(5, $perPage, PDO::PARAM_INT); $users->bindValue(6, $offset, PDO::PARAM_INT); $users->execute();
 $userRows = $users->fetchAll();
 if ($userRows) {
