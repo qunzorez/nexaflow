@@ -2,10 +2,14 @@ import Icon from './Icon.jsx';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faInstagram, faTiktok, faTelegram } from "@fortawesome/free-brands-svg-icons";
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { api, post } from "../services/api.js";
 import "./sidebar-icons.css";
 import "./support-nav.css";
+
+function SidebarNavLink({ children, className = "", end = false, ...props }) {
+  return <NavLink {...props} end={end} className={({ isActive }) => `nav-item${isActive ? " active" : ""}${className ? ` ${className}` : ""}`}>{children}</NavLink>;
+}
 
 export default function Sidebar({ user, open, onNavigate }) {
   const location = useLocation();
@@ -41,6 +45,7 @@ export default function Sidebar({ user, open, onNavigate }) {
   const globalAdmin = ["admin", "owner"].includes(String(user?.role || "").toLowerCase());
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole) || globalAdmin;
   const canManageRequisites = ["admin", "owner", "manager"].includes(userRole) || globalAdmin;
+  const canUseAccountingPayouts = Boolean(planFeatures.accountant_payouts);
   const isAdmin = ["admin", "owner"].includes(userRole) || globalAdmin;
   const canUseSupport = isAdmin || ["admin", "owner"].includes(String(user?.role || "").toLowerCase()) || Number(user?.is_support_agent) === 1 || Boolean(planFeatures.support);
   const dentalNavFeatures = ["dental_inventory", "dental_procurement", "dental_management_accounting", "dental_doctor_payroll", "dental_equipment"];
@@ -153,65 +158,68 @@ export default function Sidebar({ user, open, onNavigate }) {
       </section>}
       <nav>
         <p className="nav-label">ОСНОВНЕ</p>
-        <Link className="nav-item" to="/dashboard">
+        <SidebarNavLink to="/dashboard" end>
           <span><Icon name="home" /></span> Огляд {activeClientModule !== "dentistry" && <b>{counts.tasks}</b>}
-        </Link>
-        <Link className="nav-item" to="/clients">
+        </SidebarNavLink>
+        <SidebarNavLink to="/clients">
           <span><Icon name="users" /></span> Клієнти <b>{counts.clients}</b>
-        </Link>
-        {activeClientModule !== "dentistry" && <Link className="nav-item" to="/projects">
+        </SidebarNavLink>
+        {activeClientModule !== "dentistry" && <SidebarNavLink to="/projects">
           <span><Icon name="project" /></span> Проєкти <b>{counts.projects}</b>
-        </Link>}
-        {activeClientModule !== "dentistry" && <Link className="nav-item" to="/tasks">
+        </SidebarNavLink>}
+        {activeClientModule !== "dentistry" && <SidebarNavLink to="/tasks">
           <span><Icon name="tasks" /></span> Задачі <b>{counts.tasks}</b>
-        </Link>}
-        {activeClientModule === "dentistry" && planFeatures.calendar && <Link className="nav-item" to="/appointments">
+        </SidebarNavLink>}
+        {activeClientModule === "dentistry" && planFeatures.calendar && <SidebarNavLink to="/appointments">
           <span><Icon name="calendar" /></span> Записи
-        </Link>}
+        </SidebarNavLink>}
         {(canManage || (userRole === "user" && String(activeWorkspaceId) !== String(user?.id))) && (
-          <Link className="nav-item" to="/team">
+          <SidebarNavLink to="/team">
             <span className="nav-icon">
               <Icon name="users" />
             </span>{" "}
             Команда <b>{counts.team}</b>
-          </Link>
+          </SidebarNavLink>
         )}
-        {(isAdmin || (canManage && planFeatures.services)) && <Link className="nav-item" to="/services">
+        {(isAdmin || (canManage && planFeatures.services)) && <SidebarNavLink to="/services">
           <span><Icon name="subscription" /></span> Послуги
-        </Link>}
-        {(activeClientModule === "accounting" || user?.subscription?.module === "accounting") && planFeatures.accounting && <Link className="nav-item" to="/accounting">
-          <span><Icon name="settings" /></span> Бухгалтерія
-        </Link>}
-        {activeClientModule === "accounting" && planFeatures.accounting && canManageRequisites && <Link className="nav-item" to="/accounting/requisites">
+        </SidebarNavLink>}
+        {(activeClientModule === "accounting" || user?.subscription?.module === "accounting") && planFeatures.accounting && canManageRequisites && <SidebarNavLink to="/accounting/requisites">
           <span><Icon name="briefcase" /></span> Реквізити
-        </Link>}
+        </SidebarNavLink>}
+        {(activeClientModule === "accounting" || user?.subscription?.module === "accounting") && planFeatures.accounting && <SidebarNavLink to="/accounting" end>
+          <span><Icon name="settings" /></span> Податкові налаштування
+        </SidebarNavLink>}
+        {(activeClientModule === "accounting" || user?.subscription?.module === "accounting") && planFeatures.accounting && canUseAccountingPayouts && <SidebarNavLink to="/accounting/payouts">
+          <span><Icon name="subscription" /></span> {(["admin","owner","manager"].includes(userRole) || globalAdmin) ? "Виплати бухгалтерам" : "Виплати"}
+        </SidebarNavLink>}
         {activeClientModule === "dentistry" && hasDentalNav && <>
           <p className="nav-label">ОБЛІК КЛІНІКИ</p>
-          {planFeatures.dental_inventory && <Link className="nav-item" to="/dentistry/inventory"><span><Icon name="archive" /></span> Склад</Link>}
-          {planFeatures.dental_procurement && <Link className="nav-item" to="/dentistry/purchases"><span><Icon name="briefcase" /></span> Закупівлі</Link>}
-          {canManage && planFeatures.dental_management_accounting && <Link className="nav-item" to="/dentistry/accounting"><span><Icon name="chart" /></span> Бухгалтерія</Link>}
-          {canManage && planFeatures.dental_doctor_payroll && <Link className="nav-item" to="/dentistry/payroll"><span><Icon name="users" /></span> Зарплати</Link>}
-          {planFeatures.dental_equipment && <Link className="nav-item" to="/dentistry/equipment"><span><Icon name="settings" /></span> Обладнання</Link>}
+          {planFeatures.dental_inventory && <SidebarNavLink to="/dentistry/inventory"><span><Icon name="archive" /></span> Склад</SidebarNavLink>}
+          {planFeatures.dental_procurement && <SidebarNavLink to="/dentistry/purchases"><span><Icon name="briefcase" /></span> Закупівлі</SidebarNavLink>}
+          {canManage && planFeatures.dental_management_accounting && <SidebarNavLink to="/dentistry/accounting"><span><Icon name="chart" /></span> Бухгалтерія</SidebarNavLink>}
+          {canManage && planFeatures.dental_doctor_payroll && <SidebarNavLink to="/dentistry/payroll"><span><Icon name="users" /></span> Зарплати</SidebarNavLink>}
+          {planFeatures.dental_equipment && <SidebarNavLink to="/dentistry/equipment"><span><Icon name="settings" /></span> Обладнання</SidebarNavLink>}
         </>}
         {isAdmin && (
-          <Link className="nav-item" to="/notifications">
+          <SidebarNavLink to="/notifications">
             <span className="nav-icon">
               <Icon name="bell" />
             </span>{" "}
             Сповіщення <b>{counts.notifications}</b>
-          </Link>
+          </SidebarNavLink>
         )}
-        {isAdmin && <Link className="nav-item" to="/admin"><span><Icon name="settings" /></span> Адмінпанель</Link>}
+        {isAdmin && <SidebarNavLink to="/admin"><span><Icon name="settings" /></span> Адмінпанель</SidebarNavLink>}
         <p className="nav-label">РОБОЧІ ІНСТРУМЕНТИ</p>
-        {planFeatures.calendar && <Link className="nav-item" to="/calendar">
+        {planFeatures.calendar && <SidebarNavLink to="/calendar">
           <span><Icon name="calendar" /></span> Календар
-        </Link>}
-        {canUseSupport && <Link className="nav-item" to="/support" onClick={clearSupportUnread}>
+        </SidebarNavLink>}
+        {canUseSupport && <SidebarNavLink to="/support" onClick={clearSupportUnread}>
           <span><Icon name="question" /></span> Онлайн підтримка {counts.support > 0 && <b className="support-unread-badge" aria-label={`${counts.support} непрочитаних повідомлень`}>{counts.support}</b>}
-        </Link>}
-        <Link className="nav-item" to="/faq">
+        </SidebarNavLink>}
+        <SidebarNavLink to="/faq">
           <span><Icon name="question" /></span> FAQ · Як користуватися
-        </Link>
+        </SidebarNavLink>
         <div className="sidebar-social-block">
           <p className="nav-label">СОЦІАЛЬНІ МЕРЕЖІ</p>
           <a href="https://www.instagram.com/nexaflow.top/" target="_blank" rel="noreferrer"><span aria-hidden="true"><FontAwesomeIcon icon={faInstagram} /></span> Instagram</a>

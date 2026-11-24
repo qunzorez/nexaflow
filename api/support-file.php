@@ -6,12 +6,14 @@ session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 $pdo = db();
 ensurePlanSchema($pdo);
+$createdByColumn = $pdo->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'support_sessions' AND COLUMN_NAME = 'created_by' LIMIT 1")->fetchColumn();
+if (!$createdByColumn) $pdo->exec('ALTER TABLE support_sessions ADD created_by CHAR(32) NULL');
 $userId = (string)$_SESSION['user_id'];
 $userQuery = $pdo->prepare('SELECT role, is_support_agent FROM users WHERE id = ? LIMIT 1');
 $userQuery->execute([$userId]);
 $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
-$fileQuery = $pdo->prepare('SELECT sa.id, sa.workspace_id, sa.original_name, sa.mime_type, sa.file_path, sa.file_data, ss.status, ss.closed_at FROM support_attachments sa LEFT JOIN support_sessions ss ON ss.id = sa.session_id WHERE sa.id = ? LIMIT 1');
+$fileQuery = $pdo->prepare('SELECT sa.id, sa.workspace_id, sa.original_name, sa.mime_type, sa.file_path, sa.file_data, ss.id AS session_id, ss.status, ss.closed_at, ss.created_by FROM support_attachments sa LEFT JOIN support_sessions ss ON ss.id = sa.session_id WHERE sa.id = ? LIMIT 1');
 $fileQuery->execute([trim((string)($_GET['id'] ?? ''))]);
 $file = $fileQuery->fetch();
 if (!$file || ($file['status'] === 'closed' && $file['closed_at'] < date('Y-m-d H:i:s', strtotime('-60 days')))) jsonResponse(false, 'Зображення не знайдено або його строк зберігання завершився.', [], 404);
@@ -19,6 +21,11 @@ $isSupportStaff = in_array((string)$user['role'], ['admin', 'owner'], true) || !
 if (!$isSupportStaff) {
     $context = workspacePlan($pdo, $userId, (string)$user['role']);
     if ((string)$context['owner_id'] !== (string)$file['workspace_id'] || empty($context['plan']['support'])) jsonResponse(false, 'Немає доступу до цього зображення.', [], 403);
+    if ($file['status'] === 'closed' && (string)$file['created_by'] !== $userId) {
+        $legacyOwner = $pdo->prepare('SELECT 1 FROM support_messages WHERE session_id=? AND sender_id=? LIMIT 1');
+        $legacyOwner->execute([$file['session_id'], $userId]);
+        if (!$legacyOwner->fetchColumn()) jsonResponse(false, 'Немає доступу до архівного зображення.', [], 403);
+    }
 }
 $content = null;
 if (!empty($file['file_path'])) {

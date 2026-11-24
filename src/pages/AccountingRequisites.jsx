@@ -14,13 +14,15 @@ const required = new Set(['display_name','legal_form','tax_identifier','legal_ad
 
 export default function AccountingRequisites() {
   const [user,setUser]=useState(null);const [items,setItems]=useState([]);const [history,setHistory]=useState([]);const [form,setForm]=useState(null);const [error,setError]=useState('');const [notice,setNotice]=useState('');const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);
-  async function load(){setLoading(true);const result=await api('/api/accounting-requisites.php');setLoading(false);if(!result.ok){setError(result.message);return;}setUser(result.user||null);setItems(result.requisites||[]);setHistory(result.history||[]);setError('');}
+  async function load(){setLoading(true);setError('');try{const result=await api('/api/accounting-requisites.php');if(!result.ok){setError(result.message||'Не вдалося завантажити реквізити.');return;}setUser(result.user||null);setItems(result.requisites||[]);setHistory(result.history||[]);}catch{setError('Не вдалося завантажити реквізити. Перевірте з’єднання та спробуйте ще раз.');}finally{setLoading(false);}}
   useEffect(()=>{load();},[]);
   useEffect(()=>{if(!error)return undefined;const timer=window.setTimeout(()=>setError(''),5000);return()=>window.clearTimeout(timer);},[error]);
   useEffect(()=>{if(!notice)return undefined;const timer=window.setTimeout(()=>setNotice(''),5000);return()=>window.clearTimeout(timer);},[notice]);
   async function save(event){event.preventDefault();setSaving(true);const result=await post('/api/accounting-requisites.php',{action:'save',...form});setSaving(false);if(!result.ok){setError(result.message);return;}setNotice(result.message);setForm(null);await load();}
   async function setActive(item,active){const action=active?'activate':'deactivate';if(!window.confirm(`${active?'Активувати':'Вимкнути'} набір реквізитів «${item.display_name}»?`))return;const result=await post('/api/accounting-requisites.php',{action,id:item.id});if(!result.ok){setError(result.message);return;}setNotice(result.message);load();}
   const activeCount=items.filter(item=>Number(item.active)).length;
+  if(loading&&!user)return <div className="loading-screen" role="status">Завантаження реквізитів…</div>;
+  if(!user)return <div className="accounting-requisites-load-error"><strong>{error||'Не вдалося завантажити реквізити.'}</strong><button className="primary-action" type="button" onClick={load}>Спробувати ще раз</button></div>;
   return <Layout page="Реквізити" user={user}><main className="content accounting-requisites-page">
     <header className="accounting-requisites-hero"><div><p className="eyebrow">МОДУЛЬ БУХГАЛТЕРІЯ</p><h1>Реквізити</h1><p>Централізовані дані організації для карток клієнтів і нових рахунків.</p></div><button className="primary-action" onClick={()=>setForm({...empty})}>Додати реквізити</button></header>
     {error&&<div className="form-notice accounting-toast" role="alert">{error}</div>}{notice&&<div className="team-notice accounting-toast" role="status">{notice}</div>}

@@ -6,6 +6,7 @@ session_start();
 if (empty($_SESSION['user_id'])) jsonResponse(false, 'Потрібна авторизація.', [], 401);
 
 $pdo = db();
+requireSystemModuleEnabled($pdo, 'dentistry');
 $userId = (string)$_SESSION['user_id'];
 $userQuery = $pdo->prepare('SELECT id, role FROM users WHERE id = ? LIMIT 1');
 $userQuery->execute([$userId]);

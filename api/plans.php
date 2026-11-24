@@ -5,10 +5,10 @@ declare(strict_types=1);
 function planDefinitions(): array
 {
     $accounting = [
-        'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'accounting' => false, 'services' => false, 'services_per_client' => 2, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'amount' => '7.99', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'support' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
-        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => 1, 'project_leads' => 1, 'moderators' => 3],
-        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'amount' => '24.99', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'managers' => null, 'project_leads' => 5, 'moderators' => 5],
+        'start' => ['name' => 'Старт', 'price' => 'Безкоштовно', 'projects' => 1, 'tasks_month' => 50, 'clients' => 3, 'participants' => 2, 'accounting' => false, 'services' => false, 'services_per_client' => 2, 'calendar' => false, 'analytics' => false, 'telegram' => false, 'support' => false, 'accountant_payouts' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'growth' => ['name' => 'Зростання', 'price' => '$7.99 / місяць', 'amount' => '7.99', 'projects' => 5, 'tasks_month' => 100, 'clients' => 30, 'participants' => 5, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => false, 'analytics' => false, 'telegram' => true, 'support' => false, 'accountant_payouts' => false, 'managers' => 1, 'project_leads' => 0, 'moderators' => 0],
+        'team' => ['name' => 'Команда', 'price' => '$14.99 / місяць', 'amount' => '14.99', 'projects' => 50, 'tasks_month' => 300, 'clients' => 100, 'participants' => 10, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'accountant_payouts' => true, 'managers' => 1, 'project_leads' => 1, 'moderators' => 3],
+        'business' => ['name' => 'Бізнес', 'price' => '$24.99 / місяць', 'amount' => '24.99', 'projects' => 100, 'tasks_month' => 1000, 'clients' => 500, 'participants' => 49, 'accounting' => true, 'services' => true, 'services_per_client' => null, 'calendar' => true, 'analytics' => true, 'telegram' => true, 'support' => true, 'accountant_payouts' => true, 'managers' => null, 'project_leads' => 5, 'moderators' => 5],
     ];
     $dentalFeatures = [
         'dental_medical_records' => true, 'dental_service_catalog' => true, 'dental_patient_invoices' => true,
@@ -57,6 +57,13 @@ function systemModuleEnabled(PDO $pdo, string $module): bool
         $value = $query->fetchColumn();
         return $value === false ? true : (bool)$value;
     } catch (Throwable $ignored) { return true; }
+}
+
+/** Enforce a globally enabled product module before its API reads or mutates data. */
+function requireSystemModuleEnabled(PDO $pdo, string $module): void
+{
+    if (systemModuleEnabled($pdo, $module)) return;
+    jsonResponse(false, 'Цей модуль тимчасово вимкнений адміністратором.', ['code' => 'module_disabled', 'module' => $module], 403);
 }
 
 function ensureSystemModuleSettingsSchema(PDO $pdo): void
@@ -533,10 +540,10 @@ function planSettingsPayload(array $context): array
         $planLimits = [];
         foreach ($planLabels as $metric => $label) $planLimits[$metric] = $plan[$metric] ?? null;
         $planFeatures = [];
-        foreach ($planIsDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support'] as $feature) $planFeatures[$feature] = (bool)($plan[$feature] ?? false);
+        foreach ($planIsDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support','accountant_payouts'] as $feature) $planFeatures[$feature] = (bool)($plan[$feature] ?? false);
         $availablePlans[] = ['key' => $key, 'module' => $plan['module'] ?? 'accounting', 'name' => $plan['name'], 'price' => $plan['price'], 'amount' => $plan['amount'] ?? null, 'limits' => $planLimits, 'features' => $planFeatures];
     }
     $features = [];
-    foreach ($isDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
+    foreach ($isDental ? dentalPlanFeatures() : ['accounting','services','calendar','analytics','telegram','support','accountant_payouts'] as $feature) $features[$feature] = (bool)($context['plan'][$feature] ?? false);
     return ['key' => $context['key'], 'module' => $context['module'] ?? 'accounting', 'name' => $context['plan']['name'], 'price' => $context['plan']['price'], 'workspace_id' => $context['owner_id'], 'workspace_role' => $context['workspace_role'] ?? 'user', 'services_per_client' => $context['plan']['services_per_client'] ?? null, 'billing_enabled' => (bool)($context['billing_enabled'] ?? false), 'modules' => $moduleAvailability, 'billing' => $subscription ? ['status' => $subscription['status'], 'current_period_end' => $subscription['current_period_end'], 'order_id' => $subscription['order_id']] : null, 'pending_plan' => $pendingPlan, 'limits' => $limits, 'features' => $features, 'available_plans' => $availablePlans];
 }

@@ -1,4 +1,5 @@
 import Icon from '../components/Icon.jsx';
+import SearchableSelect from '../components/SearchableSelect.jsx';
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -164,8 +165,6 @@ export default function Tasks() {
   );
   const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("");
-  const [clientSearch, setClientSearch] = useState("");
-  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [newTasksOnly, setNewTasksOnly] = useState(false);
   const [deadlineFilter, setDeadlineFilter] = useState("");
   const [sortBy, setSortBy] = useState("priority");
@@ -207,7 +206,7 @@ export default function Tasks() {
   }, [data, params]);
   useEffect(() => {
     setPage(1);
-  }, [filter, search, clientFilter, clientSearch, newTasksOnly, deadlineFilter]);
+  }, [filter, search, clientFilter, newTasksOnly, deadlineFilter]);
   useEffect(() => {
     window.localStorage.setItem("nexaflow.tasks.filter", filter);
   }, [filter]);
@@ -410,28 +409,45 @@ export default function Tasks() {
                 placeholder="Пошук за назвою, клієнтом або виконавцем…"
               />
             </label>
-            <select
-              className="task-filter task-filter-large"
+            <SearchableSelect
+              portal
+              options={[
+                { id: "all", name: "Активні задачі" },
+                { id: "overdue", name: "Прострочені" },
+                { id: "urgent", name: "Термінові" },
+                { id: "todo", name: "До виконання" },
+                { id: "in_progress", name: "У роботі" },
+                { id: "review", name: "На перевірці" },
+                { id: "done", name: "Завершені" },
+                { id: "cancelled", name: "Скасовані" },
+                { id: "archived", name: "Архів" },
+              ]}
               value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-            >
-              <option value="all">Активні задачі</option>
-              <option value="overdue">Прострочені</option>
-              <option value="urgent">Термінові</option>
-              <option value="todo">До виконання</option>
-              <option value="in_progress">У роботі</option>
-              <option value="review">На перевірці</option>
-              <option value="done">Завершені</option>
-              <option value="cancelled">Скасовані</option>
-              <option value="archived">Архів</option>
-            </select>
-            <div className="task-client-filter">
-              <button type="button" className="task-client-trigger" onClick={() => setClientDropdownOpen(open => !open)}>{clientFilter ? (data.clients || []).find(client => String(client.id) === clientFilter)?.name : "Усі клієнти"}<span>⌄</span></button>
-              {clientDropdownOpen && <div className="task-client-options"><input autoFocus value={clientSearch} onChange={event => setClientSearch(event.target.value)} placeholder="Пошук клієнта…" aria-label="Пошук клієнта" /><button type="button" onClick={() => { setClientFilter(""); setClientDropdownOpen(false); }}>Усі клієнти</button>{(data.clients || []).filter(client => client.name.toLocaleLowerCase("uk").includes(clientSearch.trim().toLocaleLowerCase("uk"))).map(client => <button type="button" key={client.id} onClick={() => { setClientFilter(String(client.id)); setClientDropdownOpen(false); }}>{client.name}</button>)}{!(data.clients || []).some(client => client.name.toLocaleLowerCase("uk").includes(clientSearch.trim().toLocaleLowerCase("uk"))) && <span>Клієнтів не знайдено</span>}</div>}
-            </div>
-            <select className="task-filter" value={deadlineFilter} onChange={(event) => setDeadlineFilter(event.target.value)} aria-label="Фільтр за дедлайном">
-              <option value="">Усі дедлайни</option><option value="week">Дедлайн за 7 днів</option><option value="overdue">Прострочені дедлайни</option><option value="none">Без дедлайну</option>
-            </select>
+              onChange={setFilter}
+              placeholder="Статус задач"
+            />
+            <SearchableSelect
+              portal
+              options={[
+                { id: "", name: "Усі клієнти" },
+                ...(data.clients || []).map((client) => ({ id: String(client.id), name: client.name })),
+              ]}
+              value={clientFilter}
+              onChange={setClientFilter}
+              placeholder="Усі клієнти"
+            />
+            <SearchableSelect
+              portal
+              options={[
+                { id: "", name: "Усі дедлайни" },
+                { id: "week", name: "Дедлайн за 7 днів" },
+                { id: "overdue", name: "Прострочені дедлайни" },
+                { id: "none", name: "Без дедлайну" },
+              ]}
+              value={deadlineFilter}
+              onChange={setDeadlineFilter}
+              placeholder="Усі дедлайни"
+            />
             <label className="task-new-filter"><input type="checkbox" checked={newTasksOnly} onChange={event => setNewTasksOnly(event.target.checked)} /> Нові за 7 днів</label>
           </div>
           <div className="task-table-wrap">
