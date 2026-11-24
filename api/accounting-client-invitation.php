@@ -57,7 +57,7 @@ if(!in_array($ctx['workspace_role']??'', ['manager','admin','owner'],true)||($ct
 $owner=(string)$ctx['owner_id'];$client=(string)($data['client_id']??($_GET['client_id']??''));$members=array_values(array_unique(array_map('strval',$ctx['member_ids']??[$owner])));
 $q=$pdo->prepare("SELECT name FROM clients WHERE id=? AND module='accounting' AND created_by IN (".implode(',',array_fill(0,count($members),'?')).')');$q->execute(array_merge([$client],$members));$clientName=$q->fetchColumn();
 if(!$clientName)jsonResponse(false,'Компанію не знайдено.',[],404);
-if($action==='list'){$q=$pdo->prepare('SELECT id,email,status,expires_at,created_at,accepted_at,updated_at FROM accounting_client_invitations WHERE owner_id=? AND client_id=? ORDER BY created_at DESC');$q->execute([$owner,$client]);jsonResponse(true,'Запрошення завантажено.',['invitations'=>$q->fetchAll()]);}
+if($action==='list'){$q=$pdo->prepare("SELECT id,email,status,expires_at,created_at,accepted_at,updated_at FROM accounting_client_invitations WHERE owner_id=? AND client_id=? AND status<>'revoked' ORDER BY created_at DESC");$q->execute([$owner,$client]);jsonResponse(true,'Запрошення завантажено.',['invitations'=>$q->fetchAll()]);}
 if($action==='invite'||$action==='resend'){
  $email=mb_strtolower(trim((string)($data['email']??'')));if(!filter_var($email,FILTER_VALIDATE_EMAIL))jsonResponse(false,'Введіть коректний email.',[],422);
  $q=$pdo->prepare("SELECT created_at FROM accounting_client_invitations WHERE owner_id=? AND client_id=? AND email=? AND status='pending' ORDER BY created_at DESC LIMIT 1");$q->execute([$owner,$client,$email]);$last=$q->fetchColumn();if($last&&strtotime($last)>time()-60)jsonResponse(false,'Повторне надсилання доступне через хвилину.',[],429);
