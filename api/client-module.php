@@ -12,7 +12,7 @@ $user = $userQuery->fetch();
 if (!$user) jsonResponse(false, 'Користувача не знайдено.', [], 401);
 $context = workspacePlan($pdo, $userId, (string)$user['role']);
 $activeModule = (string)($context['module'] ?? 'accounting');
-if (!systemModuleEnabled($pdo, $activeModule)) jsonResponse(false, 'Цей модуль тимчасово вимкнений адміністратором.', ['code' => 'module_disabled', 'module' => $activeModule], 403);
+requireSystemModuleEnabled($pdo, $activeModule);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     jsonResponse(false, 'Модуль змінюється лише разом із підключенням відповідного тарифу в налаштуваннях підписки.', ['code' => 'select_plan_to_change_module', 'active_client_module' => $context['module'] ?? 'accounting'], 409);
 }

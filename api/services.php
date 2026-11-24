@@ -55,6 +55,7 @@ $data = $method === 'POST' ? body() : [];
 $modules = ['all', 'accounting', 'dentistry', 'legal', 'real_estate'];
 $requestedModule = (string)($_GET['module'] ?? ($method === 'POST' ? ($data['module'] ?? $workspaceClientModule) : $workspaceClientModule));
 $activeModule = in_array($requestedModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true) ? $requestedModule : $workspaceClientModule;
+if ($activeModule === 'dentistry') requireSystemModuleEnabled($pdo, 'dentistry');
 $newId = static fn(): string => bin2hex(random_bytes(16));
 $moduleLabel = static fn(string $module): string => [
     'all' => 'Усі модулі клієнтів', 'accounting' => 'Бухгалтерія', 'dentistry' => 'Стоматологія',

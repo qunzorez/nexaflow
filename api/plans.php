@@ -59,6 +59,13 @@ function systemModuleEnabled(PDO $pdo, string $module): bool
     } catch (Throwable $ignored) { return true; }
 }
 
+/** Enforce a globally enabled product module before its API reads or mutates data. */
+function requireSystemModuleEnabled(PDO $pdo, string $module): void
+{
+    if (systemModuleEnabled($pdo, $module)) return;
+    jsonResponse(false, 'Цей модуль тимчасово вимкнений адміністратором.', ['code' => 'module_disabled', 'module' => $module], 403);
+}
+
 function ensureSystemModuleSettingsSchema(PDO $pdo): void
 {
     static $ready = false;

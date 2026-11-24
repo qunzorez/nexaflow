@@ -24,6 +24,7 @@ if (in_array($user['role'], ['admin', 'owner'], true) && trim((string)($_GET['wo
     if ($selectedOwnerModule !== false) $activeClientModule = (string)$selectedOwnerModule;
 }
 if (!in_array($activeClientModule, ['accounting', 'dentistry', 'legal', 'real_estate'], true)) $activeClientModule = 'accounting';
+if ($activeClientModule === 'dentistry') requireSystemModuleEnabled($pdo, 'dentistry');
 $user['subscription'] = planSettingsPayload($planContext);
 $user['workspaces'] = $planContext['workspaces']; $user['active_workspace_id'] = $planContext['owner_id']; $user['workspace_role'] = $planContext['workspace_role'];
 $pdo->exec("CREATE TABLE IF NOT EXISTS clients (id CHAR(32) PRIMARY KEY, name VARCHAR(190) NOT NULL, legal_form VARCHAR(40) NOT NULL, tax_system VARCHAR(80) NOT NULL, has_vat TINYINT(1) NOT NULL DEFAULT 0, has_excise TINYINT(1) NOT NULL DEFAULT 0, has_employees TINYINT(1) NOT NULL DEFAULT 0, employee_count INT NULL, special_taxes TEXT NULL, services TEXT NULL, module VARCHAR(40) NOT NULL DEFAULT 'accounting', module_data TEXT NULL, created_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_clients_created_by (created_by)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
