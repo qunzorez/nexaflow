@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/db.php';require_once __DIR__.'/plans.php';require_once __DIR__.'/accounting-requisites-lib.php';session_start();
+require __DIR__.'/db.php';require_once __DIR__.'/plans.php';require_once __DIR__.'/accounting-requisites-lib.php';require_once __DIR__.'/mailer.php';session_start();
 if(empty($_SESSION['user_id']))jsonResponse(false,'Потрібна авторизація.',[],401);
 $pdo=db();ensureAccountingRequisitesSchema($pdo);$uid=(string)$_SESSION['user_id'];$q=$pdo->prepare('SELECT id,role,email_verified_at FROM users WHERE id=?');$q->execute([$uid]);$user=$q->fetch();if(!$user||!$user['email_verified_at'])jsonResponse(false,'Підтвердьте електронну адресу.',[],403);
 $pdo->exec("CREATE TABLE IF NOT EXISTS accounting_client_portal_access(owner_id CHAR(32) NOT NULL,client_id CHAR(32) NOT NULL,user_id CHAR(32) NOT NULL,granted_by CHAR(32) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(owner_id,client_id,user_id),KEY idx_portal_user(user_id,owner_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");

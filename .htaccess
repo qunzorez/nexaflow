@@ -5,6 +5,12 @@ Options -Indexes
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # HTML must revalidate so it never points at chunks from a previous deploy.
+  <FilesMatch "^(index\.html|maintenance-page\.php)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
 </IfModule>
 
 RewriteEngine On
@@ -23,6 +29,11 @@ RewriteRule ^maintenance-page\.php$ - [L]
 RewriteRule ^dist/index\.html$ maintenance-page.php [L]
 
 # Serve React's generated assets and other files from dist/.
+<IfModule mod_headers.c>
+  <FilesMatch "\.[A-Za-z0-9_-]{8,}\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
 RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f [OR]
 RewriteCond %{DOCUMENT_ROOT}/dist/$1 -d
 RewriteRule ^(.+)$ dist/$1 [L]
