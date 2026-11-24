@@ -179,8 +179,8 @@ export default function Sidebar({ user, open, onNavigate }) {
         {(isAdmin || (canManage && planFeatures.services)) && <Link className="nav-item" to="/services">
           <span><Icon name="subscription" /></span> Послуги
         </Link>}
-        {activeClientModule === "accounting" && planFeatures.accounting && <Link className="nav-item" to="/accounting">
-          <span><Icon name="settings" /></span> Податкові налаштування
+        {(activeClientModule === "accounting" || user?.subscription?.module === "accounting") && planFeatures.accounting && <Link className="nav-item" to="/accounting">
+          <span><Icon name="settings" /></span> Бухгалтерія
         </Link>}
         {activeClientModule === "accounting" && planFeatures.accounting && canManageRequisites && <Link className="nav-item" to="/accounting/requisites">
           <span><Icon name="briefcase" /></span> Реквізити
