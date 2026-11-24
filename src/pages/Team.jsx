@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
+import Icon from '../components/Icon.jsx';
 import { api, post } from '../services/api.js';
 import ManagerTeamView from '../modules/team/ManagerTeamView.jsx';
 import '../modules/team/team-modern.css';
@@ -33,7 +34,7 @@ export default function Team() {
 
   if (!data) return <div className="loading-screen">Завантаження команди…</div>;
 
-  if (!data.permissions?.admin && !['admin', 'owner', 'manager', 'project_lead'].includes(currentUser?.workspace_role || currentUser?.role)) return <Layout page="Команда" user={currentUser}><div className="content"><section className="panel workspace-membership-panel"><div><strong>Ви в просторі «{data.membership?.workspace_name || 'Робочий простір'}»</strong><small>Вийдіть, щоб припинити доступ до його даних. Ваш обліковий запис залишиться активним.</small>{leaveMessage && <small role="status">{leaveMessage}</small>}</div><button type="button" className="remove-member" disabled={leaving} onClick={async () => { if (!window.confirm(`Вийти з простору «${data.membership?.workspace_name || 'Робочий простір'}»?`)) return; setLeaving(true); const result = await post('/api/team.php', { action: 'leave_workspace' }); setLeaving(false); setLeaveMessage(result.message || ''); if (result.ok) window.location.assign('/dashboard'); }}>{leaving ? 'Вихід…' : 'Вийти з простору'}</button></section></div></Layout>;
+  if (!data.permissions?.admin && !['admin', 'owner', 'manager', 'project_lead'].includes(currentUser?.workspace_role || currentUser?.role)) return <Layout page="Команда" user={currentUser}><div className="content"><section className="panel workspace-membership-panel"><div className="workspace-membership-copy"><span className="workspace-membership-icon"><Icon name="project" /></span><span><strong>Ви в просторі «{data.membership?.workspace_name || 'Робочий простір'}»</strong><small>Вийдіть, щоб припинити доступ до його даних. Ваш обліковий запис залишиться активним.</small>{leaveMessage && <small role="status">{leaveMessage}</small>}</span></div><button type="button" className="workspace-leave-button" disabled={leaving} onClick={async () => { if (!window.confirm(`Вийти з простору «${data.membership?.workspace_name || 'Робочий простір'}»?`)) return; setLeaving(true); const result = await post('/api/team.php', { action: 'leave_workspace' }); setLeaving(false); setLeaveMessage(result.message || ''); if (result.ok) window.location.assign('/dashboard'); }}><Icon name={leaving ? 'loading' : 'logout'} />{leaving ? 'Виходимо…' : 'Вийти з простору'}</button></section></div></Layout>;
 
   const canLeaveCurrentWorkspace = Boolean(data.permissions?.admin && data.current_workspace && !data.current_workspace.is_own && String(data.current_workspace.id) !== String(currentUser?.id));
   async function leaveWorkspace() {
@@ -46,7 +47,7 @@ export default function Team() {
 
   return <Layout page="Команда" user={currentUser}>
     <div className="content">
-      {canLeaveCurrentWorkspace && <section className="panel workspace-membership-panel"><div><strong>Ви переглядаєте простір «{data.current_workspace.name || 'Робочий простір'}»</strong><small>Вихід закриє доступ до цього простору, але не видалить ваш обліковий запис.</small>{leaveMessage && <small role="status">{leaveMessage}</small>}</div><button type="button" className="remove-member" disabled={leaving} onClick={leaveWorkspace}>{leaving ? 'Вихід…' : 'Вийти з простору'}</button></section>}
+      {canLeaveCurrentWorkspace && <section className="panel workspace-membership-panel"><div className="workspace-membership-copy"><span className="workspace-membership-icon"><Icon name="project" /></span><span><strong>Ви переглядаєте простір «{data.current_workspace.name || 'Робочий простір'}»</strong><small>Вихід закриє доступ до цього простору, але не видалить ваш обліковий запис.</small>{leaveMessage && <small role="status">{leaveMessage}</small>}</span></div><button type="button" className="workspace-leave-button" disabled={leaving} onClick={leaveWorkspace}><Icon name={leaving ? 'loading' : 'logout'} />{leaving ? 'Виходимо…' : 'Вийти з простору'}</button></section>}
       <ManagerTeamView data={data} onReload={load} isAdmin={Boolean(data.permissions?.admin)} isProjectLead={Boolean(data.permissions?.project_lead)} currentUserId={currentUser?.id} subscription={currentUser?.subscription} />
     </div>
   </Layout>;

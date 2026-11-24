@@ -2,6 +2,6 @@ Options -Indexes
 
 # These files contain secrets or implementation-only helpers and must never
 # be requested directly over HTTP.
-<FilesMatch "^(config(?:\.[^.]+)?|liqpay\.local|db|mailer|plans|claims|runtime-config|verification|rate-limit|task-deadline-notifications)\.php$">
+<FilesMatch "^(config(?:\.[^.]+)?|liqpay\.local|db|mailer|plans|claims|runtime-config|verification|rate-limit|task-deadline-notifications|dentistry-erp-(schema|ledger|operations)|telegram|maintenance|maintenance-icons|accounting-portal-access|accounting-client-invitations-lib)\.php$">
   Require all denied
 </FilesMatch>

@@ -12,7 +12,9 @@ export default function VerifyEmail() {
     api(`/api/verify-email.php?token=${encodeURIComponent(params.get('token') || '')}`)
       .then(async result => {
         const session = result.ok ? await api('/api/me.php?optional=1') : null;
-        setState({ loading: false, ok: result.ok, message: result.message, destination: session?.authenticated ? '/dashboard' : '/login?verified=1' });
+        const invite = params.get('client_invite');
+        const destination = invite ? `/client/login?token=${encodeURIComponent(invite)}` : session?.user?.client_portal_only ? '/accounting/portal' : session?.authenticated ? '/dashboard' : '/login?verified=1';
+        setState({ loading: false, ok: result.ok, message: result.message, destination });
       })
       .catch(() => setState({ loading: false, ok: false, message: 'Не вдалося перевірити посилання. Спробуйте відкрити його ще раз.' }));
   }, [params]);

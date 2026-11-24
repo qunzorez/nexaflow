@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node tools/generate-maintenance-icons.mjs",
+    "prebuild:local": "node tools/generate-maintenance-icons.mjs",
+    "prebuild:live": "node tools/generate-maintenance-icons.mjs",
     "dev": "vite --mode development",
     "build": "vite build && node tools/normalize-dist.mjs && node tools/prerender-home.mjs",
     "dev:local": "vite --mode development",

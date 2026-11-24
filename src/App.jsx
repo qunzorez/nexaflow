@@ -1,6 +1,9 @@
-import { lazy, Suspense, useLayoutEffect } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import Icon from './components/Icon.jsx';
+import './components/maintenance-warning.css';
 const Login = lazy(() => import("./pages/Login.jsx"));
+const ClientAccess = lazy(() => import("./pages/ClientAccess.jsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Team = lazy(() => import("./pages/Team.jsx"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite.jsx"));
@@ -37,6 +40,25 @@ const BannedPage = lazy(() => import("./pages/BannedPage.jsx"));
 const FAQ = lazy(() => import("./pages/FAQ.jsx"));
 
 export default function App() {
+  const [maintenanceStarts, setMaintenanceStarts] = useState(null);
+  const [maintenanceNoticeMinutes, setMaintenanceNoticeMinutes] = useState(5);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    let active = true;
+    const check = () => fetch('/api/maintenance-status.php', { cache: 'no-store', credentials: 'same-origin' })
+      .then(response => response.json())
+      .then(state => {
+        if (!active) return;
+        if (!state.ok || (state.enabled && !state.is_admin)) { window.location.replace('/maintenance-page.php'); return; }
+        setMaintenanceStarts(state.starts_at_epoch ? Number(state.starts_at_epoch) * 1000 : null);
+        setMaintenanceNoticeMinutes(Math.max(1, Number(state.notice_minutes) || 5));
+      })
+      .catch(() => { if (active) window.location.replace('/maintenance-page.php'); });
+    check();
+    const poll = window.setInterval(check, 15000);
+    const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => { active = false; window.clearInterval(poll); window.clearInterval(clock); };
+  }, []);
   useLayoutEffect(() => {
     const reloadForStaleBundle = (event) => {
       event.preventDefault();
@@ -53,10 +75,21 @@ export default function App() {
     document.documentElement.classList.remove('nf-spa-route-loading');
   }, []);
 
+  const secondsLeft = maintenanceStarts ? Math.max(0, Math.ceil((maintenanceStarts - now) / 1000)) : 0;
   return (
+    <>{maintenanceStarts && <aside className={`maintenance-warning${secondsLeft <= 60 ? ' maintenance-warning-urgent' : ''}`} aria-label="Попередження про технічні роботи">
+      <div className="maintenance-warning-main">
+        <span className="maintenance-warning-icon"><Icon name="hourglass" /></span>
+        <div className="maintenance-warning-copy"><strong>Незабаром технічні роботи</strong><span>Збережіть введені дані та завершіть поточну дію.</span></div>
+        <span className="maintenance-warning-timer" aria-label={`До початку ${Math.floor(secondsLeft / 60)} хвилин ${secondsLeft % 60} секунд`}><Icon name="clock" />{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
+      </div>
+      <div className="maintenance-warning-track" aria-hidden="true"><span style={{ width: `${Math.min(100, secondsLeft / (maintenanceNoticeMinutes * 60) * 100)}%` }} /></div>
+    </aside>}
     <RouteErrorBoundary><Suspense fallback={<div className="loading-screen" role="status">Завантажуємо сторінку…</div>}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
+      <Route path="/client/login" element={<ClientAccess mode="login" />} />
+      <Route path="/client/register" element={<ClientAccess mode="register" />} />
       <Route path="/register" element={<Login initialMode="register" />} />
       <Route path="/settings" element={<Settings />} />
       <Route element={<EmailVerifiedRoute />}>
@@ -95,6 +128,6 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes></Suspense></RouteErrorBoundary>
+    </Routes></Suspense></RouteErrorBoundary></>
   );
 }

@@ -13,6 +13,7 @@ export async function api(path, options = {}) {
     }
     if (!result || typeof result !== 'object') result = { ok: false, message: `Сервер повернув некоректну відповідь (${response.status}).` };
     if (!response.ok && result.ok !== false) return { ok: false, message: `Помилка сервера (${response.status}).` };
+    if (result.code === 'maintenance_mode' && window.location.pathname !== '/maintenance-page.php') window.location.replace('/maintenance-page.php');
     if (result.code === 'account_blocked') {
       try { window.sessionStorage.setItem('nexaflow.block_reason', String(result.reason || '')); } catch {}
       if (window.location.pathname !== '/banned') window.location.assign('/banned');

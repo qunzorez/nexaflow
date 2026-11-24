@@ -2,12 +2,12 @@
 declare(strict_types=1);
 require_once __DIR__ . '/mailer.php';
 
-function issueEmailVerification(PDO $pdo, string $userId, string $email, string $name): bool
+function issueEmailVerification(PDO $pdo, string $userId, string $email, string $name, string $clientInviteToken = ''): bool
 {
     $token = bin2hex(random_bytes(32));
     $pdo->prepare('DELETE FROM email_verification_tokens WHERE user_id = ?')->execute([$userId]);
     $pdo->prepare('INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))')->execute([bin2hex(random_bytes(16)), $userId, hash('sha256', $token)]);
-    $link = appUrl('/verify-email') . '?token=' . urlencode($token);
+    $link = appUrl('/verify-email') . '?token=' . urlencode($token) . ($clientInviteToken !== '' ? '&client_invite=' . urlencode($clientInviteToken) : '');
     $logo = appUrl('/assets/logo-color-text.png');
     $subject = 'Підтвердіть email у NexaFlow';
     $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');

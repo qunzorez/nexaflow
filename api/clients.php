@@ -35,6 +35,34 @@ $canManage = in_array($planContext['workspace_role'], ['admin', 'owner', 'manage
 $isAdmin = in_array($user['role'], ['admin', 'owner'], true);
 $isProjectLead = $planContext['workspace_role'] === 'project_lead';
 $clientAction = (string)($data['action'] ?? 'create');
+function syncAccountingClientResponsibles(PDO $pdo, string $ownerId, string $clientId, array $accountantIds, string $changedBy): void {
+    $ids = array_values(array_unique(array_filter(array_map('strval', $accountantIds), static fn(string $id): bool => preg_match('/^[a-f0-9]{32}$/i', $id) === 1)));
+    $pdo->exec("CREATE TABLE IF NOT EXISTS accounting_obligation_assignees (obligation_id CHAR(32) NOT NULL, owner_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, assigned_by CHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (obligation_id, user_id), KEY idx_accounting_assignees_user (owner_id, user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS accounting_assignment_history (id CHAR(32) PRIMARY KEY, owner_id CHAR(32) NOT NULL, obligation_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, old_assignee CHAR(32) NULL, new_assignee CHAR(32) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, KEY idx_accounting_assignment_history (obligation_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS task_assignees (task_id CHAR(32) NOT NULL, user_id CHAR(32) NOT NULL, PRIMARY KEY (task_id, user_id), INDEX idx_task_assignees_user (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $obligations = $pdo->prepare("SELECT id, task_id FROM accounting_obligations WHERE owner_id=? AND client_id=? AND status IN ('planned','in_progress')");
+    $obligations->execute([$ownerId, $clientId]);
+    $hasManualAssignment = $pdo->prepare('SELECT 1 FROM accounting_assignment_history WHERE owner_id=? AND obligation_id=? LIMIT 1');
+    $deleteAssignees = $pdo->prepare('DELETE FROM accounting_obligation_assignees WHERE owner_id=? AND obligation_id=?');
+    $insertAssignee = $pdo->prepare('INSERT IGNORE INTO accounting_obligation_assignees(obligation_id,owner_id,user_id,assigned_by) VALUES(?,?,?,?)');
+    $syncTaskMembers = $pdo->prepare('INSERT IGNORE INTO task_assignees(task_id,user_id) SELECT ?,user_id FROM accounting_obligation_assignees WHERE owner_id=? AND obligation_id=?');
+    $primaryAssignee = $pdo->prepare('SELECT user_id FROM accounting_obligation_assignees WHERE owner_id=? AND obligation_id=? ORDER BY user_id LIMIT 1');
+    $updateTask = $pdo->prepare('UPDATE tasks SET assignee_id=? WHERE id=?');
+    $deleteTaskMembers = $pdo->prepare('DELETE FROM task_assignees WHERE task_id=?');
+    foreach ($obligations->fetchAll(PDO::FETCH_ASSOC) as $obligation) {
+        $obligationId = (string)$obligation['id'];
+        $hasManualAssignment->execute([$ownerId, $obligationId]);
+        if ($hasManualAssignment->fetchColumn()) continue;
+        $deleteAssignees->execute([$ownerId, $obligationId]);
+        foreach ($ids as $accountantId) $insertAssignee->execute([$obligationId, $ownerId, $accountantId, $changedBy]);
+        if (empty($obligation['task_id'])) continue;
+        $taskId = (string)$obligation['task_id'];
+        $deleteTaskMembers->execute([$taskId]);
+        $syncTaskMembers->execute([$taskId, $ownerId, $obligationId]);
+        $primaryAssignee->execute([$ownerId, $obligationId]);
+        $updateTask->execute([$primaryAssignee->fetchColumn() ?: null, $taskId]);
+    }
+}
 if ($method === 'POST' && in_array($clientAction, ['update', 'delete'], true)) {
     if (!$canManage) jsonResponse(false, 'Звичайний користувач може лише переглядати клієнтів.', [], 403);
     if ($isProjectLead && $clientAction === 'delete') jsonResponse(false, 'Керівник проєкту може керувати клієнтами, але не видаляти їх.', [], 403);
@@ -465,6 +493,12 @@ if ($action === 'update' && $id !== '') {
     if (($previousProfile['module'] ?? '') === 'accounting' && $module === 'accounting') {
         $oldData = json_decode((string)($previousProfile['module_data'] ?? '{}'), true) ?: [];
         $newData = json_decode((string)$moduleData, true) ?: [];
+        $oldAccountantIds = array_values(array_unique(array_map('strval', (array)($oldData['accountant_ids'] ?? []))));
+        $newAccountantIds = array_values(array_unique(array_map('strval', (array)($newData['accountant_ids'] ?? []))));
+        sort($oldAccountantIds); sort($newAccountantIds);
+        if ($oldAccountantIds !== $newAccountantIds) {
+            syncAccountingClientResponsibles($pdo, $ownerId ?? (string)$planContext['owner_id'], $id, $newAccountantIds, $userId);
+        }
         $oldProfile = ['legal_form'=>$previousProfile['legal_form'], 'tax_system'=>$previousProfile['tax_system'], 'has_vat'=>(bool)$previousProfile['has_vat'], 'has_excise'=>(bool)$previousProfile['has_excise'], 'has_employees'=>(bool)$previousProfile['has_employees'], 'employee_count'=>$previousProfile['employee_count'], 'special_taxes'=>json_decode((string)($previousProfile['special_taxes'] ?? '[]'), true) ?: [], 'tax_income_over_40m'=>(bool)($oldData['tax_income_over_40m'] ?? false), 'tax_group'=>$oldData['tax_group'] ?? null, 'tax_profile_extra'=>$oldData['tax_profile_extra'] ?? []];
         $newProfile = ['legal_form'=>$legalForm, 'tax_system'=>$taxSystem, 'has_vat'=>(bool)$hasVat, 'has_excise'=>(bool)$hasExcise, 'has_employees'=>(bool)$hasEmployees, 'employee_count'=>$employeeCount, 'special_taxes'=>$specialTaxes, 'tax_income_over_40m'=>(bool)($newData['tax_income_over_40m'] ?? false), 'tax_group'=>$newData['tax_group'] ?? null, 'tax_profile_extra'=>$newData['tax_profile_extra'] ?? []];
         if ($oldProfile !== $newProfile) {

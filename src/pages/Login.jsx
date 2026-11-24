@@ -57,6 +57,10 @@ export default function Login({ initialMode = 'login' }) {
       navigate(`/settings?plan=${encodeURIComponent(planToActivate)}`, { replace: true });
       return;
     }
+    if (result.user?.client_portal_only) {
+      navigate('/accounting/portal', { replace: true });
+      return;
+    }
     navigate('/dashboard', { replace: true });
   }
 
@@ -81,7 +85,7 @@ export default function Login({ initialMode = 'login' }) {
         {mode === 'register' && <label className="terms"><input name="terms" type="checkbox" checked={form.terms} onChange={update} /> Я погоджуюсь з умовами використання</label>}
         <button className="primary-action auth-submit" disabled={busy}>{busy ? 'Зачекайте…' : mode === 'login' ? 'Увійти в систему' : 'Створити акаунт'} <span><Icon name="forward" /></span></button>
         {verificationEmail && <button type="button" className="resend-button" onClick={resend}><Icon name="refresh" /> Відправити лист підтвердження ще раз</button>}
-      </form><small className="auth-footer">Ваші дані захищені шифруванням</small></section>
+      </form><Link to="/client/login" className="resend-button">Вхід для клієнтів →</Link><small className="auth-footer">Ваші дані захищені шифруванням</small></section>
     {toast && <div className="auth-toast" role="alert" aria-live="assertive"><span aria-hidden="true">!</span>{toast}</div>}
   </main>;
 }

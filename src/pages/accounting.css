@@ -5,6 +5,12 @@
 .checklist-add{display:flex;gap:8px;margin:16px 0}.checklist-add input{flex:1}
 .checklist-list form{grid-template-columns:minmax(130px,1.2fr) repeat(6,minmax(100px,1fr)) auto}
 
+/* The obligation form is intentionally wider than ordinary dialogs: it has
+   financial evidence fields and needs an internal scrollbar without clipping
+   the rounded card edge. */
+.accounting-backdrop{padding:24px;overflow:hidden}.accounting-dialog{box-sizing:border-box;width:min(720px,calc(100vw - 48px));max-height:calc(100dvh - 48px);overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;border:1px solid #e1ebe5;border-radius:22px;padding:30px 32px;gap:14px;box-shadow:0 28px 80px #0b201866;background-clip:padding-box}.accounting-dialog h2{padding-right:44px}.accounting-dialog>p{padding-right:42px}.accounting-dialog::-webkit-scrollbar{width:10px}.accounting-dialog::-webkit-scrollbar-track{margin:18px 3px;background:transparent}.accounting-dialog::-webkit-scrollbar-thumb{background:#a4b3ab;border:3px solid transparent;background-clip:padding-box;border-radius:999px}.accounting-close{right:19px;top:15px;width:34px;height:34px;border-radius:10px;background:#f2f7f4;font-size:25px;line-height:1}.accounting-close:hover{background:#e1f1e8;color:#168968}.accounting-required-fields{padding:13px 15px;border:1px solid #f1d7a2;border-radius:12px;background:#fff9ea;color:#805a14;font-size:12px;line-height:1.45}.accounting-required-fields strong{display:block}.accounting-required-fields ul{margin:7px 0 0;padding-left:18px}.accounting-required-fields.is-ready{border-color:#cce8d7;background:#effaf3;color:#24724f}@media(max-width:620px){.accounting-backdrop{padding:8px}.accounting-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:17px;padding:23px 20px}.accounting-dialog h2{font-size:21px}}
+.accounting-field-label{display:inline-flex;align-items:baseline;gap:3px}.accounting-required-mark{color:#d15445;font-size:15px;font-weight:900;line-height:1}
+
 /* Keep document archive actions consistent with the accounting controls. */
 .accounting-table td:has(> a,> button,> label){display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .accounting-table td> a,.accounting-table td>button{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:7px 10px;border:1px solid #d7e8dd;border-radius:8px;background:#f5faf6;color:#286a50;font-family:inherit;font-size:11px;font-weight:700;line-height:1.2;text-decoration:none;white-space:nowrap;cursor:pointer}
@@ -162,7 +168,51 @@
 .accounting-portal-issuer>div{display:grid;gap:4px;margin-top:10px;color:#57685f;font-size:11px;overflow-wrap:anywhere}
 .accounting-portal-issuer>div strong{color:#263a30;font-size:12px}
 .accounting-portal-issuer-legacy{display:block;margin:10px 0;color:#85928a;font-size:10px}
+.accounting-client-invites{width:100%;padding:14px;border:1px solid #dce9df;border-radius:12px;background:#f8fbf9}
+.accounting-client-invites h3{margin:0;color:#2d4939;font-size:13px}.accounting-client-invites>p{color:#73877a;font-size:11px;line-height:1.5}
+.accounting-document-request .checklist-add{display:grid;grid-template-columns:minmax(220px,1fr) minmax(170px,230px) auto;align-items:end;gap:12px;margin:0}
+.accounting-document-request .checklist-add label{display:grid;gap:7px;min-width:0;color:#52685a;font-size:11px;font-weight:700}
+.accounting-document-request .checklist-add input{width:100%;min-height:42px;padding:0 12px;border:1px solid #dce6df;border-radius:8px;background:#fff}
+.accounting-document-request .checklist-add button{min-height:42px;padding:0 16px;white-space:nowrap}
+@media(max-width:700px){.accounting-document-request .checklist-add{grid-template-columns:1fr 1fr}.accounting-document-request .checklist-add label:first-child{grid-column:1/-1}.accounting-document-request .checklist-add button{width:100%}}
+@media(max-width:460px){.accounting-document-request .checklist-add{grid-template-columns:1fr}.accounting-document-request .checklist-add label:first-child{grid-column:auto}}
+.accounting-client-invite-feedback{margin:8px 0;padding:10px 12px;border:1px solid #cae8d3;border-radius:9px;background:#edf8f0;color:#246c46;font-size:11px;font-weight:700;line-height:1.45}
+.accounting-client-invite-feedback.is-error{border-color:#f0d2cb;background:#fff4f1;color:#a24336}
+.accounting-client-invites form{display:flex;align-items:end;gap:8px}.accounting-client-invites form label{display:grid;flex:1;gap:5px;color:#52685a;font-size:11px;font-weight:700}.accounting-client-invites input{min-height:39px;padding:0 10px;border:1px solid #dce9df;border-radius:8px;background:#fff}.accounting-client-invites form button{min-height:39px;white-space:nowrap}
+.accounting-client-invite-list{display:grid;gap:8px;margin-top:12px}.accounting-client-invite-list>div{display:grid;gap:4px;padding:9px 10px;border:1px solid #e0ebe3;border-radius:8px;background:#fff}.accounting-client-invite-list strong{color:#2d4939;font-size:11px}.accounting-client-invite-list span{color:#829188;font-size:10px}.accounting-client-invite-list>div>div{display:flex;gap:7px}.accounting-client-invite-list button{padding:5px 8px;border:1px solid #dce9df;border-radius:6px;background:#f7faf8;color:#286a50;font:700 10px inherit;cursor:pointer}
+@media(max-width:560px){.accounting-client-invites form{flex-direction:column;align-items:stretch}}
 .accounting-invoice-requisites{display:grid;align-content:center;gap:3px;min-height:42px;padding:8px 10px;border:1px solid #dce6df;border-radius:8px;background:#f7fbf8;color:#586a60;font-size:10px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
 .accounting-invoice-requisites strong{color:#263b31;font-size:11px}
 .accounting-invoice-requisites a{color:var(--green);font-weight:800;text-decoration:none}
 .accounting-invoice-requisites a:hover{text-decoration:underline}
+.accounting-portal-company-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.accounting-portal-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.accounting-portal-brand{display:inline-flex;align-items:center;gap:9px;color:#168968;font-size:14px;font-weight:850;text-decoration:none}
+.accounting-portal-brand span{display:grid;place-items:center;width:29px;height:29px;border-radius:8px;background:#168968;color:#fff}
+.accounting-portal-topbar>div{display:flex;align-items:center;gap:10px}
+.accounting-portal-topbar>div a,.accounting-portal-topbar>div button{padding:8px 11px;border:1px solid #dce9df;border-radius:8px;background:#fff;color:#286a50;font-family:inherit;font-size:11px;font-weight:700;text-decoration:none;cursor:pointer}
+.accounting-portal-company-tools label{display:grid;gap:5px;color:#718078;font-size:11px;font-weight:700}
+.accounting-portal-company-tools select{min-height:40px;max-width:280px;padding:0 12px;border:1px solid #dce6df;border-radius:9px;background:#fff;color:#263b31;font:inherit;font-size:12px}
+.accounting-portal-actions{border-color:#cce4d5;background:linear-gradient(125deg,#fff,#f6fbf7)}
+.accounting-portal-action-list,.accounting-portal-nearest,.accounting-portal-messages{display:grid;gap:9px}
+.accounting-portal-action{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid #dfeae2;border-radius:11px;background:#fff}
+.accounting-portal-action.is-late{border-color:#f0d9d4;background:#fffaf9}
+.accounting-portal-action>div{display:grid;gap:5px;min-width:0;flex:1}
+.accounting-portal-action strong{color:#2b4034;font-size:12px;overflow-wrap:anywhere}
+.accounting-portal-action>div span{color:#73837a;font-size:10px}
+.accounting-portal-action button{min-height:36px;padding:0 12px;border:1px solid #cde3d5;border-radius:8px;background:#f4faf6;color:#286a50;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+.accounting-portal-progress{position:fixed;right:20px;bottom:20px;z-index:100;display:grid;gap:8px;min-width:210px;padding:12px 15px;border:1px solid #cde4d5;border-radius:12px;background:#fff;box-shadow:0 12px 30px #173c2426;color:#286a50;font-size:12px;font-weight:700}
+.accounting-portal-progress progress{width:100%;accent-color:#168968}
+.accounting-portal-review-comment{display:block;margin:8px 0 0;padding:9px 11px;border-radius:8px;background:#fff2ed;color:#9a4838;font-size:11px;font-weight:700;line-height:1.45}
+.accounting-portal-payment .accounting-portal-proof{grid-column:1/-1}
+.accounting-portal-proof input{padding:6px 8px}
+.accounting-portal-proof small{color:#87948d;font-size:10px}
+.accounting-portal-nearest button{display:flex;align-items:center;gap:13px;min-height:43px;padding:9px 13px;border:1px solid #e4ece6;border-radius:9px;background:#fff;color:#354a3d;text-align:left;cursor:pointer}
+.accounting-portal-nearest button span{color:#168968;font-size:11px;font-weight:800}
+.accounting-portal-nearest button strong{flex:1;font-size:11px}
+.accounting-portal-messages article{padding:13px 15px;border:1px solid #e4ece6;border-radius:10px;background:#fff}
+.accounting-portal-messages strong{color:#30463a;font-size:12px}
+.accounting-portal-messages time{margin-left:10px;color:#88968c;font-size:10px}
+.accounting-portal-messages p{margin:6px 0 0;color:#596c60;font-size:11px;line-height:1.5}
+.accounting-portal-page :is(button,input,select,textarea,a):focus-visible{outline:2px solid #168968;outline-offset:2px}
+@media(max-width:720px){.accounting-portal-company{flex-direction:column;align-items:stretch}.accounting-portal-company-tools select{max-width:100%;width:100%}.accounting-portal-company-tools label{width:100%}.accounting-portal-action{align-items:flex-start;flex-wrap:wrap}.accounting-portal-action>div{flex-basis:100%}.accounting-portal-action button{margin-left:auto}}
