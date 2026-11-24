@@ -6,6 +6,7 @@ require_once __DIR__.'/mailer.php';
 require_once __DIR__.'/verification.php';
 require_once __DIR__.'/rate-limit.php';
 require_once __DIR__.'/accounting-client-invitations-lib.php';
+require_once __DIR__.'/accounting-client-access.php';
 if(session_status()!==PHP_SESSION_ACTIVE)session_start();
 $pdo=db();clientInvitationSchema($pdo);
 $data=body();$action=(string)($data['action']??($_GET['action']??''));
@@ -53,10 +54,11 @@ if($action==='accept'){
 }
 if(empty($_SESSION['user_id']))jsonResponse(false,'Потрібна авторизація.',[],401);
 $uid=(string)$_SESSION['user_id'];$q=$pdo->prepare('SELECT role FROM users WHERE id=?');$q->execute([$uid]);$role=(string)$q->fetchColumn();$ctx=workspacePlan($pdo,$uid,$role);
-if(!in_array($ctx['workspace_role']??'', ['manager','admin','owner'],true)||($ctx['module']??'')!=='accounting')jsonResponse(false,'Доступ заборонено.',[],403);
+if(($ctx['module']??'')!=='accounting')jsonResponse(false,'Доступ заборонено.',[],403);
 $owner=(string)$ctx['owner_id'];$client=(string)($data['client_id']??($_GET['client_id']??''));$members=array_values(array_unique(array_map('strval',$ctx['member_ids']??[$owner])));
 $q=$pdo->prepare("SELECT name FROM clients WHERE id=? AND module='accounting' AND created_by IN (".implode(',',array_fill(0,count($members),'?')).')');$q->execute(array_merge([$client],$members));$clientName=$q->fetchColumn();
 if(!$clientName)jsonResponse(false,'Компанію не знайдено.',[],404);
+if(!accountingCanManageClient($pdo,$ctx,$uid,$client))jsonResponse(false,'Немає доступу до цього клієнта.',[],403);
 if($action==='list'){$q=$pdo->prepare("SELECT id,email,status,expires_at,created_at,accepted_at,updated_at FROM accounting_client_invitations WHERE owner_id=? AND client_id=? AND status<>'revoked' ORDER BY created_at DESC");$q->execute([$owner,$client]);jsonResponse(true,'Запрошення завантажено.',['invitations'=>$q->fetchAll()]);}
 if($action==='invite'||$action==='resend'){
  $email=mb_strtolower(trim((string)($data['email']??'')));if(!filter_var($email,FILTER_VALIDATE_EMAIL))jsonResponse(false,'Введіть коректний email.',[],422);
@@ -77,5 +79,5 @@ if($action==='invite'||$action==='resend'){
  }catch(Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
  jsonResponse(true,'Запрошення надіслано.',['id'=>$id]);
 }
-if($action==='revoke'){$id=(string)($data['id']??'');$q=$pdo->prepare("UPDATE accounting_client_invitations SET status='revoked' WHERE id=? AND owner_id=? AND client_id=? AND status='pending'");$q->execute([$id,$owner,$client]);if(!$q->rowCount())jsonResponse(false,'Чинне запрошення не знайдено.',[],404);clientInvitationAudit($pdo,$id,$uid,'revoked');jsonResponse(true,'Запрошення відкликано.');}
+if($action==='revoke'){if(!in_array($ctx['workspace_role']??'', ['manager','admin','owner'],true))jsonResponse(false,'Відкликати запрошення може лише менеджер.',[],403);$id=(string)($data['id']??'');$q=$pdo->prepare("UPDATE accounting_client_invitations SET status='revoked' WHERE id=? AND owner_id=? AND client_id=? AND status='pending'");$q->execute([$id,$owner,$client]);if(!$q->rowCount())jsonResponse(false,'Чинне запрошення не знайдено.',[],404);clientInvitationAudit($pdo,$id,$uid,'revoked');jsonResponse(true,'Запрошення відкликано.');}
 jsonResponse(false,'Невідома дія.',[],422);

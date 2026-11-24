@@ -5,6 +5,12 @@
 .checklist-add{display:flex;gap:8px;margin:16px 0}.checklist-add input{flex:1}
 .checklist-list form{grid-template-columns:minmax(130px,1.2fr) repeat(6,minmax(100px,1fr)) auto}
 
+/* The obligation form is intentionally wider than ordinary dialogs: it has
+   financial evidence fields and needs an internal scrollbar without clipping
+   the rounded card edge. */
+.accounting-backdrop{padding:24px;overflow:hidden}.accounting-dialog{box-sizing:border-box;width:min(720px,calc(100vw - 48px));max-height:calc(100dvh - 48px);overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;border:1px solid #e1ebe5;border-radius:22px;padding:30px 32px;gap:14px;box-shadow:0 28px 80px #0b201866;background-clip:padding-box}.accounting-dialog h2{padding-right:44px}.accounting-dialog>p{padding-right:42px}.accounting-dialog::-webkit-scrollbar{width:10px}.accounting-dialog::-webkit-scrollbar-track{margin:18px 3px;background:transparent}.accounting-dialog::-webkit-scrollbar-thumb{background:#a4b3ab;border:3px solid transparent;background-clip:padding-box;border-radius:999px}.accounting-close{right:19px;top:15px;width:34px;height:34px;border-radius:10px;background:#f2f7f4;font-size:25px;line-height:1}.accounting-close:hover{background:#e1f1e8;color:#168968}.accounting-required-fields{padding:13px 15px;border:1px solid #f1d7a2;border-radius:12px;background:#fff9ea;color:#805a14;font-size:12px;line-height:1.45}.accounting-required-fields strong{display:block}.accounting-required-fields ul{margin:7px 0 0;padding-left:18px}.accounting-required-fields.is-ready{border-color:#cce8d7;background:#effaf3;color:#24724f}@media(max-width:620px){.accounting-backdrop{padding:8px}.accounting-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:17px;padding:23px 20px}.accounting-dialog h2{font-size:21px}}
+.accounting-field-label{display:inline-flex;align-items:baseline;gap:3px}.accounting-required-mark{color:#d15445;font-size:15px;font-weight:900;line-height:1}
+
 /* Keep document archive actions consistent with the accounting controls. */
 .accounting-table td:has(> a,> button,> label){display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .accounting-table td> a,.accounting-table td>button{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:7px 10px;border:1px solid #d7e8dd;border-radius:8px;background:#f5faf6;color:#286a50;font-family:inherit;font-size:11px;font-weight:700;line-height:1.2;text-decoration:none;white-space:nowrap;cursor:pointer}

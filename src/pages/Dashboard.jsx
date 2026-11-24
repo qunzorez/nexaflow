@@ -93,7 +93,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!data?.user?.id) return undefined;
     let active = true;
-    api("/api/accounting-portal.php").then(result => {
+    api("/api/accounting-portal.php?scope=dashboard_shortcuts").then(result => {
       if (!active || !result.ok || result.manager_view) return;
       const clients = result.client ? [result.client] : (result.clients || []);
       setClientPortalClients(clients.filter(client => client.client_id));
