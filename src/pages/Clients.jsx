@@ -1096,6 +1096,23 @@ export default function Clients() {
     load();
   }, []);
   useEffect(() => {
+    if (!data) return undefined;
+    let active = true;
+    let updating = false;
+    const refresh = async () => {
+      if (!active || updating || document.visibilityState !== 'visible') return;
+      updating = true;
+      try {
+        const result = await api('/api/clients.php');
+        if (active && result.ok) setData(result);
+      } finally { updating = false; }
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    const timer = window.setInterval(refresh, 30000);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [Boolean(data)]);
+  useEffect(() => {
     setPage(1);
   }, [search, legalFilter, taxFilter, sort]);
   useEffect(() => {
