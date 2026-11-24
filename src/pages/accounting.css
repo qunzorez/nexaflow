@@ -164,6 +164,12 @@
 .accounting-portal-issuer-legacy{display:block;margin:10px 0;color:#85928a;font-size:10px}
 .accounting-client-invites{width:100%;padding:14px;border:1px solid #dce9df;border-radius:12px;background:#f8fbf9}
 .accounting-client-invites h3{margin:0;color:#2d4939;font-size:13px}.accounting-client-invites>p{color:#73877a;font-size:11px;line-height:1.5}
+.accounting-document-request .checklist-add{display:grid;grid-template-columns:minmax(220px,1fr) minmax(170px,230px) auto;align-items:end;gap:12px;margin:0}
+.accounting-document-request .checklist-add label{display:grid;gap:7px;min-width:0;color:#52685a;font-size:11px;font-weight:700}
+.accounting-document-request .checklist-add input{width:100%;min-height:42px;padding:0 12px;border:1px solid #dce6df;border-radius:8px;background:#fff}
+.accounting-document-request .checklist-add button{min-height:42px;padding:0 16px;white-space:nowrap}
+@media(max-width:700px){.accounting-document-request .checklist-add{grid-template-columns:1fr 1fr}.accounting-document-request .checklist-add label:first-child{grid-column:1/-1}.accounting-document-request .checklist-add button{width:100%}}
+@media(max-width:460px){.accounting-document-request .checklist-add{grid-template-columns:1fr}.accounting-document-request .checklist-add label:first-child{grid-column:auto}}
 .accounting-client-invite-feedback{margin:8px 0;padding:10px 12px;border:1px solid #cae8d3;border-radius:9px;background:#edf8f0;color:#246c46;font-size:11px;font-weight:700;line-height:1.45}
 .accounting-client-invite-feedback.is-error{border-color:#f0d2cb;background:#fff4f1;color:#a24336}
 .accounting-client-invites form{display:flex;align-items:end;gap:8px}.accounting-client-invites form label{display:grid;flex:1;gap:5px;color:#52685a;font-size:11px;font-weight:700}.accounting-client-invites input{min-height:39px;padding:0 10px;border:1px solid #dce9df;border-radius:8px;background:#fff}.accounting-client-invites form button{min-height:39px;white-space:nowrap}
