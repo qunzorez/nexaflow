@@ -4,10 +4,21 @@ import { useLocation } from 'react-router-dom';
 class RouteErrorBoundaryImpl extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(error) { console.error('Page render failed:', error); }
-  retry = () => this.setState({ failed: false });
+  componentDidCatch(error) {
+    console.error('Page render failed:', error);
+    const path = `${window.location.pathname}${window.location.search}`;
+    const recoveryKey = `nexaflow.route-recovery.${path}`;
+    try {
+      if (!window.sessionStorage.getItem(recoveryKey)) {
+        window.sessionStorage.setItem(recoveryKey, '1');
+        window.location.reload();
+        return;
+      }
+    } catch {}
+    window.location.replace(window.location.pathname === '/dashboard' ? '/' : '/dashboard');
+  }
   render() {
-    if (this.state.failed) return <main className="loading-screen" role="alert"><section className="route-error-card"><h1>Не вдалося відкрити сторінку</h1><p>Спробуйте відкрити її ще раз. Якщо помилка повториться, поверніться до огляду.</p><button type="button" onClick={this.retry}>Спробувати ще раз</button><a href="/dashboard">До огляду</a></section></main>;
+    if (this.state.failed) return <main className="loading-screen" role="status" aria-label="Відновлюємо сторінку" />;
     return this.props.children;
   }
 }
