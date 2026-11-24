@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout.jsx";
 import SearchableSelect from "../components/SearchableSelect.jsx";
+import DateTimePicker from "../components/DateTimePicker.jsx";
 import { api, post } from "../services/api.js";
 import "./accounting-payouts.css";
 
@@ -71,7 +72,7 @@ export default function AccountingPayouts() {
         <label>Бухгалтер<SearchableSelect options={[{ id: "", name: "Усі бухгалтери" }, ...(data.accountants || []).map(person => ({ id: person.id, name: person.name, email: person.email }))]} value={filters.accountant} onChange={value => setFilter("accountant", value)} /></label>
         <label>Клієнт<SearchableSelect options={[{ id: "", name: "Усі клієнти" }, ...(data.clients || []).map(client => ({ id: client.id, name: client.name }))]} value={filters.client} onChange={value => setFilter("client", value)} /></label>
         <label>Послуга<SearchableSelect options={[{ id: "", name: "Усі послуги" }, ...services.map(service => ({ id: service, name: service }))]} value={filters.service} onChange={value => setFilter("service", value)} /></label>
-        <label>Період<input type="month" value={filters.period} onChange={event => setFilter("period", event.target.value)} /></label>
+        <label>Період<DateTimePicker monthOnly value={filters.period} onChange={value => setFilter("period", value)} /></label>
         <label>Статус<SearchableSelect options={[{ id: "", name: "Усі статуси" }, ...Object.entries(labels).map(([id, name]) => ({ id, name }))]} value={filters.status} onChange={value => setFilter("status", value)} /></label>
       </div></section>}
       {isManager && data.manual_reviews?.length > 0 && <section className="panel payout-manual-review"><div><h2>Потребують ручного рішення</h2><p>Автоматичне нарахування не створено, щоб не виплатити повну суму помилково.</p></div>{data.manual_reviews.map(item => <article key={item.payment_id + item.reason}><strong>{item.client_name} · {item.period_key}</strong><span>{money(item.payment_amount)} з рахунка на {money(item.invoice_total)}</span><small>{item.reason}</small></article>)}</section>}

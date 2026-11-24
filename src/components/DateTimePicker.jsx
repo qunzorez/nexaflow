@@ -26,18 +26,28 @@ function displayValue(value, withTime) {
   return withTime ? `${date} · ${pad(parts.hour)}:${pad(parts.minute)}` : date;
 }
 
+function monthValue(parts) {
+  return `${parts.year}-${pad(parts.month + 1)}`;
+}
+
+function displayMonth(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})$/);
+  if (!match) return "Оберіть місяць";
+  return `${MONTHS[Number(match[2]) - 1]} ${match[1]} р.`;
+}
+
 function monthDays(year, month) {
   const count = new Date(year, month + 1, 0).getDate();
   const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
   return [...Array(firstDay).fill(null), ...Array.from({ length: count }, (_, i) => i + 1)];
 }
 
-export default function DateTimePicker({ name, value, defaultValue = "", onChange, withTime = false, timeLabel = "Час", required = false, disabled = false }) {
+export default function DateTimePicker({ name, value, defaultValue = "", onChange, withTime = false, monthOnly = false, timeLabel = "Час", required = false, disabled = false }) {
   const initial = value ?? defaultValue;
   const [internalValue, setInternalValue] = useState(initial);
   const [open, setOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState({});
-  const [view, setView] = useState(() => parseValue(initial, withTime));
+  const [view, setView] = useState(() => parseValue(monthOnly && initial ? `${initial}-01` : initial, withTime));
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const popoverRef = useRef(null);
@@ -62,7 +72,7 @@ export default function DateTimePicker({ name, value, defaultValue = "", onChang
     const updatePosition = () => {
       const rect = triggerRef.current.getBoundingClientRect();
       const width = Math.min(300, window.innerWidth - 32);
-      const estimatedHeight = withTime ? 405 : 345;
+      const estimatedHeight = monthOnly ? 270 : withTime ? 405 : 345;
       const left = Math.min(Math.max(16, rect.left), window.innerWidth - width - 16);
       const below = rect.bottom + 9;
       const top = below + estimatedHeight <= window.innerHeight - 12
@@ -81,15 +91,16 @@ export default function DateTimePicker({ name, value, defaultValue = "", onChang
 
   const setValue = (next) => { if (value === undefined) setInternalValue(next); onChange?.(next); };
   const selectDay = (day) => { const next = { ...view, day }; setValue(toValue(next, withTime)); setView(next); if (!withTime) setOpen(false); };
+  const selectMonth = (month) => { const next = { ...view, month, day: 1 }; setValue(monthValue(next)); setView(next); setOpen(false); };
   const shiftMonth = (offset) => { const next = new Date(view.year, view.month + offset, 1); setView((current) => ({ ...current, year: next.getFullYear(), month: next.getMonth() })); };
   const updateTime = (key, nextValue) => { const next = { ...parseValue(currentValue, true), ...view, [key]: +nextValue }; setValue(toValue(next, true)); setView(next); };
-  const today = () => { const now = new Date(); const next = { ...view, year: now.getFullYear(), month: now.getMonth(), day: now.getDate() }; setValue(toValue(next, withTime)); setView(next); };
-  const selected = parseValue(currentValue, withTime);
+  const today = () => { const now = new Date(); const next = { ...view, year: now.getFullYear(), month: now.getMonth(), day: now.getDate() }; setValue(monthOnly ? monthValue(next) : toValue(next, withTime)); setView(next); };
+  const selected = parseValue(monthOnly && currentValue ? `${currentValue}-01` : currentValue, withTime);
   const updateCalendarDate = (year, month) => {
     const day = Math.min(view.day, new Date(year, month + 1, 0).getDate());
     const next = { ...view, year, month, day };
     setView(next);
-    setValue(toValue(next, withTime));
+    setValue(monthOnly ? monthValue(next) : toValue(next, withTime));
   };
   const changeMonth = (month) => updateCalendarDate(view.year, Number(month));
   const changeYear = (year) => updateCalendarDate(Number(year), view.month);
@@ -97,14 +108,12 @@ export default function DateTimePicker({ name, value, defaultValue = "", onChang
   return <div className={`date-time-picker ${open ? "is-open" : ""}`} ref={rootRef}>
     <input type="hidden" name={name} value={currentValue || ""} required={required} readOnly />
     <button ref={triggerRef} type="button" className="date-time-trigger" onClick={() => setOpen((state) => !state)} aria-expanded={open} disabled={disabled}>
-      <span className="date-time-icon">{withTime ? <Icon name="clock" /> : <Icon name="calendar" />}</span><span className={currentValue ? "date-time-value" : "date-time-placeholder"}>{displayValue(currentValue, withTime)}</span>
+      <span className="date-time-icon">{withTime ? <Icon name="clock" /> : <Icon name="calendar" />}</span><span className={currentValue ? "date-time-value" : "date-time-placeholder"}>{monthOnly ? displayMonth(currentValue) : displayValue(currentValue, withTime)}</span>
     </button>
     {open && createPortal(<div ref={popoverRef} className="date-time-popover" style={popoverStyle}>
       <div className="date-time-head"><button type="button" onClick={() => shiftMonth(-1)} aria-label="Попередній місяць"><Icon name="left" /></button><div className="date-time-month-year"><select className="date-time-month-select" value={view.month} onChange={(event) => changeMonth(event.target.value)} aria-label="Місяць">{MONTHS.map((month, index) => <option value={index} key={month}>{month}</option>)}</select><select className="date-time-year-select" value={view.year} onChange={(event) => changeYear(event.target.value)} aria-label="Рік">{years.map((year) => <option value={year} key={year}>{year} р.</option>)}</select></div><button type="button" onClick={() => shiftMonth(1)} aria-label="Наступний місяць"><Icon name="right" /></button></div>
-      <div className="calendar-weekdays">{WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div>
-      <div className="calendar-grid">{days.map((day, index) => day ? <button type="button" key={day} className={day === selected.day && selected.month === view.month && selected.year === view.year ? "selected" : ""} onClick={() => selectDay(day)}>{day}</button> : <span key={`empty-${index}`} />)}</div>
-      {withTime && <div className="time-picker-row"><span className="time-picker-label">{timeLabel}</span><input className="time-number-input" type="number" min="0" max="23" value={pad(view.hour)} onChange={(event) => updateTime("hour", Math.min(23, Math.max(0, Number(event.target.value || 0))))} aria-label="Години" /><b>:</b><input className="time-number-input" type="number" min="0" max="59" value={pad(view.minute)} onChange={(event) => updateTime("minute", Math.min(59, Math.max(0, Number(event.target.value || 0))))} aria-label="Хвилини" /></div>}
-      <div className="date-time-actions"><button type="button" className="date-time-today" onClick={today}>Сьогодні</button><button type="button" className="date-time-done" onClick={() => setOpen(false)}>Готово</button></div>
+      {monthOnly ? <div className="month-picker-grid">{MONTHS.map((month, index) => <button type="button" key={month} className={selected.month === index && selected.year === view.year ? "selected" : ""} onClick={() => selectMonth(index)}>{month}</button>)}</div> : <><div className="calendar-weekdays">{WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div><div className="calendar-grid">{days.map((day, index) => day ? <button type="button" key={day} className={day === selected.day && selected.month === view.month && selected.year === view.year ? "selected" : ""} onClick={() => selectDay(day)}>{day}</button> : <span key={`empty-${index}`} />)}</div>{withTime && <div className="time-picker-row"><span className="time-picker-label">{timeLabel}</span><input className="time-number-input" type="number" min="0" max="23" value={pad(view.hour)} onChange={(event) => updateTime("hour", Math.min(23, Math.max(0, Number(event.target.value || 0))))} aria-label="Години" /><b>:</b><input className="time-number-input" type="number" min="0" max="59" value={pad(view.minute)} onChange={(event) => updateTime("minute", Math.min(59, Math.max(0, Number(event.target.value || 0))))} aria-label="Хвилини" /></div>}</>}
+      <div className="date-time-actions"><button type="button" className="date-time-today" onClick={today}>{monthOnly ? "Поточний місяць" : "Сьогодні"}</button><button type="button" className="date-time-done" onClick={() => setOpen(false)}>Готово</button></div>
     </div>, document.body)}
   </div>;
 }
