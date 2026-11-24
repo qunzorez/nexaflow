@@ -1,12 +1,14 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { faShieldHalved, faClock, faRotate, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faShieldHalved, faClock, faRotate, faChevronRight, faLock, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
 const definitions = {
   shield: faShieldHalved,
   clock: faClock,
   refresh: faRotate,
   next: faChevronRight,
+  lock: faLock,
+  arrow: faArrowRight,
 };
 
 const entries = Object.entries(definitions).map(([name, definition]) => {
