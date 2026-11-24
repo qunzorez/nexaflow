@@ -45,7 +45,7 @@ export default function Sidebar({ user, open, onNavigate }) {
   const globalAdmin = ["admin", "owner"].includes(String(user?.role || "").toLowerCase());
   const canManage = ["admin", "owner", "manager", "project_lead"].includes(userRole) || globalAdmin;
   const canManageRequisites = ["admin", "owner", "manager"].includes(userRole) || globalAdmin;
-  const canUseAccountingPayouts = ["team", "business"].includes(String(user?.subscription?.key || ""));
+  const canUseAccountingPayouts = Boolean(planFeatures.accountant_payouts);
   const isAdmin = ["admin", "owner"].includes(userRole) || globalAdmin;
   const canUseSupport = isAdmin || ["admin", "owner"].includes(String(user?.role || "").toLowerCase()) || Number(user?.is_support_agent) === 1 || Boolean(planFeatures.support);
   const dentalNavFeatures = ["dental_inventory", "dental_procurement", "dental_management_accounting", "dental_doctor_payroll", "dental_equipment"];
@@ -191,7 +191,7 @@ export default function Sidebar({ user, open, onNavigate }) {
           <span><Icon name="settings" /></span> Податкові налаштування
         </SidebarNavLink>}
         {(activeClientModule === "accounting" || user?.subscription?.module === "accounting") && planFeatures.accounting && canUseAccountingPayouts && <SidebarNavLink to="/accounting/payouts">
-          <span><Icon name="subscription" /></span> Виплати бухгалтерам
+          <span><Icon name="subscription" /></span> {(["admin","owner","manager"].includes(userRole) || globalAdmin) ? "Виплати бухгалтерам" : "Виплати"}
         </SidebarNavLink>}
         {activeClientModule === "dentistry" && hasDentalNav && <>
           <p className="nav-label">ОБЛІК КЛІНІКИ</p>

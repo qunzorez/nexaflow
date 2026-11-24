@@ -183,3 +183,6 @@
 .client-service-appointment-date{grid-column:1/-1}
 
 .client-service-schedule .searchable-select{width:100%;min-width:0}.client-service-schedule .searchable-select-trigger{height:34px;min-height:34px;padding:7px 10px;border-radius:8px;font-size:11px}.client-service-schedule .searchable-select-value,.client-service-schedule .searchable-select-placeholder{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.client-service-schedule .searchable-select-menu{min-width:220px}.client-service-schedule label{min-width:0}
+/* Four schedule fields need two full-width columns in a service card. */
+@media(min-width:801px){.client-service-schedule{grid-template-columns:repeat(2,minmax(0,1fr))!important}.client-service-schedule .client-field-label{min-height:18px;white-space:normal!important;line-height:1.25;overflow:visible!important}}
+.client-service-schedule select{height:36px!important;min-height:36px!important;padding:0 32px 0 10px!important;box-sizing:border-box!important;color:var(--ink)!important;font:600 11px/1.2 Manrope!important;line-height:1.2!important}

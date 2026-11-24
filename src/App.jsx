@@ -101,7 +101,7 @@ export default function App() {
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/accounting" element={<PlanFeatureRoute feature="accounting"><Accounting /></PlanFeatureRoute>} />
-      <Route path="/accounting/payouts" element={<PlanFeatureRoute feature="accounting"><AccountingPayouts /></PlanFeatureRoute>} />
+      <Route path="/accounting/payouts" element={<PlanFeatureRoute feature="accountant_payouts"><AccountingPayouts /></PlanFeatureRoute>} />
       <Route path="/accounting/requisites" element={<PlanFeatureRoute feature="accounting"><AccountingRequisites /></PlanFeatureRoute>} />
       <Route path="/accounting/portal" element={<AccountingPortal />} />
       <Route path="/patients/:id" element={<DentistryModuleRoute><DentistryPatientPage /></DentistryModuleRoute>} />

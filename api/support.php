@@ -63,8 +63,8 @@ if ($method === 'GET') {
 
     $requestedSessionId = trim((string)($_GET['session_id'] ?? ''));
     if ($requestedSessionId !== '') {
-        $sessionQuery = $pdo->prepare('SELECT id, workspace_id, status, created_at, updated_at, closed_at FROM support_sessions WHERE workspace_id = ? AND id = ? LIMIT 1');
-        $sessionQuery->execute([$workspaceId, $requestedSessionId]);
+        $sessionQuery = $pdo->prepare("SELECT id, workspace_id, status, created_at, updated_at, closed_at FROM support_sessions ss WHERE workspace_id = ? AND id = ? AND (status <> 'closed' OR created_by = ? OR (created_by IS NULL AND EXISTS (SELECT 1 FROM support_messages own_message WHERE own_message.session_id = ss.id AND own_message.sender_id = ?))) LIMIT 1");
+        $sessionQuery->execute([$workspaceId, $requestedSessionId, $userId, $userId]);
     } else {
         $sessionQuery = $pdo->prepare("SELECT id, workspace_id, status, created_at, updated_at, closed_at FROM support_sessions WHERE workspace_id = ? AND status = 'open' ORDER BY updated_at DESC LIMIT 1");
         $sessionQuery->execute([$workspaceId]);
@@ -78,8 +78,8 @@ if ($method === 'GET') {
         $pdo->prepare('INSERT INTO support_reads (workspace_id, user_id, last_read_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE last_read_at = CURRENT_TIMESTAMP')->execute([$workspaceId, $userId]);
     }
     attachSupportFiles($pdo, $messages);
-    $closedQuery = $pdo->prepare("SELECT id, closed_at, DATE_ADD(closed_at, INTERVAL 60 DAY) AS expires_at FROM support_sessions WHERE workspace_id = ? AND status = 'closed' ORDER BY closed_at DESC LIMIT 20");
-    $closedQuery->execute([$workspaceId]);
+    $closedQuery = $pdo->prepare("SELECT id, closed_at, DATE_ADD(closed_at, INTERVAL 60 DAY) AS expires_at FROM support_sessions ss WHERE workspace_id = ? AND status = 'closed' AND (created_by = ? OR (created_by IS NULL AND EXISTS (SELECT 1 FROM support_messages own_message WHERE own_message.session_id = ss.id AND own_message.sender_id = ?))) ORDER BY closed_at DESC LIMIT 20");
+    $closedQuery->execute([$workspaceId, $userId, $userId]);
     jsonResponse(true, 'Чат підтримки завантажено.', ['staff' => false, 'workspace_id' => $workspaceId, 'session' => $session, 'messages' => $messages, 'closed_sessions' => $closedQuery->fetchAll()]);
 }
 
@@ -95,7 +95,7 @@ if ($action === 'create_session') {
     $sessionId = $existing->fetchColumn();
     if (!$sessionId) {
         $sessionId = bin2hex(random_bytes(16));
-        $pdo->prepare("INSERT INTO support_sessions (id, workspace_id, status) VALUES (?, ?, 'open')")->execute([$sessionId, $workspaceId]);
+        $pdo->prepare("INSERT INTO support_sessions (id, workspace_id, created_by, status) VALUES (?, ?, ?, 'open')")->execute([$sessionId, $workspaceId, $userId]);
     }
     jsonResponse(true, 'Звернення відкрито.', ['session_id' => $sessionId]);
 }
@@ -186,6 +186,7 @@ function ensureSupportSchema(PDO $pdo): void
     $pdo->exec("CREATE TABLE IF NOT EXISTS support_sessions (
         id CHAR(32) NOT NULL PRIMARY KEY,
         workspace_id CHAR(32) NOT NULL,
+        created_by CHAR(32) NULL,
         status ENUM('open','closed') NOT NULL DEFAULT 'open',
         assigned_to CHAR(32) NULL,
         assigned_at DATETIME NULL,
@@ -193,6 +194,7 @@ function ensureSupportSchema(PDO $pdo): void
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         closed_at DATETIME NULL,
         INDEX idx_support_sessions_workspace_status (workspace_id, status, updated_at),
+        INDEX idx_support_sessions_creator (workspace_id, created_by, status, closed_at),
         INDEX idx_support_sessions_retention (status, closed_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $pdo->exec("CREATE TABLE IF NOT EXISTS support_messages (
@@ -229,9 +231,10 @@ function ensureSupportSchema(PDO $pdo): void
         PRIMARY KEY (workspace_id, user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-    $columns = $pdo->query("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'support_sessions' AND COLUMN_NAME IN ('assigned_to','assigned_at')) OR (TABLE_NAME = 'support_messages' AND COLUMN_NAME = 'session_id') OR (TABLE_NAME = 'support_attachments' AND COLUMN_NAME IN ('session_id','file_path'))) ")->fetchAll();
+    $columns = $pdo->query("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'support_sessions' AND COLUMN_NAME IN ('created_by','assigned_to','assigned_at')) OR (TABLE_NAME = 'support_messages' AND COLUMN_NAME = 'session_id') OR (TABLE_NAME = 'support_attachments' AND COLUMN_NAME IN ('session_id','file_path'))) ")->fetchAll();
     $existing = [];
     foreach ($columns as $column) $existing[$column['TABLE_NAME'] . '.' . $column['COLUMN_NAME']] = true;
+    if (!isset($existing['support_sessions.created_by'])) $pdo->exec('ALTER TABLE support_sessions ADD created_by CHAR(32) NULL, ADD INDEX idx_support_sessions_creator (workspace_id, created_by, status, closed_at)');
     if (!isset($existing['support_sessions.assigned_to'])) $pdo->exec('ALTER TABLE support_sessions ADD assigned_to CHAR(32) NULL');
     if (!isset($existing['support_sessions.assigned_at'])) $pdo->exec('ALTER TABLE support_sessions ADD assigned_at DATETIME NULL');
     if (!isset($existing['support_messages.session_id'])) $pdo->exec('ALTER TABLE support_messages ADD session_id CHAR(32) NULL, ADD INDEX idx_support_session_created (session_id, created_at, id)');
@@ -247,6 +250,7 @@ function ensureSupportSchema(PDO $pdo): void
         $pdo->prepare('UPDATE support_messages SET session_id = ? WHERE workspace_id = ? AND session_id IS NULL')->execute([$sessionId, $legacyWorkspaceId]);
         $pdo->prepare('UPDATE support_attachments sa JOIN support_messages sm ON sm.id = sa.message_id SET sa.session_id = ? WHERE sm.session_id = ? AND sa.session_id IS NULL')->execute([$sessionId, $sessionId]);
     }
+    $pdo->exec("UPDATE support_sessions ss SET created_by=(SELECT sm.sender_id FROM support_messages sm JOIN users u ON u.id=sm.sender_id WHERE sm.session_id=ss.id AND u.role NOT IN ('admin','owner') AND COALESCE(u.is_support_agent,0)=0 ORDER BY sm.created_at,sm.id LIMIT 1) WHERE ss.created_by IS NULL");
 }
 
 function purgeExpiredSupportSessions(PDO $pdo): void

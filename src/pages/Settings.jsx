@@ -140,11 +140,6 @@ export default function Settings() {
     }
   }
   useEffect(() => {
-    api("/api/client-module.php").then((moduleResult) => {
-      if (!moduleResult.ok) return;
-      setClientModule(moduleResult.active_client_module || "accounting");
-      window.localStorage.setItem("nexaflow.client.module", moduleResult.active_client_module || "accounting");
-    });
     api("/api/profile.php").then(async (result) => {
       if (!result.ok) return;
       const isPaymentReturn = new URLSearchParams(window.location.search).get("payment") === "return";
@@ -483,6 +478,7 @@ export default function Settings() {
               <span className={subscription?.features.services || subscription?.services_per_client ? "enabled" : "locked"}>{subscription?.features.services ? "✓ Створення послуг і пакетів" : subscription?.services_per_client ? `✓ До ${subscription.services_per_client} послуг на клієнта · без пакетів` : "× Створення послуг і пакетів"}</span>
               <span className={subscription?.features.telegram ? "enabled" : "locked"}>{subscription?.features.telegram ? "✓" : "×"} Telegram-сповіщення</span>
               <span className={subscription?.features.support ? "enabled" : "locked"}>{subscription?.features.support ? "✓" : "×"} Онлайн-підтримка</span>
+              <span className={subscription?.features.accountant_payouts ? "enabled" : "locked"}>{subscription?.features.accountant_payouts ? "✓" : "×"} Виплати бухгалтерам</span>
             </div>}
             {!subscription?.billing_enabled && <div className="billing-disabled-note"><strong>Оплата тарифів поки не підключена</strong><span>Оберіть план - ми відкриємо його можливості без списання коштів.</span></div>}
             <div className="plan-comparison-heading"><strong>Порівняти плани</strong><span>Оберіть рівень для свого робочого простору</span></div>
@@ -517,6 +513,7 @@ export default function Settings() {
                       <span className={plan.features.services ? "available" : plan.limits.services_per_client ? "available" : "unavailable"}>{plan.features.services ? "✓ Послуги й пакети" : plan.limits.services_per_client ? `✓ До ${plan.limits.services_per_client} послуг / клієнта` : "- Послуги"}</span>
                       <span className={plan.features.telegram ? "available" : "unavailable"}>{plan.features.telegram ? "✓" : "-"} Telegram</span>
                       <span className={plan.features.support ? "available" : "unavailable"}>{plan.features.support ? "✓ Онлайн-підтримка" : "- Онлайн-підтримка"}</span>
+                      <span className={plan.features.accountant_payouts ? "available" : "unavailable"}>{plan.features.accountant_payouts ? "✓ Виплати бухгалтерам" : "- Виплати бухгалтерам"}</span>
                     </>}
                   </div>
                   {(plan.limits.project_leads > 0 || plan.limits.moderators > 0) && <small className="plan-tier-roles">{plan.limits.project_leads > 0 ? `${plan.limits.project_leads === 1 ? "1 керівник проєкту" : `До ${plan.limits.project_leads} керівників проєктів`}` : ""}{plan.limits.project_leads > 0 && plan.limits.moderators > 0 ? " · " : ""}{plan.limits.moderators > 0 ? `До ${plan.limits.moderators} модераторів` : ""}</small>}

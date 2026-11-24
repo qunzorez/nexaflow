@@ -21,7 +21,7 @@ $isManager = in_array((string)($context['workspace_role'] ?? ''), ['manager', 'a
     || in_array((string)$user['role'], ['admin', 'owner'], true);
 
 if (($context['module'] ?? '') !== 'accounting') jsonResponse(false, 'Розділ доступний лише в бухгалтерському просторі.', [], 403);
-if (!in_array((string)($context['key'] ?? ''), ['team', 'business'], true)) {
+if (empty($context['plan']['accountant_payouts'])) {
     jsonResponse(false, 'Облік виплат бухгалтерам доступний у пакетах «Команда» та «Бізнес».', ['code' => 'plan_feature_locked'], 403);
 }
 
@@ -51,6 +51,14 @@ function payoutText(mixed $value, int $limit = 1000): string { return mb_substr(
 function payoutHistory(PDO $pdo, string $ownerId, string $accrualId, string $action, ?string $oldStatus, ?string $newStatus, ?float $oldAmount, ?float $newAmount, string $comment, string $userId): void {
     $pdo->prepare('INSERT INTO accounting_accountant_accrual_history(id,owner_id,accrual_id,action,old_status,new_status,old_amount,new_amount,comment,user_id) VALUES(?,?,?,?,?,?,?,?,?,?)')
         ->execute([payoutId(), $ownerId, $accrualId, $action, $oldStatus, $newStatus, $oldAmount, $newAmount, $comment ?: null, $userId]);
+}
+function payoutNotifyAccountant(PDO $pdo, array $accrual, string $senderId): void {
+    $recipientId = (string)($accrual['accountant_id'] ?? '');
+    if ($recipientId === '' || $recipientId === $senderId) return;
+    $amount = number_format((float)($accrual['amount'] ?? 0), 2, ',', ' ');
+    $message = 'Виплату '.$amount.' грн за послугу «'.(string)($accrual['service_name'] ?? '').'» позначено як виконану.';
+    $pdo->prepare("INSERT INTO notifications(id,user_id,sender_id,type,title,message,entity_type,entity_id) VALUES(?,?,?,'accounting','Виплату проведено',?,'client',?)")
+        ->execute([payoutId(), $recipientId, $senderId, $message, (string)($accrual['client_id'] ?? '')]);
 }
 function payoutServicePeople(array $service, array $fallback): array {
     $ids = array_merge((array)($service['accountant_ids'] ?? []), [(string)($service['accountant_id'] ?? '')]);
@@ -129,13 +137,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         payoutHistory($pdo,$ownerId,$id,$action,$oldStatus,$next,(float)$row['amount'],(float)$row['amount'],$comment,$userId);
         jsonResponse(true, $next === 'approved' ? 'Запит схвалено.' : 'Запит відхилено.');
     }
-    if ($oldStatus !== 'approved') jsonResponse(false, 'Позначити виплату можна лише після схвалення.', [], 409);
+    if (!in_array($oldStatus, ['approved', 'pending_manager'], true)) jsonResponse(false, 'Позначити виплату можна після схвалення або безпосередньо з нового нарахування.', [], 409);
     $paidAt = payoutText($data['paid_at'] ?? '', 10);
     $validDate = DateTimeImmutable::createFromFormat('!Y-m-d', $paidAt);
     if (!$validDate || $validDate->format('Y-m-d') !== $paidAt) jsonResponse(false, 'Вкажіть фактичну дату виплати.', [], 422);
-    $pdo->prepare("UPDATE accounting_accountant_accruals SET status='paid',paid_at=?,paid_by=?,paid_comment=? WHERE id=? AND owner_id=?")->execute([$paidAt,$userId,$comment ?: null,$id,$ownerId]);
-    payoutHistory($pdo,$ownerId,$id,'paid',$oldStatus,'paid',(float)$row['amount'],(float)$row['amount'],$comment,$userId);
-    jsonResponse(true, 'Виплату позначено як виконану.');
+    $direct = $oldStatus === 'pending_manager';
+    $historyComment = $comment ?: ($direct ? 'Виплачено менеджером без запиту бухгалтера.' : '');
+    if ($direct) {
+        $pdo->prepare("UPDATE accounting_accountant_accruals SET status='paid',decided_at=NOW(),decided_by=?,decision_comment=?,paid_at=?,paid_by=?,paid_comment=? WHERE id=? AND owner_id=?")->execute([$userId,$historyComment,$paidAt,$userId,$comment ?: null,$id,$ownerId]);
+    } else {
+        $pdo->prepare("UPDATE accounting_accountant_accruals SET status='paid',paid_at=?,paid_by=?,paid_comment=? WHERE id=? AND owner_id=?")->execute([$paidAt,$userId,$comment ?: null,$id,$ownerId]);
+    }
+    payoutHistory($pdo,$ownerId,$id,$direct ? 'paid_directly' : 'paid',$oldStatus,'paid',(float)$row['amount'],(float)$row['amount'],$historyComment,$userId);
+    payoutNotifyAccountant($pdo, $row, $userId);
+    jsonResponse(true, $direct ? 'Виплату проведено без запиту бухгалтера.' : 'Виплату позначено як виконану.');
 }
 
 $sync = payoutSync($pdo, $ownerId, $members, $userId);
