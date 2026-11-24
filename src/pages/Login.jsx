@@ -57,6 +57,10 @@ export default function Login({ initialMode = 'login' }) {
       navigate(`/settings?plan=${encodeURIComponent(planToActivate)}`, { replace: true });
       return;
     }
+    if (result.user?.client_portal_only) {
+      navigate('/accounting/portal', { replace: true });
+      return;
+    }
     navigate('/dashboard', { replace: true });
   }
 

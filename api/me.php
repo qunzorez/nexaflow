@@ -27,4 +27,5 @@ $user['subscription'] = planSettingsPayload($planContext);
 $user['workspaces'] = $planContext['workspaces'];
 $user['active_workspace_id'] = $planContext['owner_id'];
 $user['workspace_role'] = $planContext['workspace_role'];
+$user['client_portal_only'] = accountingPortalOnlyUser($pdo, (string)$user['id'], (string)$user['role']);
 jsonResponse(true, 'Користувач авторизований.', ['authenticated' => true, 'user' => $user]);

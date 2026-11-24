@@ -40,7 +40,7 @@ try {
     $_SESSION['user_role'] = $user['role'];
     $event = $pdo->prepare("INSERT INTO auth_event_log (user_id, email, event_type, result) VALUES (?, ?, 'login', 'success')");
     $event->execute([$user['id'], $user['email']]);
-    jsonResponse(true, 'Вхід виконано.', ['user' => ['name' => $user['name'], 'email' => $user['email'], 'role' => $user['role'], 'email_verified_at' => $user['email_verified_at']]]);
+    jsonResponse(true, 'Вхід виконано.', ['user' => ['name' => $user['name'], 'email' => $user['email'], 'role' => $user['role'], 'email_verified_at' => $user['email_verified_at'], 'client_portal_only' => accountingPortalOnlyUser($pdo, (string)$user['id'], (string)$user['role'])]]);
 } catch (Throwable $error) {
     error_log($error->getMessage());
     jsonResponse(false, 'Помилка бази даних під час входу.', [], 500);
