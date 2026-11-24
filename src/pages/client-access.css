@@ -11,4 +11,5 @@
 .client-access-card button{min-height:44px}
 .client-access-links{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}.client-access-links a{color:#148567;font-size:12px;font-weight:700}
 .client-access-message{margin-top:16px;padding:12px;border:1px solid #d9e8dd;border-radius:10px;background:#f4faf5;color:#326447;font-size:12px}
+.client-access-next{display:grid;place-items:center;min-height:44px;margin-top:18px;text-decoration:none}
 @media(max-width:520px){.client-access-card{padding:24px}.client-access-card h1{font-size:23px}}

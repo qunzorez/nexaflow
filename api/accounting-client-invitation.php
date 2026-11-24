@@ -62,14 +62,15 @@ if($action==='invite'||$action==='resend'){
  $email=mb_strtolower(trim((string)($data['email']??'')));if(!filter_var($email,FILTER_VALIDATE_EMAIL))jsonResponse(false,'Введіть коректний email.',[],422);
  $q=$pdo->prepare("SELECT created_at FROM accounting_client_invitations WHERE owner_id=? AND client_id=? AND email=? AND status='pending' ORDER BY created_at DESC LIMIT 1");$q->execute([$owner,$client,$email]);$last=$q->fetchColumn();if($last&&strtotime($last)>time()-60)jsonResponse(false,'Повторне надсилання доступне через хвилину.',[],429);
  $token=bin2hex(random_bytes(32));$id=bin2hex(random_bytes(16));
+ $link=appUrl('/client/register').'?token='.urlencode($token);
  $pdo->beginTransaction();try{
-  $pdo->prepare("UPDATE accounting_client_invitations SET status='revoked' WHERE owner_id=? AND client_id=? AND email=? AND status='pending'")->execute([$owner,$client,$email]);
   $pdo->prepare("INSERT INTO accounting_client_invitations(id,owner_id,client_id,email,token_hash,invited_by,expires_at) VALUES(?,?,?,?,?,?,DATE_ADD(NOW(),INTERVAL 7 DAY))")->execute([$id,$owner,$client,$email,hash('sha256',$token),$uid]);
+  $sent=sendProjectEmail($email,'Запрошення до кабінету клієнта NexaFlow',"Вас запросили до кабінету компанії {$clientName}. Перейдіть за посиланням протягом 7 днів:\n{$link}\nЯкщо ви не очікували запрошення, проігноруйте лист.");
+  if(!$sent){$pdo->rollBack();jsonResponse(false,'Не вдалося надіслати запрошення. Попереднє посилання залишається чинним.',[],503);}
+  $pdo->prepare("UPDATE accounting_client_invitations SET status='revoked' WHERE owner_id=? AND client_id=? AND email=? AND status='pending' AND id<>?")->execute([$owner,$client,$email,$id]);
   clientInvitationAudit($pdo,$id,$uid,$action==='resend'?'resent':'created');$pdo->commit();
  }catch(Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
- $link=appUrl('/client/register').'?token='.urlencode($token);
- $sent=sendProjectEmail($email,'Запрошення до кабінету клієнта NexaFlow',"Вас запросили до кабінету компанії {$clientName}. Перейдіть за посиланням протягом 7 днів:\n{$link}\nЯкщо ви не очікували запрошення, проігноруйте лист.");
- jsonResponse($sent,$sent?'Запрошення надіслано.':'Не вдалося надіслати запрошення. Повторіть спробу пізніше.',['id'=>$id],$sent?200:503);
+ jsonResponse(true,'Запрошення надіслано.',['id'=>$id]);
 }
 if($action==='revoke'){$id=(string)($data['id']??'');$q=$pdo->prepare("UPDATE accounting_client_invitations SET status='revoked' WHERE id=? AND owner_id=? AND client_id=? AND status='pending'");$q->execute([$id,$owner,$client]);if(!$q->rowCount())jsonResponse(false,'Чинне запрошення не знайдено.',[],404);clientInvitationAudit($pdo,$id,$uid,'revoked');jsonResponse(true,'Запрошення відкликано.');}
 jsonResponse(false,'Невідома дія.',[],422);
