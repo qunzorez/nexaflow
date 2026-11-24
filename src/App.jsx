@@ -33,6 +33,7 @@ import DentistryModuleRoute from "./components/DentistryModuleRoute.jsx";
 const DentistryPatientPage = lazy(() => import("./pages/DentistryPatientPage.jsx"));
 const DentistryERPPage = lazy(() => import("./pages/DentistryERPPage.jsx"));
 const Accounting = lazy(() => import("./pages/Accounting.jsx"));
+const AccountingPayouts = lazy(() => import("./pages/AccountingPayouts.jsx"));
 const AccountingRequisites = lazy(() => import("./pages/AccountingRequisites.jsx"));
 const AccountingPortal = lazy(() => import("./pages/AccountingPortal.jsx"));
 const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
@@ -100,6 +101,7 @@ export default function App() {
       <Route path="/clients/new" element={<ClientCreatePage />} />
       <Route path="/clients/:id/edit" element={<ClientEditPage />} />
       <Route path="/accounting" element={<PlanFeatureRoute feature="accounting"><Accounting /></PlanFeatureRoute>} />
+      <Route path="/accounting/payouts" element={<PlanFeatureRoute feature="accounting"><AccountingPayouts /></PlanFeatureRoute>} />
       <Route path="/accounting/requisites" element={<PlanFeatureRoute feature="accounting"><AccountingRequisites /></PlanFeatureRoute>} />
       <Route path="/accounting/portal" element={<AccountingPortal />} />
       <Route path="/patients/:id" element={<DentistryModuleRoute><DentistryPatientPage /></DentistryModuleRoute>} />
