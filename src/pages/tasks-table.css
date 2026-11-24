@@ -8,4 +8,7 @@
 
 .task-client-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);font:500 11px Manrope;cursor:pointer}.task-client-trigger:hover{border-color:#9bcbb3}.task-client-options>input{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;padding:8px;font:500 11px Manrope;outline:0}.task-client-options>input:focus{border-color:#76bca1}
 
+/* The three task filters share one searchable control and one visual rhythm. */
+.tasks-page .task-toolbar>.searchable-select{flex:0 1 190px;min-width:180px}.tasks-page .task-toolbar>.searchable-select .searchable-select-trigger{height:42px;min-height:42px;border-radius:10px;font:600 12px Manrope}@media(max-width:900px){.tasks-page .task-toolbar>.searchable-select{flex:1 1 180px}}@media(max-width:700px){.tasks-page .task-toolbar>.searchable-select{width:100%}}
+
 .task-sort-button{display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;white-space:nowrap}.task-sort-button:hover{color:var(--green)}.task-sort-button span{font-size:12px;opacity:.65}
