@@ -33,11 +33,11 @@ function db(): PDO
         $status = $accountStatus->fetch();
         if (!$status) jsonResponse(false, 'Користувача не знайдено.', [], 401);
         if ($status && (int)$status['is_blocked'] === 1) jsonResponse(false, 'Обліковий запис заблоковано.', ['code' => 'account_blocked', 'reason' => (string)($status['blocked_reason'] ?? '')], 423);
-        $selfService = ['me.php', 'profile.php', 'email-verification-account.php'];
+        $selfService = ['me.php', 'profile.php', 'email-verification-account.php', 'accounting-client-invitation.php'];
         if ($status && empty($status['email_verified_at']) && !in_array(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')), $selfService, true)) {
             jsonResponse(false, 'Підтвердьте email у налаштуваннях профілю, щоб продовжити.', ['code' => 'email_verification_required'], 403);
         }
-        $portalRoutes = ['me.php', 'profile.php', 'email-verification-account.php', 'accounting-portal.php', 'login.php', 'logout.php', 'forgot-password.php', 'reset-password.php'];
+        $portalRoutes = ['me.php', 'profile.php', 'email-verification-account.php', 'accounting-client-invitation.php', 'accounting-portal.php', 'login.php', 'logout.php', 'forgot-password.php', 'reset-password.php'];
         if (accountingPortalOnlyUser($pdo, (string)$_SESSION['user_id'], (string)$status['role']) && !in_array($script, $portalRoutes, true)) {
             jsonResponse(false, 'Ця дія недоступна у кабінеті клієнта.', ['code' => 'client_portal_only'], 403);
         }

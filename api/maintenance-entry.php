@@ -5,7 +5,7 @@ require_once __DIR__ . '/maintenance.php';
 $path = parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 if (!preg_match('~/api/([a-zA-Z0-9_-]+\.php)$~', (string)$path, $match)) { http_response_code(404); exit; }
 $script = $match[1];
-$private = ['maintenance-entry.php', 'maintenance.php', 'maintenance-icons.php', 'accounting-portal-access.php', 'db.php', 'plans.php', 'claims.php', 'runtime-config.php', 'verification.php', 'mailer.php', 'rate-limit.php', 'task-deadline-notifications.php', 'dentistry-erp-schema.php', 'dentistry-erp-ledger.php', 'dentistry-erp-operations.php', 'telegram.php', 'config.php', 'config.local.php', 'config.web.php', 'config.example.php', 'liqpay.local.php'];
+$private = ['maintenance-entry.php', 'maintenance.php', 'maintenance-icons.php', 'accounting-portal-access.php', 'accounting-client-invitations-lib.php', 'db.php', 'plans.php', 'claims.php', 'runtime-config.php', 'verification.php', 'mailer.php', 'rate-limit.php', 'task-deadline-notifications.php', 'dentistry-erp-schema.php', 'dentistry-erp-ledger.php', 'dentistry-erp-operations.php', 'telegram.php', 'config.php', 'config.local.php', 'config.web.php', 'config.example.php', 'liqpay.local.php'];
 if (in_array($script, $private, true) || !is_file(__DIR__ . '/' . $script)) { http_response_code(404); exit; }
 try {
     $pdo = maintenanceConnection();

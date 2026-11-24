@@ -162,6 +162,11 @@
 .accounting-portal-issuer>div{display:grid;gap:4px;margin-top:10px;color:#57685f;font-size:11px;overflow-wrap:anywhere}
 .accounting-portal-issuer>div strong{color:#263a30;font-size:12px}
 .accounting-portal-issuer-legacy{display:block;margin:10px 0;color:#85928a;font-size:10px}
+.accounting-client-invites{width:100%;padding:14px;border:1px solid #dce9df;border-radius:12px;background:#f8fbf9}
+.accounting-client-invites h3{margin:0;color:#2d4939;font-size:13px}.accounting-client-invites>p{color:#73877a;font-size:11px;line-height:1.5}
+.accounting-client-invites form{display:flex;align-items:end;gap:8px}.accounting-client-invites form label{display:grid;flex:1;gap:5px;color:#52685a;font-size:11px;font-weight:700}.accounting-client-invites input{min-height:39px;padding:0 10px;border:1px solid #dce9df;border-radius:8px;background:#fff}.accounting-client-invites form button{min-height:39px;white-space:nowrap}
+.accounting-client-invite-list{display:grid;gap:8px;margin-top:12px}.accounting-client-invite-list>div{display:grid;gap:4px;padding:9px 10px;border:1px solid #e0ebe3;border-radius:8px;background:#fff}.accounting-client-invite-list strong{color:#2d4939;font-size:11px}.accounting-client-invite-list span{color:#829188;font-size:10px}.accounting-client-invite-list>div>div{display:flex;gap:7px}.accounting-client-invite-list button{padding:5px 8px;border:1px solid #dce9df;border-radius:6px;background:#f7faf8;color:#286a50;font:700 10px inherit;cursor:pointer}
+@media(max-width:560px){.accounting-client-invites form{flex-direction:column;align-items:stretch}}
 .accounting-invoice-requisites{display:grid;align-content:center;gap:3px;min-height:42px;padding:8px 10px;border:1px solid #dce6df;border-radius:8px;background:#f7fbf8;color:#586a60;font-size:10px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
 .accounting-invoice-requisites strong{color:#263b31;font-size:11px}
 .accounting-invoice-requisites a{color:var(--green);font-weight:800;text-decoration:none}

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Icon from './components/Icon.jsx';
 import './components/maintenance-warning.css';
 const Login = lazy(() => import("./pages/Login.jsx"));
+const ClientAccess = lazy(() => import("./pages/ClientAccess.jsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Team = lazy(() => import("./pages/Team.jsx"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite.jsx"));
@@ -87,6 +88,8 @@ export default function App() {
     <RouteErrorBoundary><Suspense fallback={<div className="loading-screen" role="status">Завантажуємо сторінку…</div>}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login initialMode="login" />} />
+      <Route path="/client/login" element={<ClientAccess mode="login" />} />
+      <Route path="/client/register" element={<ClientAccess mode="register" />} />
       <Route path="/register" element={<Login initialMode="register" />} />
       <Route path="/settings" element={<Settings />} />
       <Route element={<EmailVerifiedRoute />}>
